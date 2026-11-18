@@ -264,7 +264,7 @@ const Shipped = z.object({
 	fallbackKind: name.describe("The kind an item runs as when neither its source nor the model call names one."),
 	docsOnly: z
 		.strictObject({ kind: name, paths: z.array(name) })
-		.describe("An item of this kind whose change touches a path outside these globs moves to its real kind."),
+		.describe("The globs of prose: an item of this kind whose change touches a path outside them moves to its real kind, and a review's approval holds past a later change that touches only them."),
 	decisionModel: name.describe("The model id of the cheap model call, made through claude -p."),
 	modelCallTimeoutSeconds: seconds.describe("How long a cheap model call may take before it counts as an abstention."),
 	measuredModels: z

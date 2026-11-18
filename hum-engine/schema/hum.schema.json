@@ -1073,7 +1073,7 @@
 				"paths"
 			],
 			"additionalProperties": false,
-			"description": "An item of this kind whose change touches a path outside these globs moves to its real kind."
+			"description": "The globs of prose: an item of this kind whose change touches a path outside them moves to its real kind, and a review's approval holds past a later change that touches only them."
 		},
 		"decisionModel": {
 			"default": "claude-haiku-5-5",

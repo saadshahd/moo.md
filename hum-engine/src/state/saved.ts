@@ -79,7 +79,8 @@ export const PullRequestText = z.object({ item: name, title: name, body: name, e
 export type PullRequestText = z.infer<typeof PullRequestText>;
 
 /** A fresh review run's verdict on the change that ends at `head`. */
-export const Verdict = z.object({ item: name, head: name, event: name, reason: z.string(), cites: z.array(Cite), models });
+/** A review's verdict on the change that ends at `head`, with that change's patch id against its base, which a rebase keeps. */
+export const Verdict = z.object({ item: name, head: name, patch: z.string().optional(), event: name, reason: z.string(), cites: z.array(Cite), models });
 
 export type Verdict = z.infer<typeof Verdict>;
 

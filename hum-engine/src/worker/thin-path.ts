@@ -21,8 +21,8 @@ import { answerOnce, foldItem, keepPick, machineStarted, ownerAnswered } from ".
 import type { State } from "../state/open.ts";
 import { HOUR_MS, SECOND_MS } from "../time.ts";
 import { checkLimits, firstFailing } from "./checks.ts";
-import { BASE_CONTENDED, changeOn, declaredChange, placementOf, rebaseOnto, type ReviewOutcome, tierOf } from "./land.ts";
-import { OWNER_APPROVAL } from "../decide/merge.ts";
+import { BASE_CONTENDED, carriedVerdict, changeOn, declaredChange, type LandContext, patchOf, placementOf, rebaseOnto, type ReviewOutcome, tierOf } from "./land.ts";
+import { OWNER_APPROVAL, REVIEW_APPROVAL } from "../decide/merge.ts";
 import { askDecision, askedQuestion, isWaitQuestion, PLAIN_QUESTIONS, type PlainQuestion, RunReason } from "../decide/question.ts";
 import type { Stage } from "../decide/answer.ts";
 import { type ItemText, reviewInput } from "../decide/review.ts";
@@ -656,6 +656,14 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			run: async ({ signal }) => {
 				const diff = purpose === "review" ? await branchDiff() : "";
 				const head = (await g(["rev-parse", "HEAD"])).trim();
+				const patch = purpose === "review" ? await patchOf(placing(d)) : undefined;
+				const carried = purpose === "review" ? await carriedVerdict(placing(d), state.verdicts.get(id), { head, patch }) : undefined;
+
+				if (carried?.event === REVIEW_APPROVAL) {
+					state.verdicts.put(id, carried);
+
+					return actor.send({ type: carried.event });
+				}
 
 				const { pick, models } = await decideProse({
 					purpose,
@@ -666,7 +674,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 					canTake: (type) => actor.getSnapshot().can({ type }),
 				});
 
-				if (purpose === "review") keepVerdict(state, { id, head, pick, models });
+				if (purpose === "review") keepVerdict(state, { id, head, patch, pick, models });
 				else keepPick(state.events, { itemId: id, pick: { judge: purpose, pick, models: [...models] } });
 
 				PICKED.get(pick.event)?.(pick, models);
@@ -820,8 +828,8 @@ export const PROSE_PROMPTS = {
 } as const satisfies Record<ProsePurpose, (config: RunConfig, item: ItemText, diff: string) => string>;
 
 /** A review's verdict on the change that ends at `head`: saved for landing, and kept in the item's log. */
-const keepVerdict = (state: State, { id, head, pick, models }: { readonly id: string; readonly head: string; readonly pick: EventPick; readonly models: readonly string[] }) => {
-	const verdict = { item: id, head, event: pick.event, reason: pick.reason, cites: pick.cites, models: [...models] };
+const keepVerdict = (state: State, { id, head, patch, pick, models }: { readonly id: string; readonly head: string; readonly patch: string | undefined; readonly pick: EventPick; readonly models: readonly string[] }) => {
+	const verdict = { item: id, head, patch, event: pick.event, reason: pick.reason, cites: pick.cites, models: [...models] };
 
 	state.verdicts.put(id, verdict);
 	keepPick(state.events, { itemId: id, pick: { judge: "review", head, pick, models: [...models] } });
@@ -847,7 +855,7 @@ const pauseOf = (id: string, outcome: Paused): ThinResult => {
  */
 export const reviewRunOf =
 	(o: Pick<ThinPathOptions, "runner" | "state" | "config">, item: Item, kindName: string) =>
-	async ({ head, diff, level }: { head: string; diff: string; level: string }): Promise<ReviewOutcome> => {
+	async ({ head, diff, level, patch }: Parameters<LandContext["reviewRun"]>[0]): Promise<ReviewOutcome> => {
 		const kind = kindNamed(o.config, kindName);
 		const row = pickTier(kind, { purpose: "review", level, size: "small" });
 
@@ -878,7 +886,7 @@ export const reviewRunOf =
 			return new Promise<never>(() => {});
 		};
 
-		const decided = decideProse({ purpose: "review", prompt: PROSE_PROMPTS.review(o.config, item, diff), diff, model: o.config.hum.models[row.tier], run }).then(({ pick, models }): ReviewOutcome => ({ verdict: keepVerdict(o.state, { id: item.id, head, pick, models }) }));
+		const decided = decideProse({ purpose: "review", prompt: PROSE_PROMPTS.review(o.config, item, diff), diff, model: o.config.hum.models[row.tier], run }).then(({ pick, models }): ReviewOutcome => ({ verdict: keepVerdict(o.state, { id: item.id, head, patch, pick, models }) }));
 
 		return Promise.race([decided, halted]);
 	};

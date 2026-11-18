@@ -521,6 +521,26 @@ test("the owner's approval holds for the same change rebased onto a moved base, 
 	expect(await questionsOn(w, id)).toHaveLength(asked);
 });
 
+test("a review run's approval holds for the same change rebased onto a base that moved elsewhere: it lands with no second review run", async () => {
+	const approve = { event: "approve", sure: true, reason: "Fine." };
+	const w = await world({ script: [{}, NOTE], decisions: [approve] }, { config: configWith((raw) => void (raw.hum.paths = [{ glob: "docs/**", level: "medium" }])) });
+	const github = new FakeGitHub();
+	const pulls = github.client();
+	const id = w.repo.add("note", itemFile("Write the note", { state: "ready", body: "touches: docs/note.md" }));
+	const branch = runBranch(SHIPPED_DEFAULTS, id);
+
+	github.requiresPullRequest = true;
+	expect(await runThinPath(w.thinPath({ pulls }))).toMatchObject({ outcome: "landing", item: id });
+
+	w.repo.put({ path: "src/other.ts", content: "moved\n" });
+	w.clock.at += TTL;
+
+	expect(await runThinPath(w.thinPath({ pulls, itemId: id }))).toMatchObject({ outcome: "landing", item: id });
+	expect(sh(w.repo.remote, ["merge-base", "--is-ancestor", "main", branch])).toBe("");
+	expect(w.shim.decisions().map((d) => d.purpose)).toEqual(["review"]);
+	expect(github.pulls()).toMatchObject([{ autoMerge: true }]);
+});
+
 test("a push the remote refuses goes through a pull request, after the branch's rules are read again", async () => {
 	const w = await world({ script: [{}, NOTE] });
 	const github = new FakeGitHub();
