@@ -110,7 +110,7 @@ const RefreshStep = z.strictObject({ run: name, when: z.enum(REFRESH_WHEN) });
 export const SlotRecipe = z.strictObject({
 	prepare: z.array(name).describe("Run once when a slot is made: install dependencies, start or attach services, seed data."),
 	refresh: z.array(RefreshStep).describe("Run after each return, once the slot is reset to the latest base: reinstall when a lockfile changed, reset the data."),
-	ready: z.array(name).describe("Read-only checks that the slot is worth driving. Run after prepare and each refresh, where a failure takes the slot out of the pool, and again before each build, fix or repro run, where a failure starts no run, and after a failed run, whose card then names it."),
+	ready: z.array(name).describe("Read-only checks that the slot is worth driving. Run after prepare and each refresh, where a failure takes the slot out of the pool, and again before each build, fix or repro run, where a failure starts no run, and after a failed run, whose card then names it. Before and after a run, a failing check runs again up to checkReruns times first."),
 });
 
 const seconds = z.int().positive();

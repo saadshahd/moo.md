@@ -181,6 +181,18 @@ test("a slot that fails its ready check leaves the pool with one card naming it 
 	expect((await second).folder).toBe(only.folder);
 });
 
+test("the ready check around a run reruns as a failing check does, so one that fails once lets the run start", async () => {
+	const trip = join(tempDir("trip"), "trip");
+	const w = world({ runners: 1, recipe: { ready: [`test ! -f ${trip} || { rm ${trip}; exit 1; }`] } });
+	const taken = await w.ask("a");
+
+	writeFileSync(trip, "");
+	expect(await taken.readyFailure()).toBeUndefined();
+	expect(existsSync(trip)).toBe(false);
+
+	await taken.giveBack();
+});
+
 test("every slot out of the pool fails the pass loudly", async () => {
 	const w = world({ runners: 1, recipe: { ready: ["false"] } });
 
