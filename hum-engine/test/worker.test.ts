@@ -398,6 +398,36 @@ test("an item someone else claims never starts and carries a card naming them, w
 	expect(w.state.faults.list().map(({ code }) => code)).not.toContain("item-claimed");
 });
 
+test("a fix item run again after its window passed reruns the repro, and opens the window again only when the repro changed", async () => {
+	const repro = (command: string) => ({ write: { "docs/repro.sh": "grep -q fixed docs/note.md\n" }, structured: { status: "done", repro: { command } } });
+
+	const runAgainAfterTheWindow = async (again: ReturnType<typeof repro>) => {
+		const w = await workerWorld({ script: [{}, repro("sh docs/repro.sh"), { error: "the run broke" }, again, { write: { "docs/note.md": "fixed\n" } }] }, { worker: { judge: scriptedJudge({ kind: { kind: "fix" }, alignment: SOUND }) } });
+
+		const step = async () => {
+			await w.worker.tick();
+			await w.worker.idle();
+		};
+
+		w.item("a", "docs/note.md");
+		await step();
+		expect(w.results.at(-1)).toMatchObject({ outcome: "asked", item: "a" });
+
+		w.clock.at += DAY_MS + 1;
+		await step();
+		expect(w.results.at(-1)).toMatchObject({ outcome: "stuck", item: "a" });
+
+		w.clock.at += TTL + 1;
+		await w.adapter.answers!.answer(ItemId.parse("a"), { text: "retry" });
+		await step();
+
+		return { result: w.results.at(-1), runs: w.shim.calls().length };
+	};
+
+	expect(await runAgainAfterTheWindow(repro("sh docs/repro.sh"))).toMatchObject({ result: { outcome: "merged", item: "a" }, runs: 5 });
+	expect(await runAgainAfterTheWindow(repro("bash docs/repro.sh"))).toMatchObject({ result: { outcome: "asked", item: "a" }, runs: 4 });
+});
+
 test("a stuck item never reruns until the owner answers; the answer takes it back with a fresh token cap", async () => {
 	const flag = join(tempDir("flag"), "flag");
 	const w = await workerWorld({ items: { a: { writeForItem: true, modelTokens: 400 } } }, { checks: [`test -f ${flag}`], settings: { maxFixRuns: 1 } });

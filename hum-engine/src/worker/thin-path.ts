@@ -612,16 +612,22 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		if (!(await commitRun(d.git, { since: before, subject: wants.pullRequest.title }))) throw failed(`the ${role} run succeeded and changed nothing`);
 	};
 
-	/** A finished repro run's check, committed under a subject of hum's and saved with the files it touched. */
+	/**
+	 * A finished repro run's check, committed under a subject of hum's and saved with the files it touched. A repro run
+	 * again, as on a branch started over, keeps the owner's window as passed while it names the same command, so only a
+	 * changed repro opens the window again.
+	 */
 	const finishRepro = async (wants: Wanted | undefined, before: string): Promise<void> => {
 		if (!wants?.repro) throw failed("the repro run ended without the command that shows the bug");
 
 		await commitRun(d.git, { since: before, subject: `hum: ${id} repro` });
 
+		const { command, translated } = wants.repro;
 		const commit = (await g(["rev-parse", "HEAD"])).trim();
 		const files = (await g(["diff", "--name-only", before, commit])).split("\n").filter(Boolean);
+		const earlier = state.repros.get(id);
 
-		state.repros.put(id, { item: id, command: wants.repro.command, translated: wants.repro.translated, commit, files });
+		state.repros.put(id, { item: id, command, translated, commit, files, unopposed: earlier?.command === command ? earlier.unopposed : undefined });
 	};
 
 	/** A build run starts only once the owner's window to object to the repro closed, so a pass that starts over passes the window by. */
