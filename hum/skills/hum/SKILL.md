@@ -16,8 +16,8 @@ Ask in this order. One question per turn, each with its proposal. Where a questi
 
 | Ask | Proposal comes from | The answer sets |
 | --- | --- | --- |
-| Where runs happen: your Mac, CI, or both | the scan: CI workflows, a service unit | `runPlaces` |
-| Where items, questions and answers live: GitHub issues, or markdown files in `itemsDir` | `integrations` in the proposal: GitHub where the repo has open issues or an issue template. An issue is ready once it carries `readyLabel`; hum leaves one a person is assigned to, or an open pull request closes | `integrations` |
+| Where runs happen: your Mac, CI, or both | the scan: CI workflows, a service unit; with roundup Todos, your Mac alone, as setup refuses CI | `runPlaces` |
+| Where items, questions and answers live: GitHub issues, markdown files in `itemsDir`, or roundup Todos | `integrations` in the proposal: GitHub where the repo has open issues or an issue template. An issue is ready once it carries `readyLabel`; hum leaves one a person is assigned to, or an open pull request closes. Offer roundup where `ROUNDUP_AGENT_ID` is set in this shell: a Todo is ready once it is open, unblocked and assigned to hum's Agent, and each follow-up hum files is assigned to that Agent | `integrations` |
 | Which commands a change must pass | CI jobs on pull requests, else package scripts, after the lockfile install a fresh clone needs | `checks` |
 | Whether every change lands through a pull request, even where the base takes a push | the base's rules, from `gh api repos/<owner>/<repo>/rules/branches/<base>`: where they require status checks and no pull request, a push from a token that may bypass them skips the checks; propose `true` there, else `false` | `alwaysPullRequest` |
 | Which label a pull request needs when it grows some files | `labelGates` in the proposal: a repo label a job quotes, in a workflow that runs again when a pull request gets a label. Read that job. Where it fails a pull request that grows the bytes of some files and lacks the label, write one entry per set of files it sums apart, with globs that match exactly those files | `growthLabels` |
@@ -46,7 +46,7 @@ Where runs include CI, tell the owner what a wake's three jobs hold. `gather` an
 ## Write
 
 1. Write the answers as JSON: `{ "hum": {settings}, "waitHours": { "kind/state": hours }, "schemaVersion": 3 }`.
-2. Run `bunx hum setup write --answers <file>`. A refusal writes nothing: relay its message, which names the fix.
+2. Run `bunx hum setup write --answers <file>`. A refusal writes nothing: relay its message, which names the fix. Where `integrations` names roundup, write prints `start` in place of a service unit, as only a Terminal roundup started can reach roundup. hum acts as the Agent whose shell runs `start`, and builds every open Todo that Agent owns, so ask the owner which Agent that is: one that owns no other open Todo. That Agent runs `start`. `hum serve` restarts `hum work` after a crash or an update; run `start` again after roundup restarts or that Terminal ends.
 3. Run `bunx hum setup measure` to record each model's pass rate, so a check that cannot yet be trusted reports instead of gating. Tell the owner: once a role file or a judge's prompt changes, the Mac worker measures that judge again, spending live calls, and writes the new rate into `.hum/hum.json`. The old rate gates until then, and in CI until they commit the file.
 4. Run `bunx hum setup prove`. Add `--item` only after the owner agrees to the live calls it spends.
 

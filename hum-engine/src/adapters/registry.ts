@@ -13,7 +13,7 @@ import { gitIn, whenGitFailed } from "./git.ts";
 import { type GuardOptions, guardTimings, guarded } from "./guard.ts";
 import { markdownAdapter } from "./markdown.ts";
 import { gitHubPullRequests, type PullRequests } from "./pull-requests.ts";
-import { roundupAdapter } from "./roundup.ts";
+import { ROUNDUP, roundupAdapter } from "./roundup.ts";
 
 export { SLOTS, type Slot } from "../config/schema.ts";
 
@@ -88,7 +88,7 @@ const BUILT_IN = {
 
 		return githubAdapter({ repo: await githubRepo(path, timeoutMs), base: await defaultBase(path, timeoutMs), claimPrefix: settings.claimPrefix, runBranchPrefix: settings.runBranchPrefix, readyLabel: settings.readyLabel, mergeMethod: settings.mergeMethod, ownerLogins: settings.ownerLogins, timeoutMs }, context);
 	},
-	roundup: async ({ context }) => roundupAdapter({}, context),
+	[ROUNDUP]: async ({ context }) => roundupAdapter({}, context),
 } satisfies Readonly<Record<string, (repo: Repo) => Promise<Adapter>>>;
 
 const isBuiltIn = (name: string): name is keyof typeof BUILT_IN => Object.hasOwn(BUILT_IN, name);

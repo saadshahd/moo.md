@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { z } from "zod";
 import type { GitIdentityRead } from "../adapters/git.ts";
+import { doesUseRoundup } from "../adapters/roundup.ts";
 import { type Config, loadConfig, type RawConfig, readConfigDir } from "../config/load.ts";
 import { hashJson } from "../config/hash.ts";
 import { asJson, Json } from "../config/json.ts";
@@ -11,6 +12,7 @@ import { noGitIdentity, type Refusal, type Result } from "../config/refusal.ts";
 import { type HumConfig, Kind, READABLE_SCHEMA_VERSIONS, SCHEMA_VERSION } from "../config/schema.ts";
 import { isGitHubHosted } from "../config/wake-job.ts";
 import { ciWorkflows } from "../service/workflows.ts";
+import { roundupStart } from "../service/roundup-start.ts";
 import { renderUnit, type UnitKind } from "../service/unit.ts";
 import { atomicWrite } from "../state/fs.ts";
 import { shippedRaw } from "./shipped.ts";
@@ -48,7 +50,15 @@ export type SetupEnv = {
 	readonly isPublicRepo?: boolean;
 };
 
-export type SetupResult = { readonly ok: true; readonly written: readonly string[]; readonly config: Config } | { readonly ok: false; readonly refusal: Refusal };
+export type SetupResult =
+	| {
+			readonly ok: true;
+			readonly written: readonly string[];
+			readonly config: Config;
+			/** The command hum's Agent runs to start `hum serve`, where roundup serves a slot and so no unit can. */
+			readonly start?: string;
+	  }
+	| { readonly ok: false; readonly refusal: Refusal };
 
 const UPDATE_ENGINE = "Update the engine: bun add --exact @moo.md/hum@latest.";
 
@@ -75,6 +85,15 @@ const ownRunnerRefusal = ({ runPlaces, ciRunner }: HumConfig, answers: SetupAnsw
 				code: "own-runner-on-public-repo",
 				message: `ciRunner names a runner GitHub does not host, and this repo ${isPublicRepo ? "is public" : "may be public: gh could not say"}. A wake there runs an agent with your secrets on a machine that keeps what the wake leaves. Name a runner GitHub hosts, or ask the owner and set "ownRunnerOnPublicRepo": true in the answers. Nothing was written.`,
 			};
+
+/** roundup answers only a Terminal it started on the owner's machine, which no CI runner is. */
+const roundupInCiRefusal = ({ runPlaces, integrations }: HumConfig): Refusal | undefined =>
+	runPlaces.includes("ci") && doesUseRoundup(integrations)
+		? {
+				code: "roundup-in-ci",
+				message: 'integrations names roundup, which answers only a Terminal it started on this machine, and runPlaces lists "ci", where no such Terminal is. Drop "ci" from runPlaces. Nothing was written.',
+			}
+		: undefined;
 
 /** Settings migrated to the schema this engine writes, so the repo's file and the answers merge at one version; refused at a schema it does not read. */
 const atCurrentSchema = (hum: Json): Result<Readonly<Record<string, Json>>> => {
@@ -150,6 +169,12 @@ export const writeSetup = (repo: string, answers: SetupAnswers, env: SetupEnv): 
 
 	if (ownRunner) return { ok: false, refusal: ownRunner };
 
+	const inCi = roundupInCiRefusal(loaded.value.hum);
+
+	if (inCi) return { ok: false, refusal: inCi };
+
+	const mac = loaded.value.hum.runPlaces.includes("mac") ? macStart(repo, loaded.value, env) : undefined;
+
 	const files = [
 		{ path: join(repo, ".hum", "hum.json"), text: jsonText(ownerKeys(hum, shippedHum)) },
 		...Object.entries(kinds).map(([name, kind]) => ({ path: join(repo, ".hum", "kinds", `${name}.json`), text: jsonText(kind) })),
@@ -157,12 +182,14 @@ export const writeSetup = (repo: string, answers: SetupAnswers, env: SetupEnv): 
 		...(existsSync(join(repo, ".hum", "memory.md")) ? [] : [{ path: join(repo, ".hum", "memory.md"), text: "" }]),
 		...(existsSync(join(repo, loaded.value.hum.itemsDir, ".gitkeep")) ? [] : [{ path: join(repo, loaded.value.hum.itemsDir, ".gitkeep"), text: "" }]),
 		...(loaded.value.hum.runPlaces.includes("ci") ? ciWorkflows(loaded.value.hum).map(({ file, text }) => ({ path: join(repo, WORKFLOW_FOLDER, file), text })) : []),
-		...(loaded.value.hum.runPlaces.includes("mac") ? [serviceFile(repo, loaded.value, env)] : []),
+		...(mac?.kind === "unit" ? [mac.file] : []),
 	];
 
 	for (const { path, text } of files) atomicWrite(path, text);
 
-	return { ok: true, written: files.map(({ path }) => path), config: loaded.value };
+	const done = { ok: true, written: files.map(({ path }) => path), config: loaded.value } as const;
+
+	return mac?.kind === "roundup" ? { ...done, start: mac.command } : done;
 };
 
 /** The kind files that parse. One that does not stays as it is, so the config check refuses it by name. */
@@ -175,10 +202,21 @@ const parsedKinds = (raw: RawConfig): Record<string, Kind> =>
 		}),
 	);
 
+const bunOf = (env: SetupEnv): string => env.runtime?.bun ?? process.execPath;
+
+/** `hum serve` from the repo's pinned engine, on the runtime setup runs on. */
+const serveCommand = (repo: string, env: SetupEnv): string[] => [bunOf(env), join(repo, "node_modules", ".bin", "hum"), "serve"];
+
+/** How `hum serve` starts on this machine: from a unit file, or from a roundup Terminal where roundup serves a slot. */
+type MacStart = { readonly kind: "unit"; readonly file: FileToWrite } | { readonly kind: "roundup"; readonly command: string };
+
+const macStart = (repo: string, config: Config, env: SetupEnv): MacStart =>
+	doesUseRoundup(config.hum.integrations) ? { kind: "roundup", command: roundupStart(repo, serveCommand(repo, env)) } : { kind: "unit", file: serviceFile(repo, config, env) };
+
 const serviceFile = (repo: string, config: Config, env: SetupEnv): FileToWrite => {
 	const kind: UnitKind = (env.platform ?? process.platform) === "darwin" ? "launchd" : "systemd";
 	const home = env.home ?? homedir();
-	const bun = env.runtime?.bun ?? process.execPath;
+	const bun = bunOf(env);
 	const label = config.hum.serviceLabel;
 
 	return {
@@ -186,7 +224,7 @@ const serviceFile = (repo: string, config: Config, env: SetupEnv): FileToWrite =
 		text: renderUnit(kind, {
 			label,
 			repo,
-			command: [bun, join(repo, "node_modules", ".bin", "hum"), "serve"],
+			command: serveCommand(repo, env),
 			path: env.runtime?.path ?? [dirname(bun), dirname(Bun.which("git") ?? "/usr/bin/git"), dirname(Bun.which("claude") ?? "/usr/local/bin/claude"), "/usr/bin", "/bin"].join(":"),
 			env: {},
 			log: join(home, kind === "launchd" ? join("Library", "Logs") : join(".local", "state"), `${label}.log`),
