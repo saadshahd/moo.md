@@ -280,7 +280,7 @@ export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gather
 	const answered = asking || !onSnapshot ? answerTo(item) : undefined;
 	const isAwaitingAnswer = asking && answered === undefined;
 	const waited = isAwaitingAnswer ? o.state.items.savedOf(id) : undefined;
-	const timedOut = waited !== undefined && isDue(o.state, kind, waited, now()) ? waited : undefined;
+	const timedOut = waited !== undefined && isDue(o.state, { kind, saved: waited }, now()) ? waited : undefined;
 
 	if (isAwaitingAnswer && timedOut === undefined) return { outcome: "waiting", item: id };
 
@@ -831,7 +831,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	const sources = { build: step("build"), checks: checksSource, fix: step("fix"), plan: decision("plan"), review: decision("review"), repro: step("repro"), "shows-bug": showsBug, "bug-gone": bugGone };
 
 	/** A wait that timed out restores on a clock that keeps its timers, so the pass fires the due ones with the real sources. */
-	const due = d.timedOut === undefined ? undefined : dueClock(state, kind, d.timedOut, d.now());
+	const due = d.timedOut === undefined ? undefined : dueClock(state, { kind, saved: d.timedOut }, d.now());
 
 	if (d.resume) {
 		const restored = await state.items.restore(id, kind, { sources, kindAt: earlierKinds(state, kind), clock: due?.clock });

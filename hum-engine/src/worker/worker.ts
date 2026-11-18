@@ -16,7 +16,7 @@ import { ENGINE_VERSION } from "../state/format.ts";
 import { persistedSnapshot, type SavedSnapshot } from "../state/items.ts";
 import type { State } from "../state/open.ts";
 import { tallyOf } from "./tally.ts";
-import { dueClock, isDue } from "./due.ts";
+import { dueClock, isDue, type SavedWait } from "./due.ts";
 import { checkBaseAfterMerge } from "./base-check.ts";
 import { settleMergedPulls } from "./merged.ts";
 import type { GitHubCommits } from "../adapters/github-commits.ts";
@@ -173,11 +173,6 @@ const neverSources = (kind: Kind) => invokedSources(kind, createAsyncLogic({ run
 
 const isAnsweredSince = (answeredAt: number | undefined, since: number): boolean => answeredAt !== undefined && answeredAt > since;
 
-type DueWait = {
-	readonly saved: SavedSnapshot;
-	readonly kind: Kind;
-};
-
 /**
  * The worker. Each tick reads its facts once, then decides: it fires waits whose deadline has passed, renews claims,
  * compares the engine and config with those at start, picks which items start, and writes a heartbeat and the status
@@ -276,11 +271,12 @@ export class Worker {
 		return kind !== undefined && isWaitingOnOwner(kind, saved.state);
 	}
 
-	#dueWaits(t: number): DueWait[] {
+	#dueWaits(t: number): SavedWait[] {
 		return this.#o.state.items.saved().flatMap((saved) => {
 			const kind = this.#kindNamed(saved.kind)?.kind;
+			const wait = kind && { kind, saved };
 
-			return kind && !this.#inFlight.has(saved.itemId) && isDue(this.#o.state, kind, saved, t) ? [{ saved, kind }] : [];
+			return wait && !this.#inFlight.has(saved.itemId) && isDue(this.#o.state, wait, t) ? [wait] : [];
 		});
 	}
 
@@ -288,9 +284,10 @@ export class Worker {
 	 * A saved wait whose deadline has passed fires now. One that ends stuck is saved and parked here; one that goes on to
 	 * work is left as it was saved, and a pass restores it and fires its timeout with the real sources.
 	 */
-	async #fireDue({ saved, kind }: DueWait, t: number): Promise<void> {
+	async #fireDue(wait: SavedWait, t: number): Promise<void> {
 		const { state } = this.#o;
-		const due = dueClock(state, kind, saved, t);
+		const { saved, kind } = wait;
+		const due = dueClock(state, wait, t);
 		const restored = await state.items.restore(saved.itemId, kind, { sources: neverSources(kind), clock: due.clock });
 
 		if (!restored.ok || !restored.value) return;

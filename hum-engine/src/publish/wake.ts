@@ -26,7 +26,7 @@ const publishWorked = async ({ publisher: p, gathered, outbox, work }: PublishWa
 
 	const item = await p.workSource.read(ItemId.parse(pass.item));
 	const saved = p.state.items.savedOf(pass.item);
-	const timedOut = saved !== undefined && isDue(p.state, kind, saved, p.now());
+	const timedOut = saved !== undefined && isDue(p.state, { kind, saved }, p.now());
 	const refused = takeWorkRecords(work, p.state, { item: pass.item, kind, at: saved?.state, answered: answerTo(item) !== undefined, timedOut }, { now: p.now(), usageLimitMaxMs: p.config.hum.ciUsageLimitMaxHours * HOUR_MS });
 
 	if (refused !== undefined) return refusedPass(pass.item, refused);
