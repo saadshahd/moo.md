@@ -157,26 +157,29 @@ test("a run's working copy comes from the checkout it is given, on the remote's 
 	expect(given).toHaveLength(1);
 });
 
-test("the working copy's ready check runs before each run, so none starts where it fails, and again after a failed run, whose card then names it", async () => {
-	const copyWhoseReady = (answers: (string | undefined)[]): Checkout => async ({ remote, base }) => {
-		const folder = tempDir("given");
+/** A checkout whose ready check answers each call with the next of `answers`: a failure, or undefined where it passes. */
+const copyWhoseReady = (answers: (string | undefined)[]): Checkout => async ({ remote, base }) => {
+	const folder = tempDir("given");
 
-		await sh(tmpdir(), ["clone", "-q", "--branch", base, remote, folder]);
+	await sh(tmpdir(), ["clone", "-q", "--branch", base, remote, folder]);
 
-		return { folder, env: {}, readyFailure: async () => answers.shift(), giveBack: async () => undefined };
-	};
+	return { folder, env: {}, readyFailure: async () => answers.shift(), giveBack: async () => undefined };
+};
 
-	const down = await world({ script: [{}, NOTE] });
-	const downId = down.repo.seed("Write the note");
+test("the working copy's ready check runs before each run, so none starts where it fails", async () => {
+	const w = await world({ script: [{}, NOTE] });
+	const id = w.repo.seed("Write the note");
 
-	expect(await runThinPath(down.thinPath({ checkout: copyWhoseReady(["the database is down"]) }))).toMatchObject({ outcome: "stuck", item: downId, detail: expect.stringContaining("ready check fails before the build run, so no run starts: the database is down") });
-	expect(down.shim.calls()).toHaveLength(1);
+	expect(await runThinPath(w.thinPath({ checkout: copyWhoseReady(["the database is down"]) }))).toMatchObject({ outcome: "stuck", item: id, detail: expect.stringContaining("ready check fails before the build run, so no run starts: the database is down") });
+	expect(w.shim.calls()).toHaveLength(1);
+});
 
-	const broke = await world({ script: [{}, { error: "the server stopped answering" }] });
-	const brokeId = broke.repo.seed("Write the note");
+test("the working copy's ready check runs again after a failed run, whose card then names it", async () => {
+	const w = await world({ script: [{}, { error: "the server stopped answering" }] });
+	const id = w.repo.seed("Write the note");
 
-	expect(await runThinPath(broke.thinPath({ checkout: copyWhoseReady([undefined, "the server is down"]) }))).toMatchObject({ outcome: "stuck", item: brokeId, detail: expect.stringContaining("the run slot's ready check fails after it too: the server is down") });
-	expect(broke.shim.calls()).toHaveLength(2);
+	expect(await runThinPath(w.thinPath({ checkout: copyWhoseReady([undefined, "the server is down"]) }))).toMatchObject({ outcome: "stuck", item: id, detail: expect.stringContaining("the run slot's ready check fails after it too: the server is down") });
+	expect(w.shim.calls()).toHaveLength(2);
 });
 
 test("a merged item is not picked up again after its claim expires", async () => {
@@ -713,22 +716,24 @@ test("an owner's reply in the window objects: a new repro run reads it, and the 
 	expect(w.shim.calls()).toHaveLength(3);
 });
 
-test("a repro that passes without a fix asks the owner, and a fix that edits the repro's own files goes to a fix run", async () => {
+test("a repro that passes without a fix asks the owner", async () => {
 	const passing = { ...REPRO, write: { "docs/repro.sh": "true\n" } };
 	const w = await world({ script: [{}, passing] }, { checks: ["true"] });
 	const id = w.repo.seed("The note is wrong");
 
 	expect(await runThinPath(w.thinPath({ judge: fixJudge, now: () => w.clock.at }))).toMatchObject({ outcome: "asked", item: id, detail: PLAIN_QUESTIONS.repro });
 	expect(w.state.repros.get(id)).toBeUndefined();
+});
 
-	const editing = await world({ script: [{}, REPRO, { write: { "docs/repro.sh": "true\n", "docs/note.md": "fixed\n" } }, { write: { "docs/repro.sh": "grep -q fixed docs/note.md\n" } }] }, { checks: ["true"] });
-	const other = editing.repo.seed("The note is wrong");
+test("a fix that edits the repro's own files goes to a fix run", async () => {
+	const w = await world({ script: [{}, REPRO, { write: { "docs/repro.sh": "true\n", "docs/note.md": "fixed\n" } }, { write: { "docs/repro.sh": "grep -q fixed docs/note.md\n" } }] }, { checks: ["true"] });
+	const id = w.repo.seed("The note is wrong");
 
-	expect(await runThinPath(editing.thinPath({ judge: fixJudge, now: () => editing.clock.at }))).toMatchObject({ outcome: "asked", item: other });
+	expect(await runThinPath(w.thinPath({ judge: fixJudge, now: () => w.clock.at }))).toMatchObject({ outcome: "asked", item: id });
 
-	editing.clock.at += DAY_MS + 1;
-	expect(await runThinPath(editing.thinPath({ judge: fixJudge, now: () => editing.clock.at, itemId: other }))).toEqual({ outcome: "merged", item: other });
-	expect(folded(editing, other).fixRuns).toBe(1);
+	w.clock.at += DAY_MS + 1;
+	expect(await runThinPath(w.thinPath({ judge: fixJudge, now: () => w.clock.at, itemId: id }))).toEqual({ outcome: "merged", item: id });
+	expect(folded(w, id).fixRuns).toBe(1);
 });
 
 test("a feature runs its plan and review states: the plan run's ready plan reaches the build, a review that cites a changed line sends it to a fix, the fixed change is reviewed again though the prompt cuts both diffs to the same text, and an approval merges it, reaching done by review though landing ran none", async () => {
