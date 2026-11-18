@@ -47,3 +47,9 @@ Graduate when builders act on 3 of the first 5 filed reports without asking the 
 - Of 26 filed reports, 15 closed not-planned. Most asked to improve a skill whose text already asked for the move (#52, #56, #57), or one that never loaded or lost to another (#36, #45, #55, #60). One row, "failed, or did not fire → improve it", sent both to a text change. It is now three rows: ran and said it (quote the line), never loaded (selection), ran and silent (improve). `read.sh` prints each plugin's path so the line can be quoted.
 - 18 close comments say when to reopen, and nothing read them: a second case would be filed fresh or missed. `past.sh` lists every harvest issue with those passages; a flow one already states becomes a comment on it, and reopens it when it meets the condition.
 - Source: Lalit Maganti, "How I Find Problems to Solve as a Staff Engineer": keep problems around until evidence piles up, and read an odd ask as the user missing the tool's idea, the tool hiding the path, or the tool needing to change.
+
+### 2026-11-18 — fetchable fact, from cursor's pstack `reflect`
+
+- Kept one of reflect's signs: context the user supplied that the agent could have fetched. It is now a kind, `kinds/fetchable-fact.md`.
+- A late ask counts a reachable answer only after work starts, and only when it undid work. On 2026-10-31 the user ruled that asking what a source shows is a fault, and that it happens more than a transcript search finds. A fact the user had to type, at any turn, is its trace.
+- Dropped: reflect's edits to skills on approval. harvest reports; builders fix.
