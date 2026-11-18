@@ -98,7 +98,7 @@
 				"invoke": {
 					"src": "shows-bug",
 					"onDone": {
-						"target": "building"
+						"target": "objecting"
 					},
 					"onError": {
 						"target": "stuck"
@@ -107,6 +107,21 @@
 				"on": {
 					"token-cap": {
 						"target": "asking-repro"
+					}
+				}
+			},
+			"objecting": {
+				"tags": [
+					"owner-wait"
+				],
+				"on": {
+					"answered": {
+						"target": "reproducing"
+					}
+				},
+				"after": {
+					"86400000": {
+						"target": "building"
 					}
 				}
 			},

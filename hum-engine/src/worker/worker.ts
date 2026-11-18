@@ -16,6 +16,7 @@ import { ENGINE_VERSION } from "../state/format.ts";
 import { persistedSnapshot, type SavedSnapshot } from "../state/items.ts";
 import type { State } from "../state/open.ts";
 import { tallyOf } from "./tally.ts";
+import { dueClock, isDue } from "./due.ts";
 import { checkBaseAfterMerge } from "./base-check.ts";
 import { settleMergedPulls } from "./merged.ts";
 import type { GitHubCommits } from "../adapters/github-commits.ts";
@@ -165,21 +166,12 @@ const readEvery = <T>(read: (() => Promise<T | undefined>) | undefined, { everyM
 const neverSources = (kind: Kind) => invokedSources(kind, createAsyncLogic({ run: () => new Promise<never>(() => {}) }));
 
 /** The declared delays of the state an item was saved in, shortest first. */
-const delaysOf = (kind: Kind, saved: SavedSnapshot): number[] =>
-	Object.keys((saved.state && kind.machine.states[saved.state]?.after) || {})
-		.map(Number)
-		.sort((a, b) => a - b);
-
 const isAnsweredSince = (answeredAt: number | undefined, since: number): boolean => answeredAt !== undefined && answeredAt > since;
 
 type DueWait = {
 	readonly saved: SavedSnapshot;
 	readonly kind: Kind;
-	readonly delays: readonly number[];
 };
-
-const isDue = ({ saved, kind, delays }: DueWait, t: number): boolean =>
-	saved.machineVersion === kind.machine.version && delays.length > 0 && t >= saved.savedAt + Math.min(...delays);
 
 /**
  * The worker. Each tick reads its facts once, then decides: it fires waits whose deadline has passed, renews claims,
@@ -196,6 +188,8 @@ export class Worker {
 	readonly #inFlight = new Map<string, InFlight>();
 	/** Items the owner answered that have not started yet; kept across ticks, because the watch token moves on. */
 	readonly #answered = new Set<string>();
+	/** Items whose owner wait timed out into work: a pass restores each wait and fires its timeout. */
+	readonly #timedOut = new Set<string>();
 	/** Saved changes that land again under this worker's config before anything else starts. */
 	readonly #relanding = new Set<string>();
 	/** The items a CI job's passes ended on: each job takes an item once, and the next wake takes it again. */
@@ -278,53 +272,37 @@ export class Worker {
 	}
 
 	#dueWaits(t: number): DueWait[] {
-		const waits = this.#o.state.items.saved().flatMap((saved) => {
+		return this.#o.state.items.saved().flatMap((saved) => {
 			const kind = this.#kindNamed(saved.kind)?.kind;
 
-			return kind && !this.#inFlight.has(saved.itemId) ? [{ saved, kind, delays: delaysOf(kind, saved) }] : [];
+			return kind && !this.#inFlight.has(saved.itemId) && isDue(this.#o.state, kind, saved, t) ? [{ saved, kind }] : [];
 		});
-
-		return waits.filter((wait) => isDue(wait, t));
 	}
 
 	/**
-	 * A saved wait whose deadline has passed fires now. The restored machine schedules its timers on the wall clock, so
-	 * the clock given here only collects them, and the earliest ones, as many as the declared delays say are due by the
-	 * worker's clock, fire.
+	 * A saved wait whose deadline has passed fires now. One that ends stuck is saved and parked here; one that goes on to
+	 * work is left as it was saved, and a pass restores it and fires its timeout with the real sources.
 	 */
-	async #fireDue({ saved, kind, delays }: DueWait, t: number): Promise<void> {
+	async #fireDue({ saved, kind }: DueWait, t: number): Promise<void> {
 		const { state } = this.#o;
-		const timers: { fire: () => void; ms: number }[] = [];
-		const clock = { setTimeout: (fire: () => void, ms: number) => timers.push({ fire, ms }), clearTimeout: () => {} };
-		const restored = await state.items.restore(saved.itemId, kind, { sources: neverSources(kind), clock });
+		const due = dueClock(state, kind, saved, t);
+		const restored = await state.items.restore(saved.itemId, kind, { sources: neverSources(kind), clock: due.clock });
 
 		if (!restored.ok || !restored.value) return;
 
 		const actor = restored.value;
 
 		actor.start();
-
-		const dueCount = delays.filter((delay) => t - saved.savedAt >= delay).length;
-
-		for (const timer of timers.sort((a, b) => a.ms - b.ms).slice(0, dueCount)) timer.fire();
+		due.fireDue();
 
 		await Bun.sleep(0);
 
 		const value = String(actor.getSnapshot().value);
 
-		if (value !== saved.state) {
+		if (hasEndedStuck(kind, value)) {
 			state.items.save(saved.itemId, kind, persistedSnapshot(actor));
-
-			if (hasEndedStuck(kind, value))
-				park(
-					{ state, now: this.#now },
-					{
-						outcome: "stuck",
-						item: saved.itemId,
-						detail: `its wait in ${saved.state} timed out`,
-					},
-				);
-		}
+			park({ state, now: this.#now }, { outcome: "stuck", item: saved.itemId, detail: `its wait in ${saved.state} timed out` });
+		} else if (value !== saved.state) this.#timedOut.add(saved.itemId);
 
 		actor.stop();
 	}
@@ -787,7 +765,7 @@ export class Worker {
 		const parked = new Set(state.parked.list().map((p) => p.item));
 		const asleep = new Set(sleeping.map((s) => s.itemId));
 		const isFresh = (id: string) => !this.#inFlight.has(id) && !parked.has(id) && !asleep.has(id) && !this.#handled.has(id);
-		const isAnsweredAndIdle = (id: string) => this.#answered.has(id) && !this.#inFlight.has(id);
+		const isWokenAndIdle = (id: string) => (this.#answered.has(id) || this.#timedOut.has(id)) && !this.#inFlight.has(id);
 		const learned = (id: string) => this.#learn(id).catch(() => undefined);
 
 		const fresh = ready.flatMap((ref) => (isFresh(ref.id) && this.#waitsMerged(ref.id) ? [learned(ref.id).then((known) => ({ id: ref.id, answered: false, known }))] : []));
@@ -795,7 +773,7 @@ export class Worker {
 		const answered = sleeping.flatMap((s) => {
 			const named = this.#kindNamed(s.kind);
 
-			return isAnsweredAndIdle(s.itemId) ? [learned(s.itemId).then((known) => ({ id: s.itemId, answered: true, known: known && named && { ...known, kind: named.name } }))] : [];
+			return isWokenAndIdle(s.itemId) ? [learned(s.itemId).then((known) => ({ id: s.itemId, answered: true, known: known && named && { ...known, kind: named.name } }))] : [];
 		});
 
 		const relands = [...this.#relanding].flatMap((id) => (isFresh(id) && !ready.some((ref) => ref.id === id) ? [learned(id).then((known) => ({ id, answered: true, known }))] : []));
@@ -824,6 +802,7 @@ export class Worker {
 			if (!known) return [];
 
 			this.#answered.delete(id);
+			this.#timedOut.delete(id);
 			this.#relanding.delete(id);
 			this.#begin(id, known, t);
 

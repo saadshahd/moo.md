@@ -19,6 +19,8 @@ import { NOW, TTL, workerWorld, type WorldOptions } from "../fixtures/worker-wor
 import { Holder, ItemId } from "../../src/adapter-api.ts";
 import { doneByOf, foldItem } from "../../src/state/item-log.ts";
 import { openState } from "../../src/state/open.ts";
+import { PLAIN_QUESTIONS } from "../../src/decide/question.ts";
+import { DAY_MS } from "../../src/time.ts";
 
 /** A worker world whose shim's start check finished, checking for the note by default. */
 const world = async (spec: ShimSpec, options: WorldOptions = {}) => {
@@ -634,7 +636,7 @@ const fixJudge = scriptedJudge({ kind: { kind: "fix" }, alignment: SOUND });
 /** A repro run that writes its check and names the command that fails until docs/note.md is right. */
 const REPRO = { write: { "docs/repro.sh": "grep -q fixed docs/note.md\n" }, structured: { status: "done", repro: { command: "sh docs/repro.sh", translated: "a shell check of the file the report's page shows" } } };
 
-test("a fix item first runs a repro, proves it fails without the fix and passes with it, and its pull request says so", async () => {
+test("a fix item runs a repro and proves it fails without the fix, gives the owner a window to object, then proves the fix passes it, and its pull request says so", async () => {
 	const reproStdin = stdinFile();
 	const w = await world({ script: [{}, { ...REPRO, saveStdin: reproStdin }, { write: { "docs/note.md": "fixed\n" } }] }, { checks: ["true"] });
 	const github = new FakeGitHub();
@@ -642,16 +644,41 @@ test("a fix item first runs a repro, proves it fails without the fix and passes 
 	const id = w.repo.seed("The note is wrong");
 
 	github.requiresPullRequest = true;
-	expect(await runThinPath(w.thinPath({ judge: fixJudge, pulls }))).toMatchObject({ outcome: "landing", item: id });
+	expect(await runThinPath(w.thinPath({ judge: fixJudge, now: () => w.clock.at, pulls }))).toEqual({ outcome: "asked", item: id, detail: PLAIN_QUESTIONS.objection });
 	expect(readFileSync(reproStdin, "utf8")).toContain('"repro":{"command":…}');
+	expect(w.state.questions.list().find(({ item }) => item === id)?.detail).toBe(
+		`sh docs/repro.sh failed on all 2 runs at ${w.state.repros.get(id)?.commit.slice(0, 12)}, where only the repro is in. Reply to object, and the repro runs again with your words. With no reply within 24 hours, the item goes on to building.`,
+	);
+
+	w.clock.at += TTL + 1;
+	expect(await runThinPath(w.thinPath({ judge: fixJudge, now: () => w.clock.at, pulls, itemId: id }))).toEqual({ outcome: "waiting", item: id });
+	expect(w.shim.calls()).toHaveLength(2);
+
+	w.clock.at += DAY_MS;
+	expect(await runThinPath(w.thinPath({ judge: fixJudge, now: () => w.clock.at, pulls, itemId: id }))).toMatchObject({ outcome: "landing", item: id });
 	expect(w.shim.calls()).toHaveLength(3);
 	expect(github.pulls()[0]?.body).toContain("Repro: `sh docs/repro.sh` failed without the fix and passed on 2 runs in a row with it.\nNot the reported environment: a shell check of the file the report's page shows.");
 
 	github.checksPass(1);
 	w.clock.at += TTL;
-	expect(await runThinPath(w.thinPath({ judge: fixJudge, pulls, itemId: id }))).toEqual({ outcome: "merged", item: id });
+	expect(await runThinPath(w.thinPath({ judge: fixJudge, now: () => w.clock.at, pulls, itemId: id }))).toEqual({ outcome: "merged", item: id });
 	expect(sh(w.repo.remote, ["show", `${runBranch(SHIPPED_DEFAULTS, id)}:docs/repro.sh`])).toBe("grep -q fixed docs/note.md\n");
 	expect(w.state.repros.get(id)).toBeUndefined();
+});
+
+test("an owner's reply in the window objects: a new repro run reads it, and the window opens again", async () => {
+	const againStdin = stdinFile();
+	const w = await world({ script: [{}, REPRO, { ...REPRO, saveStdin: againStdin }] }, { checks: ["true"] });
+	const id = w.repo.seed("The note is wrong");
+
+	expect(await runThinPath(w.thinPath({ judge: fixJudge, now: () => w.clock.at }))).toMatchObject({ outcome: "asked", item: id });
+
+	await w.adapter.answers!.answer(id, { text: "The bug is in the title, not the body" });
+	w.clock.at += TTL + 1;
+
+	expect(await runThinPath(w.thinPath({ judge: fixJudge, now: () => w.clock.at, itemId: id }))).toMatchObject({ outcome: "asked", item: id, detail: PLAIN_QUESTIONS.objection });
+	expect(readFileSync(againStdin, "utf8")).toContain("The bug is in the title, not the body");
+	expect(w.shim.calls()).toHaveLength(3);
 });
 
 test("a repro that passes without a fix asks the owner, and a fix that edits the repro's own files goes to a fix run", async () => {
@@ -659,13 +686,16 @@ test("a repro that passes without a fix asks the owner, and a fix that edits the
 	const w = await world({ script: [{}, passing] }, { checks: ["true"] });
 	const id = w.repo.seed("The note is wrong");
 
-	expect(await runThinPath(w.thinPath({ judge: fixJudge }))).toMatchObject({ outcome: "asked", item: id, detail: expect.stringContaining("The repro passes without a fix") });
+	expect(await runThinPath(w.thinPath({ judge: fixJudge, now: () => w.clock.at }))).toMatchObject({ outcome: "asked", item: id, detail: PLAIN_QUESTIONS.repro });
 	expect(w.state.repros.get(id)).toBeUndefined();
 
 	const editing = await world({ script: [{}, REPRO, { write: { "docs/repro.sh": "true\n", "docs/note.md": "fixed\n" } }, { write: { "docs/repro.sh": "grep -q fixed docs/note.md\n" } }] }, { checks: ["true"] });
 	const other = editing.repo.seed("The note is wrong");
 
-	expect(await runThinPath(editing.thinPath({ judge: fixJudge }))).toEqual({ outcome: "merged", item: other });
+	expect(await runThinPath(editing.thinPath({ judge: fixJudge, now: () => editing.clock.at }))).toMatchObject({ outcome: "asked", item: other });
+
+	editing.clock.at += DAY_MS + 1;
+	expect(await runThinPath(editing.thinPath({ judge: fixJudge, now: () => editing.clock.at, itemId: other }))).toEqual({ outcome: "merged", item: other });
 	expect(folded(editing, other).fixRuns).toBe(1);
 });
 

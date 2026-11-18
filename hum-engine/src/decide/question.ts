@@ -73,6 +73,7 @@ export const PLAIN_QUESTIONS = {
 	kind: "Which kind of work is this?",
 	level: "Which level do these paths belong to?",
 	repro: "The repro passes without a fix; how should the run go on?",
+	objection: "Object to this repro before the fix starts?",
 } as const satisfies Record<string, string>;
 
 export type PlainQuestion = keyof typeof PLAIN_QUESTIONS;

@@ -11,15 +11,16 @@ import { type Git, gitIn, isAncestor, PATCH, withConfigPinned } from "../adapter
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import { pickTier } from "../config/checks.ts";
 import type { Config } from "../config/load.ts";
-import { invokedSources, kindMachine } from "../config/machine.ts";
+import { earliestTimeout, invokedSources, kindMachine } from "../config/machine.ts";
 import { type Kind, type Naming, OWNER_WAIT_TAG, PURPOSES, STUCK_TAG } from "../config/schema.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { doesLeaveDocs } from "../decide/kind.ts";
 import { type EventPick, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, requestedChanges, SPLIT, type SplitPart } from "../decide/prose.ts";
-import { persistedSnapshot } from "../state/items.ts";
 import { answerOnce, foldItem, keepPick, machineStarted, ownerAnswered } from "../state/item-log.ts";
 import type { State } from "../state/open.ts";
 import type { SavedRepro } from "../state/saved.ts";
+import { type SavedSnapshot, persistedSnapshot } from "../state/items.ts";
+import { dueClock, isDue } from "./due.ts";
 import { HOUR_MS, SECOND_MS } from "../time.ts";
 import { checkLimits, firstFailing, runChecks } from "./checks.ts";
 import { BASE_CONTENDED, carriedVerdict, changeOn, declaredChange, type LandContext, patchOf, placementOf, rebaseOnto, type ReviewOutcome, tierOf } from "./land.ts";
@@ -218,6 +219,8 @@ export type Gathered = {
 	readonly onSnapshot: boolean;
 	readonly asking: boolean;
 	readonly answered: ReturnType<typeof answerTo>;
+	/** The saved owner wait whose timeout passed with no answer. */
+	readonly timedOut: SavedSnapshot | undefined;
 };
 
 export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gathered | ThinResult> => {
@@ -275,13 +278,15 @@ export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gather
 	const kind = kindNamed(o.config, kindName);
 	const asking = isWaitingOnOwner(kind, at);
 	const answered = asking || !onSnapshot ? answerTo(item) : undefined;
+	const waited = asking && answered === undefined ? o.state.items.saved().find(({ itemId }) => itemId === id) : undefined;
+	const timedOut = waited !== undefined && isDue(o.state, kind, waited, now()) ? waited : undefined;
 
-	if (asking && answered === undefined) return { outcome: "waiting", item: id };
+	if (asking && answered === undefined && timedOut === undefined) return { outcome: "waiting", item: id };
 
 	/* The owner's rejection at the approval wait ends the landing saved for it, so only a new change lands. */
 	if (isApprovalWait(kind, at) && answered !== undefined && answered.option !== OWNER_APPROVAL) o.state.landings.remove(id);
 
-	return { item, kindName, kind, judge, onSnapshot, asking, answered };
+	return { item, kindName, kind, judge, onSnapshot, asking, answered, timedOut };
 };
 
 export const isGathered = (gathered: Gathered | ThinResult): gathered is Gathered => "kindName" in gathered;
@@ -296,7 +301,7 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 
 	if (!isGathered(gathered)) return gathered;
 
-	const { item, kindName, kind, judge, onSnapshot, asking, answered } = gathered;
+	const { item, kindName, kind, judge, onSnapshot, asking, answered, timedOut } = gathered;
 	const landing = o.state.landings.get(id);
 	/** Nothing saved is left to go on from: a new item, one that moved to another kind, or one the owner ran again. */
 	const isFresh = !onSnapshot && landing === undefined;
@@ -324,7 +329,7 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 		try {
 			const outbox = new Outbox(id);
 			const ownChecks = ownChecksOf(o.state, id);
-			const driven: Driven = { ...o, checks: [...o.checks, ...ownChecks], ownChecks, base, baseSha: gathered.baseSha, dir: o.dir ?? o.config.hum.itemsDir, kindName, kind, judge, id, item, branch, clone, evidence, env, readyFailure, g, git, answered, resume: asking, restarted: isFresh, outbox };
+			const driven: Driven = { ...o, checks: [...o.checks, ...ownChecks], ownChecks, base, baseSha: gathered.baseSha, dir: o.dir ?? o.config.hum.itemsDir, kindName, kind, judge, id, item, branch, clone, evidence, env, readyFailure, g, git, answered, resume: asking, timedOut, restarted: isFresh, outbox };
 
 			/* A change already finished lands again from its pushed branch; no run is spent on it. One saved at the owner's approval wait goes on from the wait. */
 			const worked = landing && !asking ? await handToPublish(driven) : await drive(driven);
@@ -431,6 +436,8 @@ type Driven = ThinPathOptions & {
 	readonly ownChecks: readonly string[];
 	/** Restore the saved owner-wait snapshot instead of starting the machine. */
 	readonly resume: boolean;
+	/** The saved owner wait whose timeout passed with no answer: the pass restores it and fires the timeout. */
+	readonly timedOut: SavedSnapshot | undefined;
 	/** The run branch starts again at the base: earlier work on the item, and the plan written for it, are gone. */
 	readonly restarted: boolean;
 };
@@ -630,7 +637,8 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 				// Every fix run since the owner last answered counts, over every pass and wake: the item's log holds them all.
 				if (role === "fix" && foldItem(state.events.list(id)).fixRuns >= maxFixes) throw failed(`the checks still fail after ${maxFixes} fixes`);
 
-				if (role === "repro" && (await isReproduced())) return;
+				// An answer at the repro's wait objects to it, so a new repro run reads the owner's words.
+				if (role === "repro" && !d.answered && (await isReproduced())) return;
 
 				const unready = await d.readyFailure();
 
@@ -706,7 +714,11 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			const repro = savedRepro();
 			const passed = (await atCommit(repro.commit, () => reproRuns(repro.command))).filter((failure) => failure === undefined).length;
 
-			if (passed === 0) return;
+			if (passed === 0) {
+				pending = { question: { text: PLAIN_QUESTIONS.objection, detail: `${repro.command} failed on all ${config.hum.fixProofRuns} runs at ${repro.commit.slice(0, SHORT_SHA)}, where only the repro is in. Reply to object, and the repro runs again with your words.` }, plain: "objection", plan: "" };
+
+				return;
+			}
 
 			state.repros.remove(id);
 			ask({ question: { text: PLAIN_QUESTIONS.repro, detail: `${repro.command} passed on ${passed} of ${config.hum.fixProofRuns} runs at ${repro.commit.slice(0, SHORT_SHA)}, where the repro went in before any fix.` }, plain: "repro", plan: "" });
@@ -796,8 +808,11 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 	const sources = { build: step("build"), checks: checksSource, fix: step("fix"), plan: decision("plan"), review: decision("review"), repro: step("repro"), "shows-bug": showsBug, "bug-gone": bugGone };
 
+	/** A wait that timed out restores on a clock that keeps its timers, so the pass fires the due ones with the real sources. */
+	const due = d.timedOut === undefined ? undefined : dueClock(state, kind, d.timedOut, d.now());
+
 	if (d.resume) {
-		const restored = await state.items.restore(id, kind, { sources, kindAt: earlierKinds(state, kind) });
+		const restored = await state.items.restore(id, kind, { sources, kindAt: earlierKinds(state, kind), clock: due?.clock });
 
 		if (!restored.ok) return { outcome: "held", item: id, why: restored.fault.cause };
 
@@ -819,7 +834,9 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		if (hasEndedStuck(kind, value)) return result.resolve({ outcome: "stuck", item: id, detail: stuckCause() });
 
 		if (isWaitingOnOwner(kind, value)) {
-			const note = pending ?? { question: { text: "The run stopped for the owner." }, plain: "unsure" as const, plan: "" };
+			const note = withTimeoutNote(kind, value, pending ?? { question: { text: "The run stopped for the owner." }, plain: "unsure" as const, plan: "" });
+
+			pending = undefined;
 
 			const approval = isApprovalWait(kind, value);
 			const stopped = await handOff(d, approval ? approvalQuestion(note) : note, { approval });
@@ -852,9 +869,21 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		if (resume === OWNER_REJECTED) lastFailure = d.answered.answer;
 
 		actor.send({ type: resume });
-	}
+	} else due?.fireDue();
 
 	return result.promise.finally(() => actor.stop());
+};
+
+/** An owner wait whose timeout goes on to work, not to stuck, tells the owner when it goes on without them. */
+const withTimeoutNote = (kind: Kind, state: string, note: Pending): Pending => {
+	const timeout = earliestTimeout(kind.machine.states[state]);
+	const target = timeout?.transitions[0]?.target;
+
+	if (timeout === undefined || target === undefined || hasEndedStuck(kind, target)) return note;
+
+	const told = `With no reply within ${timeout.hours} hours, the item goes on to ${target}.`;
+
+	return { ...note, question: { ...note.question, detail: [note.question.detail, told].filter(Boolean).join(" ") } };
 };
 
 /** Saves the pull request a run wrote, with its evidence kept where GitHub shows it; evidence an earlier run kept stays when this run names none. */

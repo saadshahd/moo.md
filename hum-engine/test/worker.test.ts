@@ -8,7 +8,8 @@ import { NOW, TTL, workerWorld, type WorkerWorld } from "./fixtures/worker-world
 import { readHeartbeat, readStatus } from "../src/status/file.ts";
 import { tempDir } from "./fixtures/temp.ts";
 import { WAIT_HOURS } from "../src/setup/tables.ts";
-import { HOUR_MS } from "../src/time.ts";
+import { DAY_MS, HOUR_MS } from "../src/time.ts";
+import { scriptedJudge, SOUND } from "./fixtures/judge.ts";
 import { Holder, ItemId } from "../src/adapter-api.ts";
 import { isTrusted } from "../src/decide/prose.ts";
 import type { Measured, Measurement } from "../src/measure/remeasure.ts";
@@ -355,6 +356,27 @@ test("a saved deadline fires on the next event, not only on a tick: a question t
 	const status = readStatus(w.state.statusPath);
 
 	expect(status.ok && w.clock.at - (status.status.workers.ci ?? 0)).toBe(pastTheWait);
+});
+
+test("an item in an owner wait whose timeout goes on to work sleeps through it, and once it passes the next tick restores the wait and goes on", async () => {
+	const repro = { write: { "docs/repro.sh": "grep -q fixed docs/note.md\n" }, structured: { status: "done", repro: { command: "sh docs/repro.sh" } } };
+	const w = await workerWorld({ script: [{}, repro, { write: { "docs/note.md": "fixed\n" } }] }, { worker: { judge: scriptedJudge({ kind: { kind: "fix" }, alignment: SOUND }) } });
+
+	w.item("a", "docs/note.md");
+	await w.worker.tick();
+	await w.worker.idle();
+	expect(w.results.at(-1)).toMatchObject({ outcome: "asked", item: "a" });
+
+	w.clock.at += HOUR_MS;
+	await w.worker.tick();
+	await w.worker.idle();
+	expect(w.shim.calls()).toHaveLength(2);
+
+	w.clock.at += DAY_MS;
+	await w.worker.tick();
+	await w.worker.idle();
+	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
+	expect(w.shim.calls()).toHaveLength(3);
 });
 
 test("a stuck item never reruns until the owner answers; the answer takes it back with a fresh token cap", async () => {

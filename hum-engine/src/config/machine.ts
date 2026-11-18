@@ -1,6 +1,7 @@
 import { type AnyActorLogic, type AnyStateMachine, createAsyncLogic, machineFromJSON } from "xstate";
 import { toDirectedGraph } from "xstate/graph";
-import type { Kind } from "./schema.ts";
+import { HOUR_MS } from "../time.ts";
+import type { Kind, StateNodeJSON } from "./schema.ts";
 
 const placeholder = createAsyncLogic({ run: async () => {} });
 
@@ -12,6 +13,13 @@ const placeholder = createAsyncLogic({ run: async () => {} });
 export const kindMachine = (kind: Kind, sources: Readonly<Record<string, AnyActorLogic>> = {}): AnyStateMachine => {
 	// SAFETY: the zod machine schema is a subset of xstate's MachineJSON, and machineFromJSON validates the rest.
 	return machineFromJSON(kind.machine as Parameters<typeof machineFromJSON>[0], { actors: invokedSources(kind, placeholder, sources) });
+};
+
+/** A state's earliest `after` timeout: its hours and the transitions it takes; undefined for a state with none. */
+export const earliestTimeout = (node: StateNodeJSON | undefined): { readonly hours: number; readonly transitions: NonNullable<StateNodeJSON["after"]>[string] } | undefined => {
+	const [delay, transitions] = Object.entries(node?.after ?? {}).sort(([a], [b]) => Number(a) - Number(b))[0] ?? [];
+
+	return delay === undefined || transitions === undefined ? undefined : { hours: Number(delay) / HOUR_MS, transitions };
 };
 
 /** An actor for each source the kind's machine invokes: the one `sources` gives, else `fallback`. */

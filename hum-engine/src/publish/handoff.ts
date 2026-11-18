@@ -18,18 +18,21 @@ export type InboxItem = {
 	readonly at: string | undefined;
 	/** The inbox thread holds the owner's answer to the wait the item is in. */
 	readonly answered: boolean;
+	/** The wait the item is in timed out unanswered into work, which a pass goes on to. */
+	readonly timedOut: boolean;
 };
 
 const isOwnerWait = (kind: Kind, state: string): boolean => kind.machine.states[state]?.tags?.includes(OWNER_WAIT_TAG) ?? false;
 
 /**
  * The states one pass may carry an item to from where the inbox saved it: through every transition of its kind's
- * machine, past the owner's wait it starts in only with the owner's answer, and never past another owner's wait.
+ * machine, past the owner's wait it starts in only with the owner's answer or once its timeout passed, and never past
+ * another owner's wait.
  */
-export const passReach = ({ kind, at, answered }: Omit<InboxItem, "item">): ReadonlySet<string> => {
+export const passReach = ({ kind, at, answered, timedOut }: Omit<InboxItem, "item">): ReadonlySet<string> => {
 	const start = at ?? kind.machine.initial;
 
-	return reachedFrom(start, nextStates(kind), (state) => !isOwnerWait(kind, state) || (state === start && answered));
+	return reachedFrom(start, nextStates(kind), (state) => !isOwnerWait(kind, state) || (state === start && (answered || timedOut)));
 };
 
 /** The rank of a kind's floor among the levels; a kind with no floor ranks lowest. */
