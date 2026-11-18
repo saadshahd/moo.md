@@ -18,6 +18,7 @@ export type Problem =
 	| { readonly problem: "machine-rejected"; readonly kind: string; readonly why: string }
 	| { readonly problem: "missing-file"; readonly file: string }
 	| { readonly problem: "unknown-level"; readonly level: string }
+	| { readonly problem: "unknown-default-kind"; readonly kind: string }
 	| { readonly problem: "path-without-proof"; readonly glob: string; readonly level: string }
 	| { readonly problem: "overlapping-prefixes"; readonly run: string; readonly claim: string }
 	| { readonly problem: "wake-env-taken"; readonly name: string }
@@ -55,6 +56,7 @@ const DESCRIPTIONS = {
 	"machine-rejected": (p) => `${p.kind}: the machine does not load: ${p.why}`,
 	"missing-file": (p) => `file "${p.file}" is missing`,
 	"unknown-level": (p) => `risk level "${p.level}" is not in levels`,
+	"unknown-default-kind": (p) => `defaultKind "${p.kind}" is not in kinds`,
 	"path-without-proof": (p) => `path "${p.glob}" is at level "${p.level}", whose release waits for proof, and names no proof for every kind`,
 	"overlapping-prefixes": (p) => `the run branch prefix "${p.run}" and the claim prefix "${p.claim}" overlap: one starts with the other`,
 	"wake-env-taken": (p) => `ciEnv sets ${p.name}, which the CI wake's jobs set themselves`,

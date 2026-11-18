@@ -1090,6 +1090,84 @@ test("the owner's rejection of a change a review left to them sends it to a fix 
 	expect(readFileSync(fixStdin, "utf8")).toContain("Make it softer.");
 });
 
+test("an item with no kind label or Kind: line takes the owner's default kind without the kind call, and at a level a fresh review clears it merges once that review approves", async () => {
+	const asked: string[] = [];
+	const w = await world({ script: [{}, NOTE], decisions: [READY_PLAN] }, { config: mediumDocs(), settings: { defaultKind: "feature" } });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.thinPath({ judge: scriptedJudge({ alignment: SOUND }, asked) }))).toEqual({ outcome: "merged", item: id });
+	expect(asked).not.toContain("kind");
+	expect(folded(w, id)).toMatchObject({ doneBy: "review", picks: { plan: { pick: { event: "plan-ready" } }, review: { pick: { event: "approve" } } } });
+});
+
+/** An item that names a file for its review, in a repo whose rules file every review reads. */
+const namingItem = (w: Awaited<ReturnType<typeof world>>, named: string) => {
+	w.repo.put({ path: "AGENTS.md", content: "Reuse before you write.\n" });
+	w.repo.put({ path: "docs/rules.md", content: "Every note greets.\n" });
+
+	return w.repo.add("named", itemFile("Write the note", { body: `Write it.\n\nreads: ${named}` }));
+};
+
+const readsRules = () =>
+	configWith((raw) => {
+		raw.hum.paths = [{ glob: "docs/**", level: "medium" }];
+		raw.hum.reviewReads.paths = ["AGENTS.md"];
+	});
+
+/** Where a review runs: at landing, for a kind with no review state, and in the review state of a kind that has one. */
+const REVIEW_SITES = [
+	["a landing review", docsJudge, []],
+	["a review state", featureJudge, [READY_PLAN]],
+] as const;
+
+test.each(REVIEW_SITES)("%s reads the repo's rules file and the file the item names, as main holds them", async (_, judge, decisions) => {
+	const w = await world({ script: [{}, NOTE], decisions: [...decisions] }, { config: readsRules() });
+	const id = namingItem(w, "docs/rules.md");
+
+	expect(await runThinPath(w.thinPath({ judge }))).toEqual({ outcome: "merged", item: id });
+
+	const review = w.shim.decisions().find(({ purpose }) => purpose === "review");
+
+	expect(review?.prompt).toContain("Reuse before you write.");
+	expect(review?.prompt).toContain("Every note greets.");
+});
+
+test.each(REVIEW_SITES)("%s that cannot read a file the item names ends the item stuck, naming the file", async (_, judge, decisions) => {
+	const w = await world({ script: [{}, NOTE], decisions: [...decisions] }, { config: readsRules() });
+	const id = namingItem(w, "docs/gone.md");
+
+	expect(await runThinPath(w.thinPath({ judge }))).toEqual({ outcome: "stuck", item: id, detail: "the review cannot read docs/gone.md: git does not track it on origin/main" });
+});
+
+/** Saves the item's finished change as the next worker would land it, then the owner writes the same file on main. */
+const savedThenEditedOnMain = async (w: Awaited<ReturnType<typeof world>>, id: ItemId, note: string) => {
+	expect(await runThinPath(w.thinPath({ itemId: id, mayLand: () => false }))).toMatchObject({ outcome: "held", item: id });
+
+	w.repo.put({ path: "docs/note.md", content: note });
+};
+
+test("a change that no longer rebases on the newest base is built there again and lands", async () => {
+	const w = await world({ script: [{}, NOTE, NOTE] }, { settings: { conflictRebuilds: 1 } });
+	const id = w.repo.seed("Write the note");
+
+	await savedThenEditedOnMain(w, id, "the owner's note\n");
+
+	expect(await runThinPath(w.thinPath({ itemId: id }))).toMatchObject({ outcome: "restarted", item: id, why: expect.stringContaining("conflicts with the newest main") });
+	expect(await runThinPath(w.thinPath({ itemId: id }))).toEqual({ outcome: "merged", item: id });
+	expect(sh(w.repo.remote, ["show", "main:docs/note.md"])).toBe("hello\n");
+});
+
+test("past conflictRebuilds rebuilds since the owner last answered, a change that no longer rebases waits for the owner", async () => {
+	const w = await world({ script: [{}, NOTE, NOTE] }, { settings: { conflictRebuilds: 1 } });
+	const id = w.repo.seed("Write the note");
+
+	await savedThenEditedOnMain(w, id, "the owner's note\n");
+	expect(await runThinPath(w.thinPath({ itemId: id }))).toMatchObject({ outcome: "restarted", item: id });
+
+	await savedThenEditedOnMain(w, id, "the owner's second note\n");
+	expect(await runThinPath(w.thinPath({ itemId: id }))).toMatchObject({ outcome: "review", item: id, detail: expect.stringContaining("conflicts with the newest main") });
+});
+
 test("a run that ends done and changed nothing ends stuck, saying so", async () => {
 	const w = await world({ script: [{}, { structured: { status: "done", pullRequest: { title: "Nothing", body: "No change." } } }] });
 	const id = w.repo.seed("Write the note");

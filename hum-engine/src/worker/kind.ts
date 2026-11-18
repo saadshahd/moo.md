@@ -30,12 +30,12 @@ const noKind = async (o: Pick<KindContext, "config" | "judge">, item: Item, kind
 const kindsBut = (o: Pick<KindContext, "config">, except: string | undefined): string[] => o.config.hum.kinds.filter((kind) => kind !== except);
 
 /**
- * An item's kind: the name its source gives it, else the model call's pick from the kinds, else the fallback kind.
- * A fallback is an abstention: the item is unclear.
+ * An item's kind: the name its source gives it, else the owner's default kind, else the model call's pick from the
+ * kinds, else the fallback kind. A fallback is an abstention: the item is unclear.
  */
 export const pickKind = async (o: Pick<KindContext, "config" | "judge">, item: Item, except?: string): Promise<ItemKind> => {
 	const kinds = kindsBut(o, except);
-	const declared = declaredKind(item, kinds, o.config.hum.kindLabels);
+	const declared = declaredKind(item, kinds, o.config.hum.kindLabels) ?? kinds.find((kind) => kind === o.config.hum.defaultKind);
 
 	if (declared !== undefined) return { item: item.id, kind: declared, from: "source" };
 

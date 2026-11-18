@@ -115,6 +115,8 @@
 		"top": "claude-opus-5-5"
 	},
 	"runners": 3,
+	"undeclaredRunsAlone": true,
+	"conflictRebuilds": 0,
 	"tickIntervalSeconds": 30,
 	"drainTimeoutSeconds": 300,
 	"claimExpirySeconds": 900,
@@ -203,6 +205,10 @@
 		".pre-commit-config.yaml"
 	],
 	"diffLimit": 100000,
+	"reviewReads": {
+		"paths": [],
+		"maxBytes": 50000
+	},
 	"failureTail": 4000,
 	"kindMeanings": {
 		"feature": "adds or changes what the product does or offers",
@@ -212,6 +218,7 @@
 		"check": "adds or repairs tests, benchmarks or other verification, with no change to behaviour"
 	},
 	"fallbackKind": "feature",
+	"defaultKind": null,
 	"docsOnly": {
 		"kind": "docs",
 		"paths": [

@@ -110,6 +110,7 @@ export const SavedEvent = z.discriminatedUnion("type", [
 	z.object({ ...envelope, type: z.literal("landing-found"), payload: z.object({ head: name, doneBy: z.enum(DONE_BY) }) }),
 	z.object({ ...envelope, type: z.literal("answered"), payload: z.object({}) }),
 	z.object({ ...envelope, type: z.literal("merged"), payload: z.object({}) }),
+	z.object({ ...envelope, type: z.literal("rebuilt"), payload: z.object({ why: z.string() }) }),
 ]);
 
 export type SavedEvent = z.infer<typeof SavedEvent>;

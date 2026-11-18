@@ -268,7 +268,7 @@ test("git history: a blame git fails throws, so a fix never reads as rewriting n
 
 test("a fresh review run reads the item and the diff, and none of the author's plan or answers", () => {
 	const item = { id: "7", title: "Add a button", body: "A blue one.", ready: true, thread: [{ kind: "comment" as const, text: "hum plan:\nuse the red theme", at: NOW }] };
-	const input = reviewInput(item, diff("ui/button.tsx", ["+<Button />"]), config.hum);
+	const input = reviewInput(item, diff("ui/button.tsx", ["+<Button />"]), config.hum, []);
 
 	expect(input).toContain("# Item 7: Add a button");
 	expect(input).toContain("+<Button />");

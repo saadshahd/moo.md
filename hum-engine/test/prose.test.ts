@@ -159,7 +159,29 @@ test("a run is offered its events in a draft-07 schema, the draft claude validat
 });
 
 test("a fresh review run reads at most the diff limit of the change", () => {
-	const input = reviewInput({ id: "7", title: "t", body: "b" }, `${"x".repeat(50)}TAIL`, { diffLimit: 50 });
+	const input = reviewInput({ id: "7", title: "t", body: "b" }, `${"x".repeat(50)}TAIL`, { ...config.hum, diffLimit: 50 }, []);
 
 	expect(input).not.toContain("TAIL");
+});
+
+/** Files named for a review, each with its text. */
+const namedFiles = (texts: Readonly<Record<string, string>>) => Object.entries(texts).map(([path, text]) => ({ path, bytes: new TextEncoder().encode(text) }));
+
+const withCap = (maxBytes: number) => ({ ...config.hum, reviewReads: { paths: [], maxBytes } });
+
+test("a fresh review run reads the files named for it up to the byte cap, and is told which ones the cap cut", () => {
+	const input = reviewInput({ id: "7", title: "t", body: "b" }, "", withCap(13), namedFiles({ "AGENTS.md": "rules", "scenarios/a.md": "scenarioTAIL", "scenarios/b.md": "never shown" }));
+
+	expect(input).toContain("rules");
+	expect(input).toContain("scenario");
+	expect(input).not.toContain("TAIL");
+	expect(input).not.toContain("never shown");
+	expect(input).toContain('The cap of 13 bytes cut "scenarios/a.md", "scenarios/b.md"');
+});
+
+test("the byte cap never splits a character of a named file", () => {
+	const input = reviewInput({ id: "7", title: "t", body: "b" }, "", withCap(3), namedFiles({ "a.md": "aéé" }));
+
+	expect(input).toContain("aé\n");
+	expect(input).not.toContain("\u{FFFD}");
 });

@@ -31,10 +31,13 @@ Ask in this order. One question per turn, each with its proposal. Where a questi
 | Which paths hold data or secrets | the scan's matches | `strictPaths` |
 | How many merged changes judge a fix or a measure | the shipped windows | `changeLabels.fixWindow`, `measureWindow` |
 | Which label means which kind | issue-template labels and repo labels | `kindLabels` |
+| Which kind an item takes when no label and no `Kind:` line name one | the work source: where its items never carry labels, as roundup Todos, the kind most of them are; else `null`, so the cheap model call picks and asks when unsure | `defaultKind` |
 | Services and setup each run slot needs | compose file, env script, install command | `runSlots` |
+| Whether items with no `touches:` line run beside others, and how many times a change another run beat to the same files is built again | the work source: where items never name their files, as roundup Todos, run them side by side with one rebuild; else keep them alone | `undeclaredRunsAlone`, `conflictRebuilds` |
+| Which files every review reads beside the diff | the repo's rules files, such as `AGENTS.md`; an item adds its own on a `reads: a, b` line | `reviewReads` |
 | When `ciClaudeAuth` is `oauth-token`: the date the CI token expires, after `claude setup-token` | only the owner holds it | a reminder the owner keeps |
 
-Say what the labels cover: "`kindLabels` covers N of M open issues; the rest get the fallback kind and one question."
+Say what the labels cover: "`kindLabels` covers N of M open issues; the rest get `defaultKind`, or where it is `null` the fallback kind and one question."
 
 Where runs include CI and `isPublicRepo` is not `false`, tell the owner that anyone can read `refs/hum/state`, where each wake keeps hum's state: plans, answers and the output of failed checks.
 

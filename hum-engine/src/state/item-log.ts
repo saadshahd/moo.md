@@ -21,6 +21,9 @@ type MachineOf = { readonly itemId: string; readonly machineVersion: string };
  */
 export const machineStarted = ({ itemId, machineVersion, afresh }: MachineOf & { readonly afresh: boolean }): NewEvent => ({ source: "machine", itemId, machineVersion, type: "machine-started", payload: { afresh } });
 
+/** The item's change no longer held on the newest base, so its progress is dropped and its next pass builds it there again. */
+export const rebuilt = (itemId: string, why: string): NewEvent => ({ source: "landing", itemId, type: "rebuilt", payload: { why } });
+
 /** The owner's answer on the item's thread, keyed by when it came, so every read of it adds one entry. */
 export const ownerAnswered = (itemId: string, at: number): NewEvent => ({ source: "thread", sourceId: `answer:${at}`, itemId, type: "answered", payload: {} });
 
@@ -71,6 +74,8 @@ type Picks = { readonly [Judge in Picked["judge"]]?: Extract<Picked, { judge: Ju
 export type ItemFold = {
 	/** The answers the log keeps since the owner last answered, counted by the run (its role) that gave them. */
 	readonly runs: Readonly<Record<string, number>>;
+	/** The times its change was built again from the newest base since the owner last answered. */
+	readonly rebuilds: number;
 	/** The answers kept since the item last started afresh and the owner last answered, by the question each answered. */
 	readonly answers: Readonly<Record<string, KeptOutcome>>;
 	readonly picks: Picks;
@@ -97,14 +102,16 @@ const stepItem = (fold: ItemFold, entry: SavedEvent): ItemFold => {
 		case "landing-found":
 			return { ...fold, landing: entry.payload };
 		case "answered":
-			return { ...fold, runs: {}, answers: {} };
+			return { ...fold, runs: {}, rebuilds: 0, answers: {} };
 		case "merged":
 			return { ...fold, merged: true };
+		case "rebuilt":
+			return { ...fold, rebuilds: fold.rebuilds + 1 };
 	}
 };
 
 /** An item's facts from its log alone: no model is asked and no effect runs. */
-export const foldItem = (events: readonly SavedEvent[]): ItemFold => events.reduce(stepItem, { runs: {}, answers: {}, picks: {}, merged: false });
+export const foldItem = (events: readonly SavedEvent[]): ItemFold => events.reduce(stepItem, { runs: {}, rebuilds: 0, answers: {}, picks: {}, merged: false });
 
 /** Appends the fact unless the item's last fact of its kind is the same JSON, so a fact read back or a step retried adds nothing. */
 const keepChanged = (events: EventLog, fact: NewEvent, last: NewEvent["payload"] | undefined): void => {

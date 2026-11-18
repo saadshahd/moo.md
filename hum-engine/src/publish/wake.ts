@@ -3,7 +3,7 @@ import type { State } from "../state/open.ts";
 import { HOUR_MS } from "../time.ts";
 import { forgetProgress } from "../worker/kind.ts";
 import { releaseQuestions } from "../worker/questions.ts";
-import { answerTo, park, type ThinResult } from "../worker/thin-path.ts";
+import { answerTo, doesStartOver, park, type ThinResult } from "../worker/thin-path.ts";
 import { kindMoveFault, takeWorkRecords } from "./handoff.ts";
 import type { Gathered, OutboxPass, ReadOutbox } from "./handover.ts";
 import { fetchedPublishRepo, type Publisher, publishPass, refusedPass } from "./publisher.ts";
@@ -36,9 +36,10 @@ const publishWorked = async ({ publisher: p, gathered, outbox, work }: PublishWa
 
 		if (fault !== undefined) return refusedPass(pass.item, fault);
 
-		forgetProgress(p.state, pass.item);
 		p.state.itemKinds.put(pass.item, known.from === "fallback" ? { ...known, kind: pass.result.kind } : { item: pass.item, kind: pass.result.kind, from: "model" });
 	}
+
+	if (doesStartOver(pass.result)) forgetProgress(p.state, pass.item);
 
 	const published = await publishPass(p, { baseSha: gathered.baseSha, heads: gathered.heads }, { item: pass.item, intents: pass.intents, bundle: outbox.bundleOf(pass) });
 

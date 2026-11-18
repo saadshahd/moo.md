@@ -130,7 +130,8 @@ const count = z.int().positive();
 
 const SERVICE_LABEL = /^[A-Za-z0-9._-]+$/;
 
-const isInsideRepo = (path: string): boolean => !path.startsWith("/") && !path.endsWith("/") && !path.split("/").includes("..");
+/** A path inside the repo, relative to its top, that names no folder above it. */
+export const isInsideRepo = (path: string): boolean => !path.startsWith("/") && !path.endsWith("/") && !path.split("/").includes("..");
 
 const commitIdentity = z.strictObject({ name, email: name }, { error: "the owner's own { name, email }; run /hum to write them from your git config" });
 
@@ -210,6 +211,17 @@ const Shipped = z.object({
 		),
 	models: z.record(z.enum(TIERS), name).describe("The model id each tier of a kind's table runs on."),
 	runners: count.describe("The most runs that go at once."),
+	undeclaredRunsAlone: z
+		.boolean()
+		.describe(
+			"Whether an item with no `touches:` line runs alone, as one that may change any file. Off, it runs beside other items: each run works in its own clone, and landing checks every change again on the newest base, where a change that no longer fits is built again up to conflictRebuilds times.",
+		),
+	conflictRebuilds: z
+		.int()
+		.nonnegative()
+		.describe(
+			"Times an item's change is built again from the newest base when it no longer rebases there or the checks fail there, as when another run changed the same files first, counted since the owner last answered; past them the change waits for the owner's review.",
+		),
 	tickIntervalSeconds: seconds.describe("The time between worker ticks; each tick writes the heartbeat and renews the claims in flight."),
 	drainTimeoutSeconds: seconds.describe("How long a worker that has seen an update lets its runs finish before it stops them."),
 	claimExpirySeconds: seconds.describe("How long a claim lasts unless its holder renews it."),
@@ -278,9 +290,15 @@ const Shipped = z.object({
 	lockfiles: z.array(name).describe("Lockfiles where a changed line naming the engine package changes hum itself."),
 	hookPaths: z.array(name).describe("Globs of tracked git hooks; a change to one changes hum itself."),
 	diffLimit: count.describe("The most characters of a change's diff one prompt carries."),
+	reviewReads: z
+		.strictObject({ paths: z.array(z.string().min(1).refine(isInsideRepo, "a review file is a path inside the repo, without a leading or trailing '/'")), maxBytes: count })
+		.describe(
+			"Files a fresh review run reads beside the item and the diff, as the base branch holds them, so a change cannot rewrite the rules that judge it: 'paths' every review reads, such as the repo's rules file, then the files an item names on a `reads: a, b` line; 'maxBytes' caps their text together, and the prompt names what the cap cut. A named file git does not track on the base, one that is not a regular file, or one strictPaths marks, ends the item stuck, naming it.",
+		),
 	failureTail: count.describe("The last characters of the checks' output a fix run reads."),
 	kindMeanings: z.record(name, z.string().min(1)).describe("One line per kind saying what work it holds; the cheap model call reads these to pick an item's kind."),
 	fallbackKind: name.describe("The kind an item runs as when neither its source nor the model call names one."),
+	defaultKind: name.nullable().describe("The kind an item takes as its own when no label and no `Kind:` line name one, as for a work source whose items carry no labels: no model call and no question. null leaves such an item to the model call, then the fallback kind."),
 	docsOnly: z
 		.strictObject({ kind: name, paths: z.array(name) })
 		.describe("The globs of prose: an item of this kind whose change touches a path outside them moves to its real kind, and a review's approval holds past a later change that touches only them."),
@@ -499,6 +517,8 @@ export const OWNER_CHANGEABLE = {
 	"always pull request": "alwaysPullRequest",
 	"model per tier": "models",
 	"runner count": "runners",
+	"undeclared items alone": "undeclaredRunsAlone",
+	"conflict rebuilds": "conflictRebuilds",
 	"tick interval": "tickIntervalSeconds",
 	"drain timeout": "drainTimeoutSeconds",
 	"claim expiry": "claimExpirySeconds",
@@ -549,9 +569,11 @@ export const OWNER_CHANGEABLE = {
 	lockfiles: "lockfiles",
 	"hook paths": "hookPaths",
 	"diff limit": "diffLimit",
+	"review reads": "reviewReads",
 	"failure tail": "failureTail",
 	"kind meanings": "kindMeanings",
 	"fallback kind": "fallbackKind",
+	"default kind": "defaultKind",
 	"docs-only kind": "docsOnly",
 	"model call timeout": "modelCallTimeoutSeconds",
 	"measured models": "measuredModels",

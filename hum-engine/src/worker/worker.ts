@@ -38,7 +38,7 @@ import { newestChoices, openQuestions } from "../status/sections.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { SECOND_MS } from "../time.ts";
 import { type Exit, runLifecycle, type TickResult } from "./lifecycle.ts";
-import { type Footprint, footprintOf, pick, PrefixGate } from "./scheduler.ts";
+import { type Footprint, footprintOf, pick, PrefixGate, undeclaredFootprint } from "./scheduler.ts";
 import { type Signature, signatureOf } from "./signature.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import type { SlotPool } from "../slots/pool.ts";
@@ -766,7 +766,7 @@ export class Worker {
 	async #learn(id: string): Promise<Known> {
 		const item = await this.#o.adapters.workSource.read(ItemId.parse(id));
 
-		return { footprint: footprintOf(item), title: item.title, claimedBy: item.claimedBy ?? [] };
+		return { footprint: footprintOf(item) ?? undeclaredFootprint(this.#o.config.hum), title: item.title, claimedBy: item.claimedBy ?? [] };
 	}
 
 	/** Which waiting items start now, by the scheduler's rules, and starts them. */

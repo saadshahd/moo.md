@@ -45,6 +45,7 @@ export type Inbox = z.infer<typeof Inbox>;
 const WorkResult = z.discriminatedUnion("outcome", [
 	z.strictObject({ outcome: z.enum(["lost", "waiting"]), item: text }),
 	z.strictObject({ outcome: z.literal("moved"), item: text, kind: text }),
+	z.strictObject({ outcome: z.literal("restarted"), item: text, why: z.string() }),
 	z.strictObject({ outcome: z.enum(["asked", "stuck", "review"]), item: text, detail: z.string().optional() }),
 	z.strictObject({ outcome: z.literal("limited"), item: text, until: z.int().nonnegative() }),
 	z.strictObject({ outcome: z.literal("held"), item: text, why: z.string() }),
