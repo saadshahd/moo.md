@@ -2,7 +2,10 @@ import { z } from "zod";
 import type { ThreadEntry } from "../adapter-api.ts";
 import { OWNER_APPROVAL } from "./merge.ts";
 import { DATA_RULE, fenced } from "./prose.ts";
-import { bareWord } from "./question.ts";
+import { bareWord, isOverCapStop } from "./question.ts";
+
+/** The answer option that runs a parked item again from the start. */
+export const RUN_AGAIN = "retry";
 
 /** What the model call answers when none of the question's options fits the reply. */
 export const NONE_OF_THESE = "none of these";
@@ -83,6 +86,8 @@ type DisposeFacts = {
 	/** An earlier answer to the same question was applied. */
 	readonly answeredBefore: boolean;
 	readonly stage: Stage;
+	/** The question the owner reads, without its options and fold. */
+	readonly question: string;
 };
 
 const dropped = (why: string): Disposition => ({ disposition: "dropped", why });
@@ -97,6 +102,7 @@ export const dispose = ({
 	resolution,
 	answeredBefore,
 	stage,
+	question,
 }: DisposeFacts): Disposition => {
 	if (answeredBefore) return dropped("The question already has an answer.");
 
@@ -111,6 +117,8 @@ export const dispose = ({
 			disposition: "held",
 			why: "A run is going. Your answer takes effect when it ends.",
 		};
+
+	if ("option" in resolution && isOverCapStop(question, resolution.option)) return { disposition: "applied", why: `The item stopped. Answer ${RUN_AGAIN} to start it again.` };
 
 	return { disposition: "applied", why: "The run goes on with your answer." };
 };

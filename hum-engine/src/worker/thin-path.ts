@@ -25,8 +25,8 @@ import { HOUR_MS, SECOND_MS } from "../time.ts";
 import { checkLimits, firstFailing, runChecks } from "./checks.ts";
 import { BASE_CONTENDED, carriedVerdict, changeOn, declaredChange, type LandContext, patchOf, placementOf, rebaseOnto, type ReviewOutcome, tierOf } from "./land.ts";
 import { OWNER_APPROVAL, REVIEW_APPROVAL } from "../decide/merge.ts";
-import { askDecision, askedQuestion, isWaitQuestion, OVER_CAP_OPTIONS, PLAIN_QUESTIONS, type PlainQuestion, RunReason } from "../decide/question.ts";
-import type { Stage } from "../decide/answer.ts";
+import { askDecision, askedQuestion, isOverCapStop, isWaitQuestion, OVER_CAP_OPTIONS, PLAIN_QUESTIONS, type PlainQuestion, RunReason } from "../decide/question.ts";
+import { RUN_AGAIN, type Stage } from "../decide/answer.ts";
 import { type ItemText, reviewInput } from "../decide/review.ts";
 import { forgetProgress, keepKind, kindAnswered, pickKind } from "./kind.ts";
 import { settleAnswers } from "./answers.ts";
@@ -283,7 +283,7 @@ export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gather
 
 	if (asking && answered === undefined && timedOut === undefined) return { outcome: "waiting", item: id };
 
-	const stopped = answered?.option === OVER_CAP_OPTIONS.stop && visibleText(answered.question) === PLAIN_QUESTIONS["over-cap"];
+	const stopped = answered !== undefined && isOverCapStop(visibleText(answered.question), answered.option);
 
 	if (stopped && asking) return park(o, { outcome: "stuck", item: id, detail: "the owner stopped it at the token cap" });
 
@@ -1225,9 +1225,6 @@ const handToPublish = async (d: Driven): Promise<ThinResult> => {
 
 	return { outcome: "held", item: d.id, why: LANDING_HANDED };
 };
-
-/** The answer option that runs a parked item again from the start. */
-export const RUN_AGAIN = "retry";
 
 type Parking = { readonly outcome: "stuck" | "review"; readonly item: string; readonly detail?: string };
 

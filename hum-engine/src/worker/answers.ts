@@ -103,7 +103,7 @@ const settleOne = async ({ ctx, item, question, options, stage }: Settling, { re
 
 	if (saved && isFinal(saved)) return { record: saved, resolution };
 
-	const outcome = dispose({ resolution, answeredBefore, stage });
+	const outcome = dispose({ resolution, answeredBefore, stage, question });
 	const record = saved?.disposition === outcome.disposition ? saved : recordOf(item.id, reply, resolution, outcome, ctx.now());
 
 	if (record !== saved) ctx.state.answers.put(keyOf(item.id, reply.ordinal), record);
