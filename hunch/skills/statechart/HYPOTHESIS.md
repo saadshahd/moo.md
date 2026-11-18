@@ -20,3 +20,13 @@ Graduate when 2 bugs it finds, in at least 2 flows, replay against the real code
 - Kept: each action points at code a reviewer can open, and an indivisible step in the code stays one action. A planted break in the real code must be caught before a pass counts.
 - Kept: the covered files and a sync commit, and the upkeep pass that sorts each change since the sync and ends in sync, updated, bug or blocked. They live in the spec's own header.
 - Dropped: generating a verify skill in each repo. The owner ruled out generated per-repo skills; the spec's header holds what such a skill would record.
+
+### 2026-11-18 — first run, on hum's five kind machines
+
+- How: one generator, kept outside the repo, wrote a model per kind from its JSON and the engine code that drives it, each action citing its file and line. Left out: pauses, crashes, claims and a second worker; the token cap counts runs, not tokens.
+- Planted breaks, both caught: fixing without its `token-cap` arrow broke "a run's question reaches the owner" in 5 steps; merging with no way out broke deadlock and "every item settles". Checking the fix cap before every fix run made the fix-cap rule hold.
+- Bug, replayed: the fix cap is checked only when a fix step starts (`thin-path.ts:573`). A fix run whose question hum answers itself runs again inside the same step, and each run counts. With `maxFixRuns` 1, hum's own test world ran 3 fix runs before it ended stuck. Only the token cap bounds the loop. Not fixed yet: hum is outside this branch.
+- Mismatch, read, not run: each kind's `tokenCap.overCap` says `asking`, but only the config check reads it. A plan or review run past the cap ends stuck, as the comment on `runAgent` says it should.
+- Held on all five: a run's question reaches an owner wait; no deadlock; every item settles. Settling assumes a landing ends, which the code does not promise: a held landing retries without bound.
+- The chart refused the first view, whose labels put states that break different rules under one name; the relabelled view drew. Charts ran 37 to 63 arrows against a budget of 20.
+- Open for the skill: it says nothing about generating the model when the flow is already data, as hum's kinds are.
