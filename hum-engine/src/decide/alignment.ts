@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { Item } from "../adapter-api.ts";
 import { GRADED, type HumConfig } from "../config/schema.ts";
-import { DATA_RULE, fenced, isTrusted } from "./prose.ts";
+import { DATA_RULE, fenced, isTrusted, measuredScore } from "./prose.ts";
 import type { Placement } from "./risk.ts";
 
 const Grade = z.enum(["sound", "partial", "concern"]);
@@ -32,7 +32,7 @@ export const alignmentQuestion = (item: Pick<Item, "title" | "body">, diff: stri
 
 /** The pull request comment for a call below the bar: its grades, or why it gave none. It blocks nothing. */
 export const alignmentComment = (alignment: { readonly graded: AlignmentAnswer } | { readonly abstained: string }, config: Pick<HumConfig, "decisionModel" | "measuredModels" | "minJudgeRate">): string => {
-	const rate = config.measuredModels.alignment?.[config.decisionModel]?.rate;
+	const rate = measuredScore(config.measuredModels, "alignment", config.decisionModel)?.rate;
 	const measured = rate === undefined ? "not measured" : `measured at ${rate.toFixed(2)}`;
 	const view = "graded" in alignment ? `alignment ${alignment.graded.alignment}, verification ${alignment.graded.verification}` : `no view (${alignment.abstained})`;
 

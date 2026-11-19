@@ -4,7 +4,7 @@ import parseDiff from "parse-diff";
 import { z } from "zod";
 import type { Finished } from "../adapters/claude-p.ts";
 import { hashJson } from "../config/hash.ts";
-import type { Boundary, HumConfig } from "../config/schema.ts";
+import type { Boundary, HumConfig, Score } from "../config/schema.ts";
 
 const TAG_HASH = 12;
 
@@ -24,9 +24,35 @@ export const fenced = (label: string, text: string): string => {
 	return `<${tag}>\n${clean}\n</${tag}>`;
 };
 
+/** A context size Claude Code appends to a model id, such as `[1m]`. */
+const CONTEXT_SIZE = /\[[^\]]+\]$/;
+
+/** A Bedrock model version such as `-v1:0`, after the version or date that ends a model id; `claude-v2:1` keeps its own. */
+const BEDROCK_VERSION = /(?<=\d)-v\d+(?::\d+)?$/;
+
+/** A Bedrock inference profile's region or `global.` prefix, then `anthropic.`. */
+const BEDROCK_PREFIX = /^(?:[a-z][a-z-]*\.)?anthropic\./;
+
+/**
+ * The model id as the Claude API names it, for an id Bedrock, a gateway in front of it or Claude Code named it by:
+ * `global.anthropic.claude-sonnet-5-5[1m]` names `claude-sonnet-5-5`. A date stays, so a dated id names only its
+ * own snapshot. Any other id, such as an alias, comes back as written.
+ */
+export const modelIdOf = (id: string): string => id.replace(CONTEXT_SIZE, "").replace(BEDROCK_VERSION, "").replace(BEDROCK_PREFIX, "");
+
+/**
+ * The score measured at a boundary for the model an id names, under whichever id it was recorded. Where several
+ * recorded ids name that model, as a `hum.json` measured before ids matched this way can hold, the lowest rate stands.
+ */
+export const measuredScore = (measuredModels: Partial<HumConfig["measuredModels"]>, boundary: Boundary, id: string): Score | undefined =>
+	Object.entries(measuredModels[boundary] ?? {})
+		.filter(([recorded]) => modelIdOf(recorded) === modelIdOf(id))
+		.map(([, score]) => score)
+		.toSorted((a, b) => a.rate - b.rate)[0];
+
 /** Whether every model id that answered has a measured rate at the boundary of at least `bar`; none answering meets no bar. */
 export const doesMeetBar = (models: readonly string[], boundary: Boundary, measuredModels: HumConfig["measuredModels"], bar: number): boolean =>
-	models.length > 0 && models.every((model) => (measuredModels[boundary]?.[model]?.rate ?? 0) >= bar);
+	models.length > 0 && models.every((model) => (measuredScore(measuredModels, boundary, model)?.rate ?? 0) >= bar);
 
 /** A model's pick counts only when every model id that answered has a measured rate at the boundary that meets the bar. */
 export const isTrusted = (models: readonly string[], boundary: Boundary, { measuredModels, minJudgeRate }: Pick<HumConfig, "measuredModels" | "minJudgeRate">): boolean =>

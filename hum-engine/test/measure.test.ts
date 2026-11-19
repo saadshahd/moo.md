@@ -253,13 +253,14 @@ test("rates measured into a hum.json that had none keep each boundary not measur
 	expect(Object.entries(loaded).filter(([, rates]) => Object.keys(rates).length > 0)).toEqual([["kind", { haiku: { rate: 0.9, judgeHash: KIND_JUDGE } }]]);
 });
 
-test("a measured rate is kept under the model as the owner names it and under each id that answered, so an alias such as haiku is trusted by the id its answers name", () => {
+test("a measured rate is kept under the model as the owner names it and under the model each answering id names, replacing every rate recorded for that model, so an alias such as haiku is trusted by the id its answers name", () => {
 	const shipped = SHIPPED_DEFAULTS.measuredModels;
-	const measured = withRate(shipped, { boundary: "alignment", model: "haiku", answered: ["global.anthropic.claude-haiku-5-5"], rate: 0.8123, judgeHash: KIND_JUDGE });
+	const before = { ...shipped, alignment: { ...shipped.alignment, "global.anthropic.claude-haiku-5-5": { rate: 0.95 } } };
+	const measured = withRate(before, { boundary: "alignment", model: "haiku", answered: ["global.anthropic.claude-haiku-5-5"], rate: 0.8123, judgeHash: KIND_JUDGE });
 	const bar = { measuredModels: measured, minJudgeRate: 0.8 };
 	const score = { rate: 0.81, judgeHash: KIND_JUDGE };
 
-	expect(measured).toEqual({ ...shipped, alignment: { ...shipped.alignment, haiku: score, "global.anthropic.claude-haiku-5-5": score } });
+	expect(measured).toEqual({ ...shipped, alignment: { ...shipped.alignment, haiku: score, "claude-haiku-5-5": score } });
 	expect(isTrusted(["global.anthropic.claude-haiku-5-5"], "alignment", bar)).toBe(true);
 	expect(doesGateAlignment({ ...bar, decisionModel: "haiku" })).toBe(true);
 });
