@@ -2,7 +2,7 @@
  * Draws a model's states as a Mermaid statechart in the reader's words, and writes the report, refusing
  * a view that would make the chart claim what the model does not do.
  */
-import { type Graph, must, type Step, stepId, type Trace, type Vars, stateKey } from "./tlc.ts";
+import { type Graph, must, type Step, stepId, type Trace, traceSteps, type Vars, stateKey } from "./tlc.ts";
 
 /** What a view module exports: the reader's words for a state and for a step, and the chart's title.
  * \`step\` returns null for a step the chart hides. */
@@ -45,9 +45,9 @@ const varsText = (vars: Vars) =>
 		.map(([name, value]) => `${name} = ${JSON.stringify(value)}`)
 		.join(", ");
 
-/** Each step a trace takes, the step back into its loop among them. */
-const traceSteps = ({ states }: Trace): Step[] =>
-	states.slice(1).flatMap(({ action, vars }, i) => (action === undefined ? [] : [{ from: stateKey(states[i].vars), to: stateKey(vars), action }]));
+/** A step's words, marked when the bound cuts the step. The words hold for a CONSTRAINT, which the step's end breaks,
+ * and for an ACTION_CONSTRAINT, which the step itself breaks. */
+const markedCut = (label: string | null, { cut }: Step) => (label !== null && cut ? `${label} (cut by the constraint)` : label);
 
 const loopKeys = ({ states, loop }: Trace) => new Set(loop === undefined ? [] : states.slice(loop).map(({ vars }) => stateKey(vars)));
 
@@ -77,7 +77,7 @@ export function draw(graph: Graph, verdicts: Verdict[], view: View, settings: Se
 		}
 		return stepLabels.get(id) ?? null;
 	};
-	const steps = graph.steps.map((step) => ({ ...step, label: stepLabel(step), fromLabel: labelOf(step.from), toLabel: labelOf(step.to) }));
+	const steps = graph.steps.map((step) => ({ ...step, label: markedCut(stepLabel(step), step), fromLabel: labelOf(step.from), toLabel: labelOf(step.to) }));
 	const moves = steps.filter((s) => s.fromLabel !== s.toLabel);
 
 	const broken = verdicts.filter((v) => v.trace);
@@ -164,7 +164,7 @@ export function draw(graph: Graph, verdicts: Verdict[], view: View, settings: Se
 			`${exact} has ${taken.length} step${taken.length === 1 ? "" : "s"}:`,
 			"",
 			`0. ${labelOf(stateKey(states[0].vars))} (start)`,
-			...taken.map((s, i) => `${i + 1}. ${stepLabel(s)} → ${labelOf(s.to)}${graph.states.get(s.to)?.pastBound ? " (past the constraint)" : ""}`),
+			...taken.map((s, i) => `${i + 1}. ${markedCut(stepLabel(s), s)} → ${labelOf(s.to)}`),
 			...(loop !== undefined ? ["", `From step ${loop} it repeats forever.`] : []),
 			...(stutters ? ["", `Then it stays in ${labelOf(stateKey(states.at(-1)!.vars))} forever.`] : []),
 		].join("\n");

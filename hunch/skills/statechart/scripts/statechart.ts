@@ -14,11 +14,12 @@ import { basename, dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { $ } from "bun";
 import { draw, Refusal, type Verdict, type View } from "./chart.ts";
-import { configText, definitionLevels, type Graph, parseDot, pathGraph, printedBreaks, readConfig, readRun, stateKey, TEMPORAL_LEVEL, type Trace, watchModule, withPaths } from "./tlc.ts";
+import { configText, definitionLevels, type Graph, parseDot, pathGraph, printedBreaks, readConfig, readRun, rejectedState, stateKey, TEMPORAL_LEVEL, type Trace, traceObservations, watchModule, withPaths } from "./tlc.ts";
 
 const USAGE = "usage: statechart.ts SPEC.tla [--config FILE] [--view FILE] [--out DIR] [--chart-states N] [--arrows N]";
 const ENGINE = ["bunx", "everystate@0.4.0"];
-const VIOLATION_EXITS = new Set([10, 11, 12, 13]);
+const CHECK_EXITS = new Set([0, 10, 11, 12, 13]);
+const CONFORM_EXITS = new Set([0, 20]);
 
 const fail = (message: string): never => {
 	console.error(`statechart: ${message}`);
@@ -47,21 +48,51 @@ mkdirSync(out, { recursive: true });
 
 const tail = (text: string) => text.trim().split("\n").slice(-25).join("\n");
 
+/** `text` written as the file `name` in the work folder; gives its path. */
+const workFile = (name: string, text: string) => {
+	const path = join(work, name);
+	writeFileSync(path, text);
+	return path;
+};
+
 const sany = await $`${ENGINE} java -cp _ tla2sany.xml.XMLExporter -o -I ${folder} ${spec}`.cwd(folder).nothrow().quiet();
 if (sany.exitCode !== 0) fail(`everystate cannot read ${spec}:\n${tail(sany.stdout.toString() + sany.stderr.toString())}`);
 const levels = definitionLevels(sany.stdout.toString());
 const initialOnly = new Set(config.properties.filter((rule) => (levels.get(rule) ?? fail(`SANY's export gives no level for the PROPERTY ${rule}, so it cannot tell whether ${rule} checks more than the start states.`)) < TEMPORAL_LEVEL));
 
-/** One everystate run of `target` on `cfg` from `cwd`; its output is kept in the out folder. A run everystate could
- * not finish ends the command. */
-async function check(name: string, cfg: string, flags: string[], { target = module, cwd = folder } = {}) {
-	const cfgFile = join(work, `${name}.cfg`);
-	writeFileSync(cfgFile, cfg);
-	const run = await $`${ENGINE} -workers 1 -config ${cfgFile} ${flags} ${target}`.cwd(cwd).nothrow().quiet();
+/** One everystate run named `name` from `cwd`; its output is kept in the out folder. An exit outside `finished`
+ * means everystate could not finish, and ends the command. */
+async function everystate(name: string, args: string[], finished: ReadonlySet<number>, cwd = folder) {
+	const run = await $`${ENGINE} ${args}`.cwd(cwd).nothrow().quiet();
 	const text = run.stdout.toString() + run.stderr.toString();
 	writeFileSync(join(out, `everystate-${name}.out`), text);
-	if (run.exitCode !== 0 && !VIOLATION_EXITS.has(run.exitCode)) fail(`everystate could not check ${spec} (exit ${run.exitCode}):\n${tail(text)}`);
+	if (!finished.has(run.exitCode)) fail(`everystate could not check ${spec} (exit ${run.exitCode}):\n${tail(text)}`);
+	return { stdout: run.stdout.toString(), text };
+}
+
+/** One everystate check of `target` on `cfg` from `cwd`. */
+async function check(name: string, cfg: string, flags: string[], { target = module, cwd = folder } = {}) {
+	const { text } = await everystate(name, ["-workers", "1", "-config", workFile(`${name}.cfg`, cfg), ...flags, target], CHECK_EXITS, cwd);
 	return { ...readRun(text), output: text };
+}
+
+const bounded = /\b(ACTION_)?CONSTRAINTS?\b/.test(config.base);
+
+/** `trace` with where the bound cuts it, as everystate conform finds by replaying it on the bounded model. A replay
+ * with every constraint off must take the whole trace, since everystate printed it. A replay on the model with only
+ * its CONSTRAINT bounds then proves whether the cut state lies past one. With no bound the trace comes back as it is. */
+async function cutOf(name: string, trace: Trace): Promise<Trace> {
+	if (!bounded) return trace;
+	const observations = workFile(`conform-${name}.json`, traceObservations(trace));
+	const replay = async (run: string, cfg: string, flags: string[] = []) =>
+		rejectedState((await everystate(run, ["conform", "-json", "-config", workFile(`${run}.cfg`, cfg), "-trace", observations, ...flags, module], CONFORM_EXITS)).stdout);
+	const at = await replay(`conform-${name}`, config.base);
+	if (at === undefined) return trace;
+	const unbounded = `conform-${name}-unbounded`;
+	if ((await replay(unbounded, config.base, ["-noconstraints"])) !== undefined)
+		fail(`everystate printed the path for ${name} itself, yet everystate conform rejects it even with every constraint off, so it cannot say which step the bound cuts; see ${join(out, `everystate-${unbounded}.out`)}.`);
+	const pastBound = config.stateBound !== undefined && (config.stateBound === config.base ? at : await replay(`conform-${name}-state-bound`, config.stateBound)) === at;
+	return { ...trace, cut: { at, pastBound } };
 }
 
 const broken = new Map<string, Trace>();
@@ -71,12 +102,16 @@ for (let remaining = config.invariants, k = 1; ; k++) {
 	distinct = Math.max(distinct, run.distinct);
 	const [first] = run.violations;
 	if (!first?.rule) break;
-	broken.set(first.rule, first.trace);
+	broken.set(first.rule, await cutOf(`invariant-${first.rule}`, first.trace));
 	remaining = remaining.filter((rule) => rule !== first.rule);
 }
-const deadlock = config.checksDeadlock ? (await check("deadlock", configText(config.base, {}), [])).violations[0]?.trace : undefined;
+const deadlockPath = config.checksDeadlock ? (await check("deadlock", configText(config.base, {}), [])).violations[0]?.trace : undefined;
+const deadlock = deadlockPath && (await cutOf("deadlock", deadlockPath));
 const properties = new Map<string, Trace | undefined>();
-for (const rule of config.properties) properties.set(rule, (await check(`property-${rule}`, configText(config.base, { properties: [rule] }), ["-deadlock"])).violations[0]?.trace);
+for (const rule of config.properties) {
+	const path = (await check(`property-${rule}`, configText(config.base, { properties: [rule] }), ["-deadlock"])).violations[0]?.trace;
+	properties.set(rule, path && (await cutOf(`property-${rule}`, path)));
+}
 
 /** Every state each broken invariant fails in, from one run of a module whose invariant prints them: a check names
  * only the first rule a state breaks. It runs on copies in the work folder, so nothing lands beside the spec. */
@@ -95,7 +130,6 @@ async function breakingStates(graph: Graph, graphDistinct: number) {
 const complete = distinct <= Number(values["chart-states"]);
 const lastKey = (trace: Trace) => stateKey(trace.states.at(-1)!.vars);
 const paths = [...broken.values(), deadlock, ...properties.values()].filter((trace) => trace !== undefined);
-const bounded = /\b(ACTION_)?CONSTRAINTS?\b/.test(config.base);
 const chart = complete ? await check("chart", configText(config.base, {}), ["-deadlock", "-dump", "dot,actionlabels", join(work, "chart")]) : undefined;
 const dumped = chart && parseDot(readFileSync(join(work, "chart.dot"), "utf8"));
 const graph = !dumped ? pathGraph(paths) : bounded ? withPaths(dumped, paths) : dumped;
