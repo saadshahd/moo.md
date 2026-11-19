@@ -21,10 +21,18 @@ export type Effort = (typeof EFFORTS)[number];
 /** The oldest Claude Code the runner was proven on. */
 export const CLAUDE_FLOOR = "2.1.316";
 
-/** No approval prompt in a headless run, and nothing else: no sandbox and no deny rules. */
-export const RUN_SETTINGS = JSON.stringify({
-	permissions: { defaultMode: "bypassPermissions" },
-});
+/**
+ * Two Claude Code features put a model or a price hum did not pass on a run: the advisor answers on a second model,
+ * the owner's `advisorModel` or Claude Code's own pick when that is blank, and fast mode runs at its own speed and
+ * price. Set in a run's `--settings`, which outrank the owner's settings files, these turn both off, so a run
+ * answers on the model and effort hum passes and a measured rate names that model alone.
+ */
+export const ADVISOR_AND_FAST_MODE_OFF = { CLAUDE_CODE_DISABLE_ADVISOR_TOOL: "1", CLAUDE_CODE_DISABLE_FAST_MODE: "1" };
+
+/** No approval prompt in a headless run, no advisor and no fast mode, and nothing else: no sandbox and no deny rules. */
+const HEADLESS = { permissions: { defaultMode: "bypassPermissions" }, env: ADVISOR_AND_FAST_MODE_OFF };
+
+export const RUN_SETTINGS = JSON.stringify(HEADLESS);
 
 /**
  * The two kinds of `claude -p` call. An agent run keeps its session. A model call runs as hope's judge does: no
@@ -36,7 +44,7 @@ export const RUN_SETTINGS = JSON.stringify({
 const CALLS = {
 	run: { settings: RUN_SETTINGS, flags: [] },
 	judgment: {
-		settings: JSON.stringify({ permissions: { defaultMode: "bypassPermissions" }, disableAllHooks: true, outputStyle: "default" }),
+		settings: JSON.stringify({ ...HEADLESS, disableAllHooks: true, outputStyle: "default" }),
 		flags: ["--no-session-persistence", "--setting-sources", "user", "--disable-slash-commands", "--strict-mcp-config", "--tools", ""],
 	},
 } as const satisfies Record<string, { settings: string; flags: readonly string[] }>;
