@@ -9,7 +9,7 @@ import { listRecords, orMissing } from "../state/fs.ts";
 import type { State } from "../state/open.ts";
 import { CARD_EXCERPT, type Card } from "../status/format.ts";
 import { SECOND_MS } from "../time.ts";
-import { type Finished, type RunOutcome, type RunRequest, type Runner, type RunnerOptions, START_ANSWER, START_PROMPT, START_SCHEMA, startRunner, hasSucceeded } from "./claude-p.ts";
+import { ADVISOR_AND_FAST_MODE_OFF, type Finished, type RunOutcome, type RunRequest, type Runner, type RunnerOptions, START_ANSWER, START_PROMPT, START_SCHEMA, startRunner, hasSucceeded } from "./claude-p.ts";
 import { type LimitEnded, limitOf, savedLimitUntil, settleLimit } from "./limit.ts";
 import { parseLooseJson } from "./marked.ts";
 import { billedTokens, cacheReadTokens, modelsOf, outputTokens, type RunTranscript, readTranscript } from "./transcript.ts";
@@ -37,11 +37,11 @@ const dropInto = (folder: string): string => {
 	return `cat > ${at}/$$.part && mv ${at}/$$.part ${at}/$$.json`;
 };
 
-/** The settings every background run starts with: hum's plugin off, the deny rules and auto mode's rules, and a hook that reports the run. */
+/** The settings every background run starts with: hum's plugin, the advisor and fast mode off, the deny rules and auto mode's rules, and a hook that reports the run. */
 export const backgroundSettings = ({ deniedRunCommands, runAutoMode }: Pick<HumConfig, "deniedRunCommands" | "runAutoMode">, stopsFolder: string, env: Readonly<Record<string, string>> = {}) => ({
 	enabledPlugins: { [HUM_PLUGIN]: false },
 	// A project's own settings may name an editor that waits for a window; a run has none, so its git would wait for good.
-	env: { GIT_EDITOR: "true", ...env },
+	env: { GIT_EDITOR: "true", ...env, ...ADVISOR_AND_FAST_MODE_OFF },
 	permissions: { deny: deniedRunCommands.map((command) => `Bash(${command} *)`) },
 	autoMode: { classifyAllShell: true, environment: runAutoMode.environment, allow: runAutoMode.allow, hard_deny: runAutoMode.hardDeny },
 	hooks: Object.fromEntries(HOOK_EVENTS.map((event) => [event, [{ hooks: [{ type: "command", command: dropInto(stopsFolder) }] }]])),

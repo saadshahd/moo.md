@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { backgroundSettings, launchArgs } from "../src/adapters/claude-bg.ts";
 import { judgmentRunner, type Runner, type RunnerOptions, type RunRequest, runArgs, startRunner, hasSucceeded } from "../src/adapters/claude-p.ts";
 import { parseLimit } from "../src/adapters/limit.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
@@ -47,6 +48,13 @@ test("a model call keeps no session, loads only the user's settings, where their
 	expect(judging).toContain("--strict-mcp-config");
 	expect(judging.slice(judging.indexOf("--tools"), judging.indexOf("--tools") + 2)).toEqual(["--tools", ""]);
 	expect(JSON.parse(judging[judging.indexOf("--settings") + 1] ?? "{}")).toMatchObject({ disableAllHooks: true, outputStyle: "default" });
+});
+
+test("a run, a model call and a background run each turn Claude Code's advisor and fast mode off in their settings", () => {
+	const background = launchArgs({ ...RUN, name: "hum #68 build #0", settings: backgroundSettings(SHIPPED_DEFAULTS, "/tmp/stops") });
+	const settingsOf = (args: readonly string[]) => JSON.parse(args[args.indexOf("--settings") + 1] ?? "{}");
+
+	for (const args of [runArgs(RUN), runArgs({ ...RUN, call: "judgment" }), background]) expect(settingsOf(args)).toMatchObject({ env: { CLAUDE_CODE_DISABLE_ADVISOR_TOOL: "1", CLAUDE_CODE_DISABLE_FAST_MODE: "1" } });
 });
 
 test("neither a run nor a model call holds the GitHub tokens hum pushes with; the rest of the environment reaches both", async () => {
