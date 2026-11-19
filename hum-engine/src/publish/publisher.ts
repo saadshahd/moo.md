@@ -2,8 +2,9 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import pMemoize from "p-memoize";
+import PQueue from "p-queue";
 import { ADAPTER_API_VERSION, type Item, ItemId, type Questions, type WorkSource } from "../adapter-api.ts";
-import { type Git, gitIn, push } from "../adapters/git.ts";
+import { type Git, gitIn, inTurn, push } from "../adapters/git.ts";
 import type { GitHubCommits } from "../adapters/github-commits.ts";
 import type { ModelCall } from "../adapters/model-call.ts";
 import { onceCalls } from "../adapters/once.ts";
@@ -80,9 +81,16 @@ const makePublishRepo = pMemoize(
 	{ cacheKey: ([repo]) => repo },
 );
 
+/**
+ * The queue every git command on a publish repo waits in, its worktrees' too. Passes publish side by side, and git
+ * fails a command that reads what another writes at that moment: a fetch of a ref another fetch moved, or a worktree
+ * add that reads a worktree another pass is removing.
+ */
+const turnsOf = pMemoize(async (_repo: string) => new PQueue({ concurrency: 1 }), { cacheKey: ([repo]) => repo });
+
 /** Publish's repo, made on first use, with the remote as `origin`. */
 export const openPublishRepo = async (p: Pick<Publisher, "repo" | "remote" | "config">): Promise<Git> => {
-	const git = gitIn(p.repo, { identity: p.config.hum.commitIdentity, timeoutMs: timeoutOf(p) });
+	const git = inTurn(gitIn(p.repo, { identity: p.config.hum.commitIdentity, timeoutMs: timeoutOf(p) }), await turnsOf(p.repo));
 
 	await makePublishRepo(p.repo, p.remote, git);
 
@@ -105,7 +113,7 @@ const onBranch = async <T>(git: Git, p: Publisher, { ref, branch }: { readonly r
 	await git.raw(["worktree", "add", "-q", "-B", branch, folder, ref]);
 
 	try {
-		return await use({ git: gitIn(folder, { identity: p.config.hum.commitIdentity, timeoutMs: timeoutOf(p) }), folder });
+		return await use({ git: inTurn(gitIn(folder, { identity: p.config.hum.commitIdentity, timeoutMs: timeoutOf(p) }), await turnsOf(p.repo)), folder });
 	} finally {
 		await git.run(["worktree", "remove", "--force", folder]);
 		await git.run(["branch", "-D", branch]);

@@ -582,7 +582,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			const ran = await runner
 				.run({
 					prompt,
-					cwd: role === REVIEW_ROLE ? tmpdir() : clone,
+					cwd: clone,
 					env: d.env,
 					...tier,
 					schema,
@@ -853,7 +853,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 			if (!read.ok) throw failed(read.why);
 
-			const left = role === REVIEW_ROLE ? undefined : await changedFiles(d.git);
+			const left = await changedFiles(d.git);
 
 			const { pick, models } = await decideProse({
 				purpose,
@@ -864,7 +864,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 				canTake: (type) => actor.getSnapshot().can({ type }),
 			});
 
-			if (left !== undefined) await undoRunIn(d.git, left);
+			await undoRunIn(d.git, left);
 
 			if (isReview) keepVerdict(state, { id, head, patch, pick, models });
 			else if (isOwn && purpose === "plan") keepPick(state.events, { itemId: id, pick: { judge: purpose, pick: keptPick(pick), models: [...models] } });
@@ -1042,8 +1042,8 @@ const roleOf = (config: RunConfig, name: string): string => {
 
 
 /**
- * What a plan or review run reads. A plan run, and a repo's own review role, read the repo too; the engine's review
- * reads only the item, the files named for its review and the diff, so no author's reasoning reaches it.
+ * What a plan or review run is told. The review's prompt quotes only the item, the files named for its review and the
+ * diff, so no author's reasoning reaches it through the prompt.
  */
 export const PROSE_PROMPTS = {
 	plan: (config: RunConfig, item: ItemText, _diff = "", role = "plan"): string =>
@@ -1074,7 +1074,7 @@ const WINDOW_PASSED = "window-passed";
 /** What a run that changes files makes: a build or a fix of the change, or the repro's check. Each leaves it in the working tree, which hum commits. */
 type StepKind = "build" | "fix" | "repro";
 
-/** The engine's own review role: the review at landing runs it too, and it reads only the item and the diff, so it judges the change cold. */
+/** The engine's own review role: the review at landing runs it too, as a call with no tool that reads only the item, the files named for its review and the diff. */
 const REVIEW_ROLE = "review";
 
 /** The engine's own repro role, whose run writes the check that shows the bug. */

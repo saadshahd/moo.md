@@ -340,6 +340,13 @@ test("a state that starts a run and waits on the owner is refused", () => {
 	expect(problemsOf(bad)).toContainEqual({ kind: "feature", problem: "run-and-owner-wait", state: "building" });
 });
 
+test("a state that runs a plan or review role and takes no event for an unsure run is refused", () => {
+	const bad = clone(setUp());
+	delete bad.kinds.feature.machine.states.reviewing.on["needs-owner"];
+
+	expect(problemsOf(bad)).toContainEqual({ kind: "feature", problem: "unsure-unhandled", state: "reviewing", role: "review", event: "needs-owner" });
+});
+
 test("every owner-changeable part maps to a key the hum.json schema holds", () => {
 	const keys = Object.keys(HumConfig.shape);
 	const properties = Object.keys(schemaFile.properties);

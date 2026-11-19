@@ -749,7 +749,7 @@ test("a feature runs its plan and review states: the plan run's ready plan reach
 	expect([plan?.purpose, review?.purpose, approval?.answer.event]).toEqual(["plan", "review", "approve"]);
 	expect(readFileSync(buildStdin, "utf8")).toContain("Write it.");
 	expect(readFileSync(fixStdin, "utf8")).toContain("docs/note.md:1");
-	expect(review?.cwd).not.toContain("hum-run-");
+	expect(review?.cwd).toContain("hum-run-");
 	expect(review?.prompt).not.toContain("Write it.");
 	expect(w.repo.show(id)).toContain("state: done");
 	expect(folded(w, id)).toMatchObject({ doneBy: "review", picks: { plan: { pick: { event: "plan-ready" } }, review: { pick: { event: "approve" } }, alignment: { alignment: { graded: SOUND } } } });
@@ -787,7 +787,6 @@ test("a repo's design-critic role runs after the review approves a change that t
 	expect(modelOf(critic?.argv ?? [])).toBe(config.hum.models.top);
 	expect(modelOf(review?.argv ?? [])).toBe(config.hum.models.standard);
 	expect(critic?.cwd).toContain("hum-run-");
-	expect(review?.cwd).not.toContain("hum-run-");
 	expect(readFileSync(fixStdin, "utf8")).toContain(`The button breaks the spacing scale.\n${APP}:1`);
 	expect(sh(w.repo.remote, ["show", `main:${APP}`])).toBe("<Button gap={2} />\n");
 

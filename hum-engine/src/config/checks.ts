@@ -1,4 +1,5 @@
 import { APP_TOKEN_MINUTES, WAKE_OWN_ENV } from "./wake-job.ts";
+import { isProsePurpose, PROSE_STATES } from "../decide/prose.ts";
 import { z } from "zod";
 import { GUARD_PARAMS, kindMachine, nextStates, reachedFrom } from "./machine.ts";
 import type { Problem } from "./refusal.ts";
@@ -93,6 +94,12 @@ const kindProblems = (kind: string, config: Kind, hum: HumConfig): Problem[] => 
 
 			if (role && node.tags?.includes(OWNER_WAIT_TAG)) {
 				problems.push({ problem: "run-and-owner-wait", kind, state });
+			}
+
+			const unsure = role && isProsePurpose(role.purpose) ? PROSE_STATES[role.purpose].unsure : undefined;
+
+			if (unsure !== undefined && node.on?.[unsure] === undefined) {
+				problems.push({ problem: "unsure-unhandled", kind, state, role: node.invoke.src, event: unsure });
 			}
 		}
 	}
