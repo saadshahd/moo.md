@@ -134,7 +134,7 @@ test("the alignment grades raise a level at most one step, only when they move t
 	expect(alignedPlacement({ ...placement, level: levels[2]! }, SOUND, config.hum).level.name).toBe("high");
 });
 
-test("a review asks for changes only by citing a changed line, a plan is ready only with a plan, and an unsure run takes the safer event", () => {
+test("a review asks for changes only by citing a changed line, a plan is ready only with a plan, and an unsure run goes to the owner whatever it picked", () => {
 	const cite = (file: string, line: number) => ({ file, line });
 	const review = (cites: { file: string; line: number }[], sure = true) => finished({ structured: { event: "request-changes", sure, reason: "It breaks the log.", cites } });
 
@@ -144,7 +144,8 @@ test("a review asks for changes only by citing a changed line, a plan is ready o
 	expect(readPick("review", review([]), DIFF).ok).toBe(false);
 	expect(readPick("plan", finished({ structured: { event: "plan-ready", sure: true, reason: "clear" } }), "")).toMatchObject({ ok: false });
 	expect(readPick("plan", finished({ structured: { event: "plan-ready", sure: false, reason: "two readings" } }), "")).toMatchObject({ ok: true, pick: { event: "plan-blocked" } });
-	expect(readPick("review", finished({ structured: { event: "approve", sure: false, reason: "unsure" } }), DIFF)).toMatchObject({ ok: true, pick: { event: "request-changes" } });
+	expect(readPick("review", finished({ structured: { event: "approve", sure: false, reason: "unsure" } }), DIFF)).toMatchObject({ ok: true, pick: { event: "needs-owner", reason: "unsure" } });
+	expect(readPick("review", review([cite("src/a.ts", 11)], false), DIFF)).toMatchObject({ ok: true, pick: { event: "needs-owner" } });
 });
 
 test("a split names at least two parts, each waiting only on parts listed before it", () => {

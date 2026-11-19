@@ -489,6 +489,29 @@ test("a stuck item never reruns until the owner answers; the answer takes it bac
 	expect(w.state.spent.get("a")).toMatchObject({ total: 802, base: 401 });
 });
 
+test("an item the owner runs again after it ended stuck at the fix cap gets its fix runs afresh", async () => {
+	const w = await workerWorld({ items: { a: { writeForItem: true } } }, { checks: ["! test -f docs/a.md"], settings: { maxFixRuns: 1 } });
+
+	const pass = async () => {
+		const before = w.shim.calls().length;
+
+		await w.worker.tick();
+		await w.worker.idle();
+
+		return { result: w.results.at(-1), runs: w.shim.calls().length - before };
+	};
+
+	const stuckAfterOneFix = { result: { outcome: "stuck", item: "a", detail: "the checks still fail after 1 fixes" }, runs: 2 };
+
+	w.item("a", "docs/a.md");
+	expect(await pass()).toMatchObject(stuckAfterOneFix);
+
+	w.clock.at += TTL + 1;
+	await w.adapter.answers!.answer(ItemId.parse("a"), { text: "retry" });
+
+	expect(await pass()).toMatchObject(stuckAfterOneFix);
+});
+
 test("a limit the runner hit is saved, and a restarted worker makes no call before it ends, then resumes", async () => {
 	const until = Math.floor(NOW / 1000) + 3600;
 	const w = await workerWorld({ items: { a: { error: `Claude usage limit reached|${until}` } } });

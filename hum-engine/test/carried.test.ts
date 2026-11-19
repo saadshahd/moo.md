@@ -208,7 +208,7 @@ test("three items on one role start one after the other's first token, not toget
 	// The second and third waited for the first one's token; that they then go together, scheduler.test.ts proves on the gate itself.
 	expect(second!.at).toBeGreaterThanOrEqual(tokens.get(first!.pid)!);
 	expect(third!.at).toBeGreaterThanOrEqual(tokens.get(first!.pid)!);
-	expect(w.results.filter((r) => r.outcome === "merged")).toHaveLength(3);
+	expect({ merged: w.results.filter((r) => r.outcome === "merged").length, faults: w.state.faults.list().map(({ cause }) => cause) }).toEqual({ merged: 3, faults: [] });
 });
 
 test("openWorker wires a repo: state in .git/hum, the config in .hum/, the markdown source, a started runner", async () => {

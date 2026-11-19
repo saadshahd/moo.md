@@ -8,6 +8,7 @@ export type Problem =
 	| { readonly problem: "event-without-source"; readonly event: string; readonly source: string | undefined }
 	| { readonly problem: "event-without-handler"; readonly event: string }
 	| { readonly problem: "run-and-owner-wait"; readonly kind: string; readonly state: string }
+	| { readonly problem: "unsure-unhandled"; readonly kind: string; readonly state: string; readonly role: string; readonly event: string }
 	| { readonly problem: "missing-skill"; readonly skill: string; readonly role: string }
 	| { readonly problem: "unknown-state"; readonly kind: string; readonly state: string; readonly why: string }
 	| { readonly problem: "unknown-run-source"; readonly kind: string; readonly state: string; readonly src: string }
@@ -47,6 +48,7 @@ const DESCRIPTIONS = {
 		p.source === undefined ? `event "${p.event}" is waited on but declared nowhere` : `event "${p.event}" has no source: "${p.source}" is not a part or role`,
 	"event-without-handler": (p) => `event "${p.event}" has no handler in any kind`,
 	"run-and-owner-wait": (p) => `${p.kind}: state "${p.state}" starts a run and waits on the owner`,
+	"unsure-unhandled": (p) => `${p.kind}: state "${p.state}" runs role "${p.role}" and takes no "${p.event}", the event its run sends when it is not sure`,
 	"missing-skill": (p) => `role "${p.role}" names skill "${p.skill}", which no installed plugin has`,
 	"unknown-state": (p) => `${p.kind}: ${p.why} names state "${p.state}", which does not exist`,
 	"unknown-run-source": (p) => `${p.kind}: state "${p.state}" invokes "${p.src}", which is neither a role nor a part that runs`,

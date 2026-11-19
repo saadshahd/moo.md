@@ -5,7 +5,7 @@ import pMemoize from "p-memoize";
 import PQueue from "p-queue";
 import pTimeout from "p-timeout";
 import { createAsyncLogic } from "xstate";
-import { ADAPTER_API_VERSION, type Answers, type Holder, type Item, ItemId, type ItemRef, type Questions, type WorkSource } from "../adapter-api.ts";
+import { ADAPTER_API_VERSION, type Answers, type Holder, type Item, ItemId, type ItemRef, type Questions, type ThreadEntry, type WorkSource } from "../adapter-api.ts";
 import type { Runner } from "../adapters/claude-p.ts";
 import type { Config } from "../config/load.ts";
 import { invokedSources } from "../config/machine.ts";
@@ -47,6 +47,7 @@ import { RUN_AGAIN } from "../decide/answer.ts";
 import { recentlyAsked, releaseQuestions } from "./questions.ts";
 import { OWNER_APPROVAL } from "../decide/merge.ts";
 import { answerTo, type Checkout, doesStartOver, ownerWaitStage, claimTtlMs, DEFAULT_BASE, gatherItem, hasEndedStuck, isGathered, park, rememberKinds, runThinPath, type ThinPathOptions, type ThinResult, isWaitingOnOwner } from "./thin-path.ts";
+import { ownerAnswered } from "../state/item-log.ts";
 
 export type { TickResult } from "./lifecycle.ts";
 
@@ -352,10 +353,11 @@ export class Worker {
 	}
 
 	/**
-	 * Takes an item the owner acted on back from the parked. A finished change keeps its saved landing and lands again,
-	 * unless the owner asked to run it again; otherwise its saved state is dropped and its cap starts afresh.
+	 * Takes an item back from the parked. The owner's answer that takes it back, where one does, is their latest answer
+	 * in the item's log, so its fix runs and rebuilds count afresh. A finished change keeps its saved landing and lands
+	 * again, unless the owner asked to run it again; otherwise its saved state is dropped and its cap starts afresh.
 	 */
-	#unpark(id: string, option: string | undefined): void {
+	#unpark(id: string, answer: ThreadEntry | undefined): void {
 		const { state } = this.#o;
 		const parked = state.parked.get(id);
 
@@ -364,7 +366,9 @@ export class Worker {
 		state.parked.remove(id);
 		state.faults.clear({ code: `item-${parked.why}`, item: id });
 
-		const landsAgain = state.landings.get(id) !== undefined && option !== RUN_AGAIN;
+		if (answer) state.events.add(ownerAnswered(id, answer.at));
+
+		const landsAgain = state.landings.get(id) !== undefined && answer?.option !== RUN_AGAIN;
 
 		if (landsAgain) return;
 
@@ -436,7 +440,7 @@ export class Worker {
 					const lastAnswerAt = lastAnswer?.at;
 
 					if (held) {
-						if (isAnsweredSince(lastAnswerAt, held.since)) this.#unpark(id, lastAnswer?.option);
+						if (isAnsweredSince(lastAnswerAt, held.since)) this.#unpark(id, lastAnswer);
 
 						return;
 					}

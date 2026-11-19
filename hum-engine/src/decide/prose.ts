@@ -79,7 +79,7 @@ export const SPLIT = "needs-split";
 /** The two states whose outcome is prose: the events each may pick, and the safer pick an unsure run takes. */
 export const PROSE_STATES = {
 	plan: { boundary: "plan-outcome", events: ["plan-ready", SPLIT, "plan-blocked"], unsure: "plan-blocked" },
-	review: { boundary: "review-verdict", events: ["approve", "request-changes", "needs-owner"], unsure: "request-changes" },
+	review: { boundary: "review-verdict", events: ["approve", "request-changes", "needs-owner"], unsure: "needs-owner" },
 } as const satisfies Record<string, { boundary: Boundary; events: readonly [string, ...string[]]; unsure: string }>;
 
 export type ProsePurpose = keyof typeof PROSE_STATES;

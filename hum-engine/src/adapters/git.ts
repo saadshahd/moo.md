@@ -1,6 +1,7 @@
 import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type PQueue from "p-queue";
 import { exec } from "../exec.ts";
 
 /** No hook runs: the hooks path points nowhere, whatever the clone's own config says. */
@@ -130,6 +131,13 @@ export const gitIn = (cwd: string, { identity, env = {}, timeoutMs }: GitOptions
 
 	return { run, raw, bytes };
 };
+
+/** `git` whose commands wait in `queue`, so no two commands given that queue run at once. */
+export const inTurn = (git: Git, queue: PQueue): Git => ({
+	run: (args, input) => queue.add(() => git.run(args, input)),
+	raw: (args, input) => queue.add(() => git.raw(args, input)),
+	bytes: (args, input) => queue.add(() => git.bytes(args, input)),
+});
 
 /** Every config entry git reads in the folder, with the file each came from: reading config runs nothing. */
 const CONFIG_READ = ["config", "--list", "--show-origin"] as const;

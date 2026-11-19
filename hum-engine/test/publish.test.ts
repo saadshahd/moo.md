@@ -4,6 +4,8 @@ import { join } from "node:path";
 import { gitIn, identityEnv } from "../src/adapters/git.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 import { type BundleTrust, checkBundle } from "../src/publish/bundle.ts";
+import { fetchedPublishRepo } from "../src/publish/publisher.ts";
+import { configWith } from "./fixtures/config.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { tempDir } from "./fixtures/temp.ts";
 import { sh, WorkRepo } from "./fixtures/work-repo.ts";
@@ -98,4 +100,18 @@ describe("an outbox's bundle", () => {
 		expect(await w.check(file, { signs: true })).toMatchObject({ ok: false, why: expect.stringContaining("run.sh (mode 100755)") });
 		expect(await w.check(file)).toMatchObject({ ok: true });
 	});
+});
+
+test("passes that fetch publish's repo at once, each time the base moved, all end holding the base's head", async () => {
+	const repo = new WorkRepo();
+	const publisher = { repo: join(tempDir("publish"), "repo"), remote: repo.remote, config: configWith(), base: "main" };
+	const fetchedHead = async () => (await (await fetchedPublishRepo(publisher)).raw(["rev-parse", "origin/main"])).trim();
+
+	for (const round of ["one", "two", "three"]) {
+		repo.put({ path: `docs/${round}.md`, content: `${round}\n` });
+
+		const heads = await Promise.all(Array.from({ length: 4 }, fetchedHead));
+
+		expect(new Set(heads)).toEqual(new Set([sh(repo.remote, ["rev-parse", "main"]).trim()]));
+	}
 });
