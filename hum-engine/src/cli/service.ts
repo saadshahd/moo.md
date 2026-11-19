@@ -4,12 +4,11 @@ import { mkdtempSync } from "node:fs";
 import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Command } from "commander";
-import { x } from "tinyexec";
 import { z } from "zod";
 import { listPluginSkills } from "../config/load.ts";
 import { HumConfig } from "../config/schema.ts";
 import { readSettings } from "../config/settings.ts";
-import { commandTimeoutMs, exec, SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
+import { commandTimeoutMs, exec, SHIPPED_COMMAND_TIMEOUT_MS, spawn } from "../exec.ts";
 import { CI_STATE_REF, CiStateRaced, restoreCiState, saveCiState } from "../service/ci-state.ts";
 import { readCiTick, recordCiTick } from "../service/ci-tick.ts";
 import { EXIT_UPDATED, supervise } from "../service/supervise.ts";
@@ -117,7 +116,7 @@ const onStop = (stop: () => void) => {
 
 /** `hum work` as a child process of this one, sharing its terminal. */
 const spawnWorker = (cwd: string, workArgs: readonly string[]) => {
-	const child = x(process.execPath, [process.argv[1] ?? "", "work", ...workArgs], { nodeOptions: { cwd, stdio: "inherit" } });
+	const child = spawn(process.execPath, [process.argv[1] ?? "", "work", ...workArgs], { nodeOptions: { cwd, stdio: "inherit" } });
 
 	return { exited: Promise.resolve(child).then(({ exitCode }) => exitCode ?? 1), kill: () => void child.kill("SIGTERM") };
 };

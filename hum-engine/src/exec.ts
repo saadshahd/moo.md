@@ -1,5 +1,6 @@
+import { delimiter } from "node:path";
 import pTimeout from "p-timeout";
-import { type Options, type Output, x } from "tinyexec";
+import { type Options, type Output, type Result, x } from "tinyexec";
 import { type HumConfig, SHIPPED_DEFAULTS } from "./config/schema.ts";
 import { SECOND_MS } from "./time.ts";
 
@@ -15,6 +16,32 @@ const GITHUB_TOKENS = ["GH_TOKEN", "GITHUB_TOKEN"] as const;
  * value, which the runtime drops; leaving the name out would let `process.env` put it back.
  */
 export const withoutGitHubTokens = (env: Env) => ({ ...env, ...Object.fromEntries(GITHUB_TOKENS.map((name) => [name, undefined])) });
+
+/** A PATH folder that holds a package's commands: a repo's own, or one a launcher such as bunx put first. */
+const PACKAGE_BIN = /(^|\/)node_modules\/\.bin\/?$/;
+
+/** `path` without the folders that hold a package's commands, so a command found on it is the owner's own. */
+const ownerPath = (path: string): string =>
+	path
+		.split(delimiter)
+		.filter((folder) => !PACKAGE_BIN.test(folder))
+		.join(delimiter);
+
+/** Where the owner's own `command` lives, never a copy a repo's packages hold; null where the owner has none. */
+export const which = (command: string): string | null => Bun.which(command, { PATH: ownerPath(process.env.PATH ?? "") });
+
+export type SpawnOptions = Partial<Omit<Options, "nodePath">>;
+
+/**
+ * Starts a command on the owner's PATH. tinyexec puts first the `node_modules/.bin` of the folder a command runs in
+ * and of each folder above it, and a launcher such as bunx puts the repo's there before hum starts. A command hum
+ * starts sees none of them, so the `claude` it runs is the owner's, never one a repo pins.
+ */
+export const spawn = (command: string, args: readonly string[], { nodeOptions, ...options }: SpawnOptions = {}): Result => {
+	const env = { ...process.env, ...nodeOptions?.env };
+
+	return x(command, [...args], { ...options, nodePath: false, nodeOptions: { ...nodeOptions, env: { ...nodeOptions?.env, PATH: ownerPath(env.PATH ?? "") } } });
+};
 
 const SINGLE_QUOTE = /'/g;
 
@@ -44,7 +71,7 @@ export const SHIPPED_COMMAND_TIMEOUT_MS = commandTimeoutMs(SHIPPED_DEFAULTS);
 const STOP_GRACE_MS = 2000;
 const POLL_MS = 50;
 
-export type ExecOptions = Partial<Omit<Options, "timeout" | "signal" | "persist">> & {
+export type ExecOptions = Omit<SpawnOptions, "timeout" | "signal" | "persist"> & {
 	readonly timeoutMs: number;
 	readonly graceMs?: number;
 };
@@ -88,7 +115,7 @@ const stopGroup = async (group: number, graceMs: number): Promise<void> => {
  * throws `CommandTimedOut`, never a result.
  */
 export const exec = (command: string, args: readonly string[], { timeoutMs, graceMs = STOP_GRACE_MS, ...options }: ExecOptions): Promise<Output> => {
-	const child = x(command, [...args], { ...options, persist: true });
+	const child = spawn(command, args, { ...options, persist: true });
 
 	return pTimeout(child, {
 		milliseconds: timeoutMs,

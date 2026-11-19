@@ -35,5 +35,33 @@
     "anti-slop/no-widen-then-assert": "error",
     "anti-slop/require-readable-spacing": "error",
     "anti-slop/require-safety-comment-for-type-assertion": "error"
-  }
+  },
+  "overrides": [
+    {
+      "files": [
+        "src/**"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "tinyexec",
+                "message": "Start a command through spawn or exec in src/exec.ts, which run it on the owner's PATH."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/exec.ts"
+      ],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ]
 }

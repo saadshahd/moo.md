@@ -5,10 +5,9 @@ import { join } from "node:path";
 import pMemoize, { pMemoizeClear } from "p-memoize";
 import pRetry from "p-retry";
 import semver from "semver";
-import { x } from "tinyexec";
 import { z } from "zod";
 import type { EFFORTS } from "../config/schema.ts";
-import { CommandTimedOut, type Env, exec, SHIPPED_COMMAND_TIMEOUT_MS, withoutGitHubTokens } from "../exec.ts";
+import { CommandTimedOut, type Env, exec, SHIPPED_COMMAND_TIMEOUT_MS, spawn, withoutGitHubTokens } from "../exec.ts";
 import { raiseRejectedToken, UNAUTHORIZED } from "../service/token.ts";
 import { atomicWrite, isMissing } from "../state/fs.ts";
 import type { State } from "../state/open.ts";
@@ -422,10 +421,9 @@ const callsOf = (options: RunnerOptions) => {
 		const stderrFd = openSync(stderrFile, "w");
 
 		try {
-			const proc = x(binary, runArgs({ model, effort, schema, sessionId, call, name }), {
+			const proc = spawn(binary, runArgs({ model, effort, schema, sessionId, call, name }), {
 				stdin: prompt,
 				signal: AbortSignal.any(signal ? [stop.signal, signal] : [stop.signal]),
-				nodePath: false,
 				// stderr goes to a file, so the line reader sees stdout alone: one stream cannot split another's line.
 				nodeOptions: {
 					cwd,
@@ -529,7 +527,6 @@ const startChecked = async (options: RunnerOptions): Promise<Started> => {
 	});
 
 	const version = await exec(binary, ["--version"], {
-		nodePath: false,
 		timeoutMs,
 		nodeOptions: { env },
 	}).then(
