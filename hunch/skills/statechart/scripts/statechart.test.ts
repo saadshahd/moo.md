@@ -1,6 +1,6 @@
 import { describe, expect, test } from "claude-code/testing";
-import { draw, Refusal, type Verdict, type View } from "./chart.ts";
-import { configText, definitionLevels, parseDot, parseValue, pathGraph, printedBreaks, readConfig, readRun, stateKey, watchModule, withPaths, type Graph, type Trace, type Vars } from "./tlc.ts";
+import { draw, type Drawing, Refusal, type Verdict, type View } from "./chart.ts";
+import { configText, definitionLevels, parseDot, parseValue, pathGraph, printedBreaks, readConfig, readRun, rejectedState, stateKey, traceObservations, traceSteps, watchModule, withPaths, type Graph, type Step, type Trace, type Vars } from "./tlc.ts";
 
 const COUNT = `Error: Invariant Small is violated.
 Error: The behavior up to this point is:
@@ -91,10 +91,12 @@ const PRINTED_BY_EVERYSTATE = `Finished computing initial states: 1 distinct sta
 Model checking completed. No error has been found.`;
 
 describe("readConfig", () => {
-	test("splits the rules a config checks from the rest, kept as written", () => {
+	test("splits the rules a config checks from the rest, kept as written, and gives the model with only its CONSTRAINT bounds", () => {
 		const config = readConfig("SPECIFICATION Spec \\* the model\nCONSTANT N = 3\nINVARIANT TypeOK, Safe\n(* off *) PROPERTY Live\nCHECK_DEADLOCK FALSE\n");
-		expect(config).toEqual({ base: "SPECIFICATION Spec\nCONSTANT N = 3", invariants: ["TypeOK", "Safe"], properties: ["Live"], checksDeadlock: false });
+		expect(config).toEqual({ base: "SPECIFICATION Spec\nCONSTANT N = 3", stateBound: undefined, invariants: ["TypeOK", "Safe"], properties: ["Live"], checksDeadlock: false });
 		expect(configText(config.base, { invariants: ["Safe"] })).toBe("SPECIFICATION Spec\nCONSTANT N = 3\nINVARIANT Safe\n");
+		const bounded = readConfig("SPECIFICATION Spec\nCONSTRAINT Low\nACTION_CONSTRAINT Small\nINVARIANT Safe\n");
+		expect([bounded.base, bounded.stateBound]).toEqual(["SPECIFICATION Spec\nCONSTRAINT Low\nACTION_CONSTRAINT Small", "SPECIFICATION Spec\nCONSTRAINT Low"]);
 	});
 });
 
@@ -129,12 +131,6 @@ test("pathGraph draws a trace's steps, the step back into its loop among them", 
 	const graph = pathGraph([readRun(LASSO).violations[0].trace]);
 	expect(graph.states.size).toBe(2);
 	expect(graph.steps.map((s) => s.action)).toEqual(["ChecksFail", "FixDone"]);
-});
-
-test("withPaths adds the states and steps a path takes that the dump lacks, each state it adds marked past the constraint", () => {
-	const graph = withPaths(parseDot(PAY_DOT), [readRun(DEADLOCK).violations[0].trace]);
-	expect([...graph.states.values()].map((s) => [s.vars.phase, s.vars.tries, s.pastBound ?? false])).toEqual([["idle", 0, false], ["paying", 0, false], ["idle", 1, false], ["paid", 0, true]]);
-	expect(graph.steps.map((s) => s.action)).toEqual(["YouPay", "Fails", "Succeeds"]);
 });
 
 test("definitionLevels reads each definition's level from SANY's XML, written before its name or after it", () => {
@@ -222,17 +218,184 @@ describe("draw", () => {
 		const { report } = draw(PAY, [{ ...PAID_TWICE, pastBound: 2 }], byPhase, settings);
 		expect(report).toContain("| PaysOnce | breaks, also in 2 states past the constraint, which the chart does not draw |");
 	});
-	test("marks the end of a path that lies past the constraint, and counts the drawn states past it", () => {
-		const paidPastBound = { ...PAY, states: new Map([...PAY.states].map(([key, s]) => [key, { ...s, pastBound: key === stateKey(at("paid", 1)) }])) };
-		const { report } = draw(paidPastBound, [PAID_TWICE], byPhase, settings);
-		expect(report).toContain("1 drawn state lies past the constraint, which everystate's count leaves out.");
-		expect(report).toContain("4. Accept → paid (past the constraint)");
-	});
 	test("says a property with no temporal operator checks only the start states", () => {
 		const { report } = draw(PAY, [{ rule: "StartsIdle", kind: "property", initialOnly: true }], byPhase, settings);
 		expect(report).toContain("| StartsIdle | holds, checking only the start states");
 	});
 	test("draws no chart for a model too large to draw when no rule breaks", () => {
 		expect(draw(PAY, [], byPhase, { ...settings, complete: false }).mermaid).toBeUndefined();
+	});
+});
+
+/** Climb's dump and Start's are the same: x goes 0, 1, 2 by Next. */
+const ZERO_TO_TWO_DOT = `strict digraph DiskGraph {
+nodesep=0.35;
+subgraph cluster_graph {
+color="white";
+8951627508073401491 [label="x = 0",style = filled]
+8951627508073401491 -> 9015575927165504391 [label="Next",color="black",fontcolor="black"];
+9015575927165504391 [label="x = 1"];
+9015575927165504391 -> -4558582891141179340 [label="Next",color="black",fontcolor="black"];
+-4558582891141179340 [label="x = 2"];
+{rank = same; 8951627508073401491;}
+{rank = same; 9015575927165504391;}
+}
+}`;
+
+const LEAP_DOT = `strict digraph DiskGraph {
+nodesep=0.35;
+subgraph cluster_graph {
+color="white";
+8951627508073401491 [label="x = 0",style = filled]
+8951627508073401491 -> 9015575927165504391 [label="Inc",color="black",fontcolor="black"];
+9015575927165504391 [label="x = 1"];
+9015575927165504391 -> -4558582891141179340 [label="Inc",color="black",fontcolor="black"];
+-4558582891141179340 [label="x = 2"];
+-4558582891141179340 -> -8872841427029313142 [label="Inc",color="black",fontcolor="black"];
+-8872841427029313142 [label="x = 3"];
+-8872841427029313142 -> 7031572846926829618 [label="Inc",color="black",fontcolor="black"];
+7031572846926829618 [label="x = 4"];
+7031572846926829618 -> -6938108150182140576 [label="Inc",color="black",fontcolor="black"];
+-6938108150182140576 [label="x = 5"];
+{rank = same; 8951627508073401491;}
+{rank = same; 9015575927165504391;}
+{rank = same; -4558582891141179340;}
+{rank = same; -8872841427029313142;}
+{rank = same; 7031572846926829618;}
+}
+}`;
+
+const PARAMS_DOT = `strict digraph DiskGraph {
+nodesep=0.35;
+subgraph cluster_graph {
+color="white";
+-3343820705465830753 [label="c = (p1 :> 0 @@ p2 :> 0)",style = filled]
+-3343820705465830753 -> -2601257132019441491 [label="Bump",color="black",fontcolor="black"];
+-2601257132019441491 [label="c = (p1 :> 1 @@ p2 :> 0)"];
+-3343820705465830753 -> 2618802929728384722 [label="Bump",color="black",fontcolor="black"];
+2618802929728384722 [label="c = (p1 :> 0 @@ p2 :> 1)"];
+-2601257132019441491 -> 3815098365656490992 [label="Bump",color="black",fontcolor="black"];
+3815098365656490992 [label="c = (p1 :> 1 @@ p2 :> 1)"];
+2618802929728384722 -> 3815098365656490992 [label="Bump",color="black",fontcolor="black"];
+{rank = same; -3343820705465830753;}
+{rank = same; -2601257132019441491;2618802929728384722;}
+}
+}`;
+
+const CONFORMS = `{"status":"conforms","observations":3,"ignored":0,"matched":3,"candidates":1}`;
+const TRACE_ERROR = `{"status":"trace-error","message":"not valid JSON: unterminated JSON string","line":1,"observations":0,"ignored":0,"matched":0,"candidates":0,"lastMatched":null}`;
+const REJECTS = {
+	climb: `{"status":"mismatch","message":"The spec allows no further step from the state the trace has reached.","line":1,"observations":4,"ignored":0,"matched":3,"candidates":1,"failed":{"index":4,"line":1,"observation":{"state":{"x":3}}},"lastMatched":{"index":3,"line":1,"candidates":1},"before":[{"x":2}],"nearest":[],"enabled":[],"hints":["1 matching state is outside the model's bound Bound (a CONSTRAINT in the configuration). Rerun with -noconstraints to follow the trace beyond it."]}`,
+	leap: `{"status":"mismatch","message":"No step the spec allows here produces the observed values.","line":1,"observations":2,"ignored":0,"matched":1,"candidates":1,"failed":{"index":2,"line":1,"observation":{"state":{"x":3}}},"lastMatched":{"index":1,"line":1,"candidates":1},"before":[{"x":0}],"nearest":[{"action":"Inc","differs":[{"var":"x","observed":3,"expected":1}]}],"enabled":[{"action":"Inc","produces":{"x":1},"matchesState":false}],"hints":["1 matching state is outside the model's bound Small (a CONSTRAINT in the configuration). Rerun with -noconstraints to follow the trace beyond it.","The observation can be matched if 2 steps went unlogged before it. If the log does not record every step, rerun with -hidden 2."]}`,
+	leapTo4: `{"status":"mismatch","message":"No step the spec allows here produces the observed values.","line":1,"observations":3,"ignored":0,"matched":2,"candidates":1,"failed":{"index":3,"line":1,"observation":{"state":{"x":4}}},"lastMatched":{"index":2,"line":1,"candidates":1},"before":[{"x":1}],"nearest":[{"action":"Inc","differs":[{"var":"x","observed":4,"expected":2}]}],"enabled":[{"action":"Inc","produces":{"x":2},"matchesState":false}],"hints":["1 matching state is outside the model's bound Small (a CONSTRAINT in the configuration). Rerun with -noconstraints to follow the trace beyond it.","The observation can be matched if 2 steps went unlogged before it. If the log does not record every step, rerun with -hidden 2."]}`,
+	start: `{"status":"mismatch","message":"No initial state of the spec has the observed values.","line":1,"observations":1,"ignored":0,"matched":0,"candidates":1,"failed":{"index":1,"line":1,"observation":{"state":{"x":5}}},"lastMatched":null,"before":[],"nearest":[{"action":null,"differs":[{"var":"x","observed":5,"expected":0}]}],"enabled":[]}`,
+	params: `{"status":"mismatch","message":"No step the spec allows here produces the observed values.","line":1,"observations":3,"ignored":0,"matched":2,"candidates":1,"failed":{"index":3,"line":1,"observation":{"state":{"c":{"p1":2,"p2":0}}}},"lastMatched":{"index":2,"line":1,"candidates":1},"before":[{"c":{"p1":1,"p2":0}}],"nearest":[{"action":"Bump(p2)","differs":[{"var":"c","observed":{"p1":2,"p2":0},"expected":{"p1":1,"p2":1}}]}],"enabled":[{"action":"Bump(p2)","produces":{"c":{"p1":1,"p2":1}},"matchesState":false}],"hints":["1 matching state is outside the model's bound Bound (a CONSTRAINT in the configuration). Rerun with -noconstraints to follow the trace beyond it."]}`,
+	shapes: `{"status":"mismatch","message":"The spec allows no further step from the state the trace has reached.","line":1,"observations":3,"ignored":0,"matched":2,"candidates":1,"failed":{"index":3,"line":1,"observation":{"state":{"str":"go","b":true,"e":{},"f":{"1":"x","2":"y"},"g":{"p1":2,"p2":0},"m":"p1","n":2,"q":{"1":"a","2":2,"3":0,"4":1},"r":{"b":[],"a":1},"s":[1,2,3,4]}}},"lastMatched":{"index":2,"line":1,"candidates":1},"before":[{"str":"go","b":false,"e":[],"f":["x","y"],"g":{"p1":1,"p2":0},"m":"p1","n":1,"q":["a",2,0],"r":{"b":[],"a":0},"s":[1,2,3]}],"nearest":[],"enabled":[],"hints":["1 matching state is outside the model's bound Bound (a CONSTRAINT in the configuration). Rerun with -noconstraints to follow the trace beyond it."]}`,
+};
+
+const SHAPES_RUN = `Error: Invariant Safe is violated.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\\ str = "go"
+/\\ b = TRUE
+/\\ e = <<>>
+/\\ f = <<"x", "y">>
+/\\ g = (p1 :> 0 @@ p2 :> 0)
+/\\ m = p1
+/\\ n = 0
+/\\ q = <<"a", 2>>
+/\\ r = [b |-> {}, a |-> 1]
+/\\ s = {1, 2}
+
+State 2: <Next line 9, col 9 to line 11, col 58 of module Shapes>
+/\\ str = "go"
+/\\ b = FALSE
+/\\ e = <<>>
+/\\ f = <<"x", "y">>
+/\\ g = (p1 :> 1 @@ p2 :> 0)
+/\\ m = p1
+/\\ n = 1
+/\\ q = <<"a", 2, 0>>
+/\\ r = [b |-> {}, a |-> 0]
+/\\ s = {1, 2, 3}
+
+State 3: <Next line 9, col 9 to line 11, col 58 of module Shapes>
+/\\ str = "go"
+/\\ b = TRUE
+/\\ e = <<>>
+/\\ f = <<"x", "y">>
+/\\ g = (p1 :> 2 @@ p2 :> 0)
+/\\ m = p1
+/\\ n = 2
+/\\ q = <<"a", 2, 0, 1>>
+/\\ r = [b |-> {}, a |-> 1]
+/\\ s = {1, 2, 3, 4}`;
+const SHAPES_OBSERVED = `[{"state":{"str":"go","b":true,"e":{},"f":{"1":"x","2":"y"},"g":{"p1":0,"p2":0},"m":"p1","n":0,"q":{"1":"a","2":2},"r":{"b":[],"a":1},"s":[1,2]}},{"state":{"str":"go","b":false,"e":{},"f":{"1":"x","2":"y"},"g":{"p1":1,"p2":0},"m":"p1","n":1,"q":{"1":"a","2":2,"3":0},"r":{"b":[],"a":0},"s":[1,2,3]}},{"state":{"str":"go","b":true,"e":{},"f":{"1":"x","2":"y"},"g":{"p1":2,"p2":0},"m":"p1","n":2,"q":{"1":"a","2":2,"3":0,"4":1},"r":{"b":[],"a":1},"s":[1,2,3,4]}}]`;
+
+const xIs = (x: number): Vars => ({ x });
+const counter = (p1: number, p2: number): Vars => ({ c: { p1, p2 } });
+const cutBy = (trace: Trace, answer: string, pastBound: boolean): Trace => {
+	const rejected = rejectedState(answer);
+	return rejected === undefined ? trace : { ...trace, cut: { at: rejected, pastBound } };
+};
+const CLIMB = cutBy(traceOf([undefined, xIs(0)], ["Next", xIs(1)], ["Next", xIs(2)], ["Next", xIs(3)]), REJECTS.climb, true);
+const LEAP = cutBy(traceOf([undefined, xIs(0)], ["Jump", xIs(3)]), REJECTS.leap, false);
+const LEAP_TO_4 = cutBy(traceOf([undefined, xIs(0)], ["Inc", xIs(1)], ["Jump", xIs(4)]), REJECTS.leapTo4, false);
+const LEAP_TO_2 = cutBy(traceOf([undefined, xIs(0)], ["Inc", xIs(1)], ["Inc", xIs(2)]), CONFORMS, false);
+const START = cutBy(traceOf([undefined, xIs(5)]), REJECTS.start, true);
+const PARAMS = cutBy(traceOf([undefined, counter(0, 0)], ["Bump(p1)", counter(1, 0)], ["Bump(p1)", counter(2, 0)]), REJECTS.params, true);
+
+const breaksSafe = (trace: Trace): Verdict => ({ rule: "Safe", kind: "invariant", trace, breaking: new Set([stateKey(trace.states.at(-1)!.vars)]) });
+const PAST = "1 drawn state lies past the constraint, which everystate's count leaves out.";
+const CUT_MARK = "(cut by the constraint)";
+const cutMarks = ({ report, mermaid }: Drawing) => [...report.split("\n").filter((line) => line.includes(CUT_MARK)), ...mermaid!.split("\n").filter((line) => line.includes(CUT_MARK)).map((line) => line.split(" : ")[1])];
+
+describe("under a bound", () => {
+	test("rejectedState reads only conform's status and failed index, as an index into the path's states, though a hint calls an ACTION_CONSTRAINT a CONSTRAINT", () => {
+		expect([REJECTS.leap, REJECTS.start, CONFORMS].map(rejectedState)).toEqual([1, 0, undefined]);
+		expect(() => rejectedState(TRACE_ERROR)).toThrow(/neither "conforms" nor a mismatch/);
+	});
+	test("in complete mode, the step conform finds cut is each step of a path the dump lacks, by the states it joins", () => {
+		const joins = (steps: Step[]) => steps.map(({ from, to }) => `${from} -> ${to}`);
+		for (const [dot, path] of [[ZERO_TO_TWO_DOT, CLIMB], [LEAP_DOT, LEAP], [LEAP_DOT, LEAP_TO_4], [LEAP_DOT, LEAP_TO_2], [ZERO_TO_TWO_DOT, START], [PARAMS_DOT, PARAMS]] as const) {
+			const dumped = new Set(joins(parseDot(dot).steps));
+			const steps = traceSteps(path);
+			expect(joins(steps.filter((step) => step.cut))).toEqual(joins(steps).filter((step) => !dumped.has(step)));
+		}
+	});
+	test("withPaths adds to the dump only the steps a bound cuts, so an allowed step the trace names with its parameters is drawn once", () => {
+		const graph = withPaths(parseDot(PARAMS_DOT), [PARAMS]);
+		expect(graph.steps.map((step) => [step.action, step.cut ?? false])).toEqual([["Bump", false], ["Bump", false], ["Bump", false], ["Bump", false], ["Bump(p1)", true]]);
+		expect([...graph.states.values()].filter((state) => state.pastBound).map((state) => state.vars)).toEqual([counter(2, 0)]);
+	});
+	const ROWS: [string, string, Trace, boolean[], string[], boolean][] = [
+		["Climb above --chart-states: the last step is marked", ZERO_TO_TWO_DOT, CLIMB, [false], ["3. Next (cut by the constraint) → x = 3", "Next (cut by the constraint)"], true],
+		["Climb, complete: the last step is marked, and one drawn state lies past the constraint", ZERO_TO_TWO_DOT, CLIMB, [true], ["3. Next (cut by the constraint) → x = 3", "Next (cut by the constraint)"], true],
+		["Leap, both modes: the Jump step is marked, and no state lies past the constraint", LEAP_DOT, LEAP, [true, false], ["1. Jump (cut by the constraint) → x = 3", "Jump (cut by the constraint)"], false],
+		["Leap with Safe == x # 4, both modes: the Jump step is marked, and no state lies past the constraint", LEAP_DOT, LEAP_TO_4, [true, false], ["2. Jump (cut by the constraint) → x = 4", "Jump (cut by the constraint)"], false],
+		["Leap with Safe == x # 2, both modes: no step is marked", LEAP_DOT, LEAP_TO_2, [true, false], [], false],
+		["a one-state path whose start lies past the bound, both modes: no step to mark", ZERO_TO_TWO_DOT, START, [true, false], [], true],
+	];
+	for (const [name, dot, path, modes, marks, past] of ROWS)
+		test(name, () => {
+			for (const complete of modes) {
+				const drawing = draw(complete ? withPaths(parseDot(dot), [path]) : pathGraph([path]), [breaksSafe(path)], {}, { title: "Probe", distinct: 3, complete, arrowBudget: 20 });
+				expect(cutMarks(drawing)).toEqual(marks);
+				expect(drawing.report.includes(PAST)).toBe(past);
+			}
+		});
+	test("a cut step and an allowed step between the same two labels draw as two arrows", () => {
+		const view: View = { state: (vars) => (Number(vars.x) < 3 ? "low" : "high"), step: () => "moves" };
+		const { mermaid } = draw(withPaths(parseDot(LEAP_DOT), [LEAP]), [breaksSafe(LEAP)], view, { title: "Probe", distinct: 6, complete: true, arrowBudget: 20 });
+		expect(mermaid!.split("\n").filter((line) => line.includes(" : moves"))).toEqual(["  s0 --> s1 : moves", "  s0 --> s1 : moves (cut by the constraint)"]);
+	});
+	test("a bounded path that loops or stutters replays whole: traceObservations sends the step back into a loop, and no stutter", () => {
+		expect(JSON.parse(traceObservations(readRun(LASSO).violations[0].trace))).toEqual([{ state: { phase: "checking" } }, { state: { phase: "fixing" } }, { state: { phase: "checking" } }]);
+		expect(JSON.parse(traceObservations(readRun(STUTTER).violations[0].trace))).toEqual([{ state: { phase: "checking" } }]);
+	});
+	test("Shapes: traceObservations sends every value shape as conform read it, and conform's answer cuts the last step", () => {
+		const path = readRun(SHAPES_RUN).violations[0].trace;
+		expect(traceObservations(path)).toBe(SHAPES_OBSERVED);
+		expect(traceSteps(cutBy(path, REJECTS.shapes, true)).map((step) => step.cut)).toEqual([false, true]);
 	});
 });

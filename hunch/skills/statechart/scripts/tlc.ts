@@ -10,14 +10,20 @@ export type Vars = { [name: string]: Value };
 export type TraceState = { action: string | undefined; vars: Vars };
 
 /** A path TLC printed: from a start state to where a rule breaks. A trace that loops back ends in
- * \`loop\`, the index it returns to; one that stutters ends in \`stutters\`. */
-export type Trace = { states: TraceState[]; loop?: number; stutters?: boolean };
+ * \`loop\`, the index it returns to; one that stutters ends in \`stutters\`; one a bound cuts holds \`cut\`. */
+export type Trace = { states: TraceState[]; loop?: number; stutters?: boolean; cut?: Cut };
+
+/** Where a bound cuts a trace: `at` is the index of the first state the bounded model rejects, so the step into it is
+ * cut, or the start when 0. `pastBound` holds when a replay proved that state lies past a CONSTRAINT, which leaves it
+ * out of the states a check counts. */
+export type Cut = { at: number; pastBound: boolean };
 
 export type Violation = { rule: string | undefined; kind: "invariant" | "deadlock" | "property"; trace: Trace };
 
 export type RunResult = { violations: Violation[]; distinct: number };
 
-export type Config = { base: string; invariants: string[]; properties: string[]; checksDeadlock: boolean };
+/** A config's model, `base`, and the rules it checks. `stateBound` is the model with only its CONSTRAINT bounds, when it has one. */
+export type Config = { base: string; stateBound: string | undefined; invariants: string[]; properties: string[]; checksDeadlock: boolean };
 
 /** `value`, or a throw naming what was missing. */
 export function must<T>(value: T | undefined, missing: string): T {
@@ -29,6 +35,7 @@ const KEYWORDS = ["CONSTANTS", "CONSTANT", "INIT", "NEXT", "SPECIFICATION", "INV
 const SECTION = new RegExp(String.raw`\b(${KEYWORDS.join("|")})\b`, "g");
 const withoutComments = (text: string) => text.replace(/\(\*[\s\S]*?\*\)/g, " ").replace(/\\\*.*$/gm, "");
 const namesIn = (body: string) => body.split(/[\s,]+/).filter(Boolean);
+const RULE_KEYWORDS = ["INVARIANT", "INVARIANTS", "PROPERTY", "PROPERTIES", "CHECK_DEADLOCK"];
 
 /** A config split into the rules it checks and the rest, kept as written. */
 export function readConfig(text: string): Config {
@@ -37,11 +44,14 @@ export function readConfig(text: string): Config {
 	const sections = starts.map((m, i) => ({ keyword: m[1], body: clean.slice(m.index + m[0].length, starts[i + 1]?.index ?? clean.length) }));
 	const named = (...keywords: string[]) => sections.filter((s) => keywords.includes(s.keyword)).flatMap((s) => namesIn(s.body));
 	const deadlock = sections.find((s) => s.keyword === "CHECK_DEADLOCK");
-	return {
-		base: sections
-			.filter((s) => !["INVARIANT", "INVARIANTS", "PROPERTY", "PROPERTIES", "CHECK_DEADLOCK"].includes(s.keyword))
+	const without = (keywords: string[]) =>
+		sections
+			.filter((s) => !keywords.includes(s.keyword))
 			.map((s) => (s.keyword + s.body).trim())
-			.join("\n"),
+			.join("\n");
+	return {
+		base: without(RULE_KEYWORDS),
+		stateBound: named("CONSTRAINT", "CONSTRAINTS").length ? without([...RULE_KEYWORDS, "ACTION_CONSTRAINT", "ACTION_CONSTRAINTS"]) : undefined,
 		invariants: named("INVARIANT", "INVARIANTS"),
 		properties: named("PROPERTY", "PROPERTIES"),
 		checksDeadlock: deadlock === undefined || deadlock.body.trim() !== "FALSE",
@@ -210,7 +220,8 @@ export function readRun(output: string): RunResult {
 	return { violations, distinct: Math.max(0, ...counts) };
 }
 
-export type Step = { from: string; to: string; action: string };
+/** One step between two states; `cut` marks one a bound cuts. */
+export type Step = { from: string; to: string; action: string; cut?: boolean };
 /** A state of a graph; one marked `pastBound` lies past a constraint. */
 export type GraphState = { vars: Vars; start: boolean; pastBound?: boolean };
 export type Graph = { states: Map<string, GraphState>; steps: Step[] };
@@ -240,30 +251,46 @@ export function parseDot(dot: string): Graph {
 	return { states, steps: edges.map(([from, to, action]) => ({ from: keyOf(from), to: keyOf(to), action })) };
 }
 
-/** The graph of the given traces alone: what a chart draws when the model has too many states for all. */
+/** Each step a trace takes, the step back into its loop among them, with the step its bound cuts marked `cut`. */
+export const traceSteps = ({ states, cut }: Trace): Step[] =>
+	states.slice(1).flatMap(({ action, vars }, i) => (action === undefined ? [] : [{ from: stateKey(states[i].vars), to: stateKey(vars), action, cut: i + 1 === cut?.at }]));
+
+/** The graph of the given traces alone: what a chart draws when the model has too many states for all. A state a
+ * replay proved past a CONSTRAINT is marked `pastBound`. */
 export function pathGraph(traces: Trace[]): Graph {
 	const states = new Map<string, GraphState>();
 	const steps = new Map<string, Step>();
-	for (const { states: path } of traces)
-		path.forEach(({ vars, action }, i) => {
+	for (const trace of traces) {
+		trace.states.forEach(({ vars }, i) => {
 			const key = stateKey(vars);
-			if (!states.has(key)) states.set(key, { vars, start: i === 0 });
-			if (i > 0 && action !== undefined) {
-				const step = { from: stateKey(path[i - 1].vars), to: key, action };
-				steps.set(stepId(step), step);
-			}
+			if (!states.has(key)) states.set(key, { vars, start: i === 0, pastBound: i === trace.cut?.at && trace.cut.pastBound });
 		});
+		for (const step of traceSteps(trace)) steps.set(stepId(step), step);
+	}
 	return { states, steps: [...steps.values()] };
 }
 
-/** The state graph a check dumped, with the states and steps of `traces` it lacks. Under a constraint the dump leaves
- * out the states just past it, where a check still tests each rule, so a path can end on one: each state the dump lacks
- * is marked `pastBound`. */
+/** The state graph a check dumped, with what `traces` add under a bound: each step the bound cuts, which the dump
+ * leaves out, and each state of theirs the dump lacks. A check still tests each rule on the states just past a
+ * constraint, so a path can end on one: each state the dump lacks is marked `pastBound`. */
 export function withPaths(dump: Graph, traces: Trace[]): Graph {
 	const paths = pathGraph(traces);
-	const dumped = new Set(dump.steps.map(stepId));
 	const pastBound = [...paths.states].filter(([key]) => !dump.states.has(key)).map(([key, state]): [string, GraphState] => [key, { ...state, pastBound: true }]);
-	return { states: new Map([...dump.states, ...pastBound]), steps: [...dump.steps, ...paths.steps.filter((step) => !dumped.has(stepId(step)))] };
+	return { states: new Map([...dump.states, ...pastBound]), steps: [...dump.steps, ...paths.steps.filter((step) => step.cut)] };
+}
+
+/** A trace as the observations `everystate conform` reads: each state's values, with no action named. */
+export const traceObservations = ({ states }: Trace) => JSON.stringify(states.map(({ vars }) => ({ state: vars })));
+
+/** The index in a trace's states of the first one an `everystate conform -json` run rejects, 0 for the start, or
+ * undefined when the trace conforms. It reads only `status` and `failed.index`, which counts from 1: conform's hints
+ * call an ACTION_CONSTRAINT "a CONSTRAINT". */
+export function rejectedState(output: string): number | undefined {
+	const { status, failed } = JSON.parse(output) as { status?: string; failed?: { index?: number } };
+	if (status === "conforms") return undefined;
+	const index = status === "mismatch" ? failed?.index : undefined;
+	if (index === undefined || !Number.isInteger(index) || index < 1) throw new Error(`everystate conform answered neither "conforms" nor a mismatch at an observation: ${output.slice(0, 300)}`);
+	return index - 1;
 }
 
 /** Each operator's level as SANY's XML export gives it: 0 constant, 1 state, 2 action, 3 temporal. SANY writes an
