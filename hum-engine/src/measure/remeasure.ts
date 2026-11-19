@@ -1,6 +1,6 @@
 import { join } from "node:path";
-import { x } from "tinyexec";
 import type { Boundary } from "../config/schema.ts";
+import { spawn } from "../exec.ts";
 
 const EVAL_SCRIPT = join(import.meta.dir, "..", "..", "scripts", "eval.ts");
 
@@ -21,7 +21,7 @@ export type Measured = { readonly ok: true } | { readonly ok: false; readonly wh
  * process's terminal; otherwise its output is kept to say why it failed.
  */
 export const measureOn = async (repo: string, { model, runs, boundaries = [] }: Measurement, { inherit, signal }: { readonly inherit: boolean; readonly signal?: AbortSignal }): Promise<Measured> => {
-	const ran = await x(process.execPath, [EVAL_SCRIPT, "--model", model, "--runs", String(runs), "--write", join(repo, ".hum"), ...boundaries], {
+	const ran = await spawn(process.execPath, [EVAL_SCRIPT, "--model", model, "--runs", String(runs), "--write", join(repo, ".hum"), ...boundaries], {
 		throwOnError: false,
 		signal,
 		nodeOptions: { cwd: repo, stdio: inherit ? "inherit" : "pipe" },

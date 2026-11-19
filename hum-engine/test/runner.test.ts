@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { judgmentRunner, type Runner, type RunnerOptions, type RunRequest, runArgs, startRunner, hasSucceeded } from "../src/adapters/claude-p.ts";
 import { parseLimit } from "../src/adapters/limit.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
@@ -195,6 +195,21 @@ test("a Claude Code under the floor starts no run and makes no model call", asyn
 	expect(state.faults.list().map((c) => c.code)).toEqual(["claude-too-old"]);
 	expect((await ask(runner)).kind).toBe("held");
 	expect(shim.calls()).toHaveLength(0);
+});
+
+test("the floor reads the owner's claude, never one a repo's node_modules holds, even where a launcher put that folder first on PATH", async () => {
+	const owners = makeShim({ version: "2.1.323" });
+	const pinned = join(tempDir("repo"), "node_modules", ".bin");
+	const state = openState(tempDir("runner"), { now: Date.now });
+
+	mkdirSync(pinned, { recursive: true });
+	writeFileSync(join(pinned, "claude"), "#!/bin/sh\necho '2.1.300 (Claude Code)'\n", { mode: 0o755 });
+
+	const path = [pinned, dirname(owners.binary), dirname(process.execPath), "/usr/bin", "/bin"].join(":");
+	const { check } = await startRunner({ state, model: MODEL, env: { ...owners.env, PATH: path }, now: () => NOW });
+
+	expect(state.faults.list().map((c) => c.cause)).toEqual([]);
+	expect(check.kind).toBe("finished");
 });
 
 test("a start check without the hope plugin, as bare mode answers, starts zero runs and shows one card", async () => {

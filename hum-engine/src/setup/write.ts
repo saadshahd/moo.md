@@ -11,6 +11,7 @@ import { migrateConfig } from "../config/migrate.ts";
 import { noGitIdentity, type Refusal, type Result } from "../config/refusal.ts";
 import { type HumConfig, Kind, READABLE_SCHEMA_VERSIONS, SCHEMA_VERSION } from "../config/schema.ts";
 import { isGitHubHosted } from "../config/wake-job.ts";
+import { which } from "../exec.ts";
 import { ciWorkflows } from "../service/workflows.ts";
 import { roundupStart } from "../service/roundup-start.ts";
 import { renderUnit, type UnitKind } from "../service/unit.ts";
@@ -225,7 +226,7 @@ const serviceFile = (repo: string, config: Config, env: SetupEnv): FileToWrite =
 			label,
 			repo,
 			command: serveCommand(repo, env),
-			path: env.runtime?.path ?? [dirname(bun), dirname(Bun.which("git") ?? "/usr/bin/git"), dirname(Bun.which("claude") ?? "/usr/local/bin/claude"), "/usr/bin", "/bin"].join(":"),
+			path: env.runtime?.path ?? [dirname(bun), dirname(which("git") ?? "/usr/bin/git"), dirname(which("claude") ?? "/usr/local/bin/claude"), "/usr/bin", "/bin"].join(":"),
 			env: {},
 			log: join(home, kind === "launchd" ? join("Library", "Logs") : join(".local", "state"), `${label}.log`),
 			restartDelaySeconds: config.hum.restartDelaySeconds,

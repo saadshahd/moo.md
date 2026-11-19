@@ -13,12 +13,12 @@ export type ShellOptions = {
 
 /**
  * One check's failure as its command, exit code and output, or as the limit it ran past; undefined when it passes.
- * It runs with no stdin and the worker's own PATH, as in the owner's shell; the clone's `node_modules/.bin` is not added.
+ * It runs with no stdin and on the owner's PATH, as in their shell.
  * A run wrote the code a check runs, so a check holds no GitHub token.
  */
 const failureOf = async (command: string, cwd: string, { env, timeoutMs }: ShellOptions): Promise<string | undefined> => {
 	try {
-		const { exitCode, stdout, stderr } = await exec("sh", ["-c", command], { nodePath: false, timeoutMs, nodeOptions: { cwd, env: withoutGitHubTokens({ ...process.env, ...env }), stdio: ["ignore", "pipe", "pipe"] } });
+		const { exitCode, stdout, stderr } = await exec("sh", ["-c", command], { timeoutMs, nodeOptions: { cwd, env: withoutGitHubTokens({ ...process.env, ...env }), stdio: ["ignore", "pipe", "pipe"] } });
 
 		return exitCode === 0 ? undefined : `${command} exited ${exitCode}:\n${stdout}${stderr}`;
 	} catch (error) {

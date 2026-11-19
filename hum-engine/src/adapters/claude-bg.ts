@@ -180,7 +180,7 @@ export const backgroundRunner = ({ binary = "claude", env, state, config, fallba
 	const jobsFolder = join(env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"), JOBS_FOLDER);
 
 	const claude = (args: readonly string[], options: { stdin?: string; cwd?: string } = {}) =>
-		exec(binary, args, { stdin: options.stdin, nodePath: false, timeoutMs: commandTimeoutMs(config), nodeOptions: { cwd: options.cwd, env: withoutGitHubTokens(env) } });
+		exec(binary, args, { stdin: options.stdin, timeoutMs: commandTimeoutMs(config), nodeOptions: { cwd: options.cwd, env: withoutGitHubTokens(env) } });
 
 	/** The background runs Claude Code lists. A list hum cannot read throws, with one card: read as empty, it would start a run that is already going. */
 	const agents = async (): Promise<Agent[]> => {

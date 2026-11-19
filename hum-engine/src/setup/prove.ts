@@ -6,7 +6,7 @@ import { type AdapterContext, Holder, ItemId } from "../adapter-api.ts";
 import { runContract } from "../adapters/contract.ts";
 import { markdownAdapter } from "../adapters/markdown.ts";
 import { type Config, loadConfig, readConfigDir } from "../config/load.ts";
-import { commandTimeoutMs, type Env, exec, SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
+import { commandTimeoutMs, type Env, exec, SHIPPED_COMMAND_TIMEOUT_MS, which } from "../exec.ts";
 import { SlotPool } from "../slots/pool.ts";
 import { orMissing } from "../state/fs.ts";
 import { openState } from "../state/open.ts";
@@ -166,7 +166,7 @@ const itemStep = async (repo: string, config: Config, env: ProveEnv): Promise<Ou
 
 	if (live.length > 0) return skipped(`${live.join(", ")} write to a live target, whose real items an item run would take`);
 
-	if (Bun.which("claude") === null) return skipped("claude is not installed on this machine");
+	if (which("claude") === null) return skipped("claude is not installed on this machine");
 
 	const scratch = await Scratch.from(repo, env.base, config.hum);
 
