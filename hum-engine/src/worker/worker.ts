@@ -38,7 +38,7 @@ import { newestChoices, openQuestions } from "../status/sections.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { SECOND_MS } from "../time.ts";
 import { type Exit, runLifecycle, type TickResult } from "./lifecycle.ts";
-import { type Footprint, footprintOf, pick, PrefixGate } from "./scheduler.ts";
+import { type Footprint, footprintOf, pick, PrefixGate, undeclaredFootprint } from "./scheduler.ts";
 import { type Signature, signatureOf } from "./signature.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import type { SlotPool } from "../slots/pool.ts";
@@ -46,7 +46,7 @@ import { type AnswerScope, settleAnswers } from "./answers.ts";
 import { RUN_AGAIN } from "../decide/answer.ts";
 import { recentlyAsked, releaseQuestions } from "./questions.ts";
 import { OWNER_APPROVAL } from "../decide/merge.ts";
-import { answerTo, type Checkout, ownerWaitStage, claimTtlMs, DEFAULT_BASE, gatherItem, hasEndedStuck, isGathered, park, rememberKinds, runThinPath, type ThinPathOptions, type ThinResult, isWaitingOnOwner } from "./thin-path.ts";
+import { answerTo, type Checkout, doesStartOver, ownerWaitStage, claimTtlMs, DEFAULT_BASE, gatherItem, hasEndedStuck, isGathered, park, rememberKinds, runThinPath, type ThinPathOptions, type ThinResult, isWaitingOnOwner } from "./thin-path.ts";
 
 export type { TickResult } from "./lifecycle.ts";
 
@@ -190,8 +190,11 @@ export class Worker {
 	readonly #answered = new Set<string>();
 	/** Items whose owner wait timed out into work: a pass restores each wait and fires its timeout. */
 	readonly #timedOut = new Set<string>();
-	/** Saved changes that land again under this worker's config before anything else starts. */
-	readonly #relanding = new Set<string>();
+	/**
+	 * Items this worker goes on with at its next tick, past its own standing claim, before anything else starts: a saved
+	 * change that lands again under this worker's config, and an item that starts over.
+	 */
+	readonly #resuming = new Set<string>();
 	/** The items a CI job's passes ended on: each job takes an item once, and the next wake takes it again. */
 	readonly #handled = new Set<string>();
 	/** Items whose thread a tick failed to read; the next tick reads them again whatever the watch says. */
@@ -239,7 +242,7 @@ export class Worker {
 		for (const { item } of state.landings.list()) {
 			if (state.parked.get(item)?.why === "review") this.#unpark(item, undefined);
 
-			this.#relanding.add(item);
+			this.#resuming.add(item);
 		}
 	}
 
@@ -537,7 +540,7 @@ export class Worker {
 
 		if (result.outcome === "merged" && this.#o.ciJob === undefined) void this.#pool.add(() => this.#checkBase(id));
 
-		if (result.outcome === "held" && this.#o.state.landings.get(id) !== undefined) this.#relanding.add(id);
+		if ((result.outcome === "held" && this.#o.state.landings.get(id) !== undefined) || doesStartOver(result)) this.#resuming.add(id);
 
 		this.#o.onResult?.(result);
 		this.wake();
@@ -766,7 +769,7 @@ export class Worker {
 	async #learn(id: string): Promise<Known> {
 		const item = await this.#o.adapters.workSource.read(ItemId.parse(id));
 
-		return { footprint: footprintOf(item), title: item.title, claimedBy: item.claimedBy ?? [] };
+		return { footprint: footprintOf(item) ?? undeclaredFootprint(this.#o.config.hum), title: item.title, claimedBy: item.claimedBy ?? [] };
 	}
 
 	/** Which waiting items start now, by the scheduler's rules, and starts them. */
@@ -786,9 +789,9 @@ export class Worker {
 			return isWokenAndIdle(s.itemId) ? [learned(s.itemId).then((known) => ({ id: s.itemId, answered: true, known: known && named && { ...known, kind: named.name } }))] : [];
 		});
 
-		const relands = [...this.#relanding].flatMap((id) => (isFresh(id) && !ready.some((ref) => ref.id === id) ? [learned(id).then((known) => ({ id, answered: true, known }))] : []));
+		const resumed = [...this.#resuming].flatMap((id) => (isFresh(id) && !ready.some((ref) => ref.id === id) ? [learned(id).then((known) => ({ id, answered: true, known }))] : []));
 
-		const candidates = (await Promise.all([...fresh, ...answered, ...relands])).flatMap(({ id, answered, known }) => (known ? [{ id, answered, known }] : []));
+		const candidates = (await Promise.all([...fresh, ...answered, ...resumed])).flatMap(({ id, answered, known }) => (known ? [{ id, answered, known }] : []));
 
 		for (const { id, known } of candidates.filter((candidate) => !candidate.answered)) this.#showClaim(id, known.claimedBy);
 
@@ -817,7 +820,7 @@ export class Worker {
 
 			this.#answered.delete(id);
 			this.#timedOut.delete(id);
-			this.#relanding.delete(id);
+			this.#resuming.delete(id);
 			this.#begin(id, known, t);
 
 			return [id];

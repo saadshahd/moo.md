@@ -333,6 +333,18 @@
 			"maximum": 9007199254740991,
 			"description": "The most runs that go at once."
 		},
+		"undeclaredRunsAlone": {
+			"default": true,
+			"type": "boolean",
+			"description": "Whether an item with no `touches:` line runs alone, as one that may change any file. Off, it runs beside other items: each run works in its own clone, and landing checks every change again on the newest base, where a change that no longer fits is built again up to conflictRebuilds times."
+		},
+		"conflictRebuilds": {
+			"default": 0,
+			"type": "integer",
+			"minimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Times an item's change is built again from the newest base when it no longer rebases there or the checks fail there, as when another run changed the same files first, counted since the owner last answered; past them the change waits for the owner's review."
+		},
 		"tickIntervalSeconds": {
 			"default": 30,
 			"type": "integer",
@@ -1025,6 +1037,33 @@
 			"maximum": 9007199254740991,
 			"description": "The most characters of a change's diff one prompt carries."
 		},
+		"reviewReads": {
+			"default": {
+				"paths": [],
+				"maxBytes": 50000
+			},
+			"type": "object",
+			"properties": {
+				"paths": {
+					"type": "array",
+					"items": {
+						"type": "string",
+						"minLength": 1
+					}
+				},
+				"maxBytes": {
+					"type": "integer",
+					"exclusiveMinimum": 0,
+					"maximum": 9007199254740991
+				}
+			},
+			"required": [
+				"paths",
+				"maxBytes"
+			],
+			"additionalProperties": false,
+			"description": "Files a fresh review run reads beside the item and the diff, as the base branch holds them, so a change cannot rewrite the rules that judge it: 'paths' every review reads, such as the repo's rules file, then the files an item names on a `reads: a, b` line; 'maxBytes' caps their text together, and the prompt names what the cap cut. A named file git does not track on the base, one that is not a regular file, or one strictPaths marks, ends the item stuck, naming it."
+		},
 		"failureTail": {
 			"default": 4000,
 			"type": "integer",
@@ -1056,6 +1095,19 @@
 			"type": "string",
 			"minLength": 1,
 			"description": "The kind an item runs as when neither its source nor the model call names one."
+		},
+		"defaultKind": {
+			"default": null,
+			"anyOf": [
+				{
+					"type": "string",
+					"minLength": 1
+				},
+				{
+					"type": "null"
+				}
+			],
+			"description": "The kind an item takes as its own when no label and no `Kind:` line name one, as for a work source whose items carry no labels: no model call and no question. null leaves such an item to the model call, then the fallback kind."
 		},
 		"docsOnly": {
 			"default": {
@@ -1124,18 +1176,22 @@
 				},
 				"plan-outcome": {
 					"claude-haiku-5-5": {
-						"rate": 1
+						"rate": 1,
+						"judgeHash": "b6518b2738960c097028acfed9c387ba003feee716cac68bee0375e4a04febdb"
 					},
 					"claude-sonnet-5-5": {
-						"rate": 1
+						"rate": 1,
+						"judgeHash": "b6518b2738960c097028acfed9c387ba003feee716cac68bee0375e4a04febdb"
 					}
 				},
 				"review-verdict": {
 					"claude-haiku-5-5": {
-						"rate": 0.92
+						"rate": 0.89,
+						"judgeHash": "cd53ca48300cd6d43c1be51298ac82fdfc6ce6f42e7650f43ea2f7a67089a28b"
 					},
 					"claude-sonnet-5-5": {
-						"rate": 0.83
+						"rate": 0.92,
+						"judgeHash": "cd53ca48300cd6d43c1be51298ac82fdfc6ce6f42e7650f43ea2f7a67089a28b"
 					}
 				},
 				"reply-option": {

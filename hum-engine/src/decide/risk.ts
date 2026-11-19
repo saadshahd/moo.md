@@ -85,6 +85,9 @@ export type Placement = {
 const doesMatch = (glob: string, path: string): boolean =>
 	new Bun.Glob(glob).match(path);
 
+/** Whether the owner's strictPaths mark a path as data or secrets. */
+export const isStrictPath = (path: string, { strictPaths }: Pick<Policy, "strictPaths">): boolean => strictPaths.some((glob) => doesMatch(glob, path));
+
 const isLaunchOn = (launch: Launch, { now, base }: Moment): boolean =>
 	"base" in launch
 		? doesMatch(launch.base, base)
@@ -127,8 +130,7 @@ export const placeChange = (
 	const rulesOn = (path: string): readonly PathRule[] =>
 		policy.paths.filter((rule) => doesMatch(rule.glob, path));
 
-	const isStrict = (path: string): boolean =>
-		policy.strictPaths.some((glob) => doesMatch(glob, path));
+	const isStrict = (path: string): boolean => isStrictPath(path, policy);
 
 	const isOwn = (path: string): boolean =>
 		[...OWN_PATHS, ...policy.hookPaths].some((glob) => doesMatch(glob, path));

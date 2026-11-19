@@ -115,6 +115,8 @@
 		"top": "claude-opus-5-5"
 	},
 	"runners": 3,
+	"undeclaredRunsAlone": true,
+	"conflictRebuilds": 0,
 	"tickIntervalSeconds": 30,
 	"drainTimeoutSeconds": 300,
 	"claimExpirySeconds": 900,
@@ -203,6 +205,10 @@
 		".pre-commit-config.yaml"
 	],
 	"diffLimit": 100000,
+	"reviewReads": {
+		"paths": [],
+		"maxBytes": 50000
+	},
 	"failureTail": 4000,
 	"kindMeanings": {
 		"feature": "adds or changes what the product does or offers",
@@ -212,6 +218,7 @@
 		"check": "adds or repairs tests, benchmarks or other verification, with no change to behaviour"
 	},
 	"fallbackKind": "feature",
+	"defaultKind": null,
 	"docsOnly": {
 		"kind": "docs",
 		"paths": [
@@ -247,18 +254,22 @@
 		},
 		"plan-outcome": {
 			"claude-haiku-5-5": {
-				"rate": 1
+				"rate": 1,
+				"judgeHash": "b6518b2738960c097028acfed9c387ba003feee716cac68bee0375e4a04febdb"
 			},
 			"claude-sonnet-5-5": {
-				"rate": 1
+				"rate": 1,
+				"judgeHash": "b6518b2738960c097028acfed9c387ba003feee716cac68bee0375e4a04febdb"
 			}
 		},
 		"review-verdict": {
 			"claude-haiku-5-5": {
-				"rate": 0.92
+				"rate": 0.89,
+				"judgeHash": "cd53ca48300cd6d43c1be51298ac82fdfc6ce6f42e7650f43ea2f7a67089a28b"
 			},
 			"claude-sonnet-5-5": {
-				"rate": 0.83
+				"rate": 0.92,
+				"judgeHash": "cd53ca48300cd6d43c1be51298ac82fdfc6ce6f42e7650f43ea2f7a67089a28b"
 			}
 		},
 		"reply-option": {

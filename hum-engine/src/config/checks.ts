@@ -201,6 +201,9 @@ const pathProblems = (hum: HumConfig): Problem[] => {
 	];
 };
 
+/** The default kind, where the owner names one, is one of the kinds. */
+const defaultKindProblems = ({ defaultKind, kinds }: HumConfig): Problem[] => (defaultKind === null || kinds.includes(defaultKind) ? [] : [{ problem: "unknown-default-kind", kind: defaultKind }]);
+
 /** `ciEnv` sets none of the env the wake's jobs set themselves. */
 const wakeEnvProblems = ({ ciEnv }: HumConfig): Problem[] =>
 	Object.keys(ciEnv).flatMap((name): Problem[] => (WAKE_OWN_ENV.has(name) ? [{ problem: "wake-env-taken", name }] : []));
@@ -222,6 +225,7 @@ export const checkConfig = (
 	...Object.values(hum.roles)
 		.flatMap(({ file }): Problem[] => (roleFiles.has(file) ? [] : [{ problem: "missing-file", file }])),
 	...pathProblems(hum),
+	...defaultKindProblems(hum),
 	...Object.entries(kinds).flatMap(([name, kind]) => kindProblems(name, kind, hum)),
 	...eventProblems(hum, kinds),
 	...skillProblems(hum, env),

@@ -624,6 +624,37 @@ test("an item waiting behind a run on the same file starts once the owner moves 
 	await w.worker.idle();
 });
 
+test("two items with no touches: line start together where the owner lets such items run side by side", async () => {
+	const w = await workerWorld({ items: { a: { writeForItem: true, spend: 5, sleep: 400 }, b: { writeForItem: true, spend: 5 } } }, { settings: { undeclaredRunsAlone: false } });
+
+	w.item("a");
+	w.item("b");
+
+	expect(await w.worker.tick()).toEqual({ kind: "ran", started: ["a", "b"] });
+	await w.worker.idle();
+});
+
+test("two items with no touches: line that change the same file run side by side, and the one that lands second is built again on the first and lands, with no owner", async () => {
+	const note = (text: string) => ({ write: { "docs/note.md": text }, spend: 5, sleep: 300 });
+	const w = await workerWorld({ items: { a: note("from a\n"), b: note("from b\n") } }, { settings: { runners: 2, undeclaredRunsAlone: false, conflictRebuilds: 1 } });
+
+	w.item("a");
+	w.item("b");
+
+	expect(await w.worker.tick()).toEqual({ kind: "ran", started: ["a", "b"] });
+
+	for (let tick = 0; tick < 4 && w.results.filter(({ outcome }) => outcome === "merged").length < 2; tick++) {
+		await w.worker.idle();
+		w.clock.at += 1000;
+		await w.worker.tick();
+	}
+
+	await w.worker.idle();
+	expect(w.results.map(({ outcome }) => outcome).toSorted()).toEqual(["held", "merged", "merged", "restarted"]);
+	expect(w.state.faults.list()).toEqual([]);
+	expect(w.state.questions.list()).toEqual([]);
+});
+
 /** The shipped config whose review role changed after its scores were measured. */
 const reviewRoleChanged = (measuredAgain = false) =>
 	configWith((raw) => {

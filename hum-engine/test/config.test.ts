@@ -209,6 +209,14 @@ test("publish keeps less than the App token's hour in hand, so it has time left 
 	expect(problemsOf(margin)).toEqual([{ problem: "merge-margin-fills-token-hour", minutes: 60, tokenMinutes: 60 }]);
 });
 
+test("a default kind that is not one of the kinds is refused, naming it", () => {
+	const bad = clone(setUp());
+
+	bad.hum.defaultKind = "chore";
+
+	expect(problemsOf(bad)).toEqual([{ problem: "unknown-default-kind", kind: "chore" }]);
+});
+
 test("an unknown schema version is refused and names the step", () => {
 	const newer = loadConfig({ ...shippedRaw(), hum: { schemaVersion: 99 } }, { env });
 	const older = loadConfig({ ...shippedRaw(), hum: { schemaVersion: 0 } }, { env });

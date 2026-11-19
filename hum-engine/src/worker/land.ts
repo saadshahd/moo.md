@@ -50,6 +50,8 @@ import {
 } from "../decide/merge.ts";
 import { growthLabelsOf } from "../decide/growth.ts";
 import { isTrusted } from "../decide/prose.ts";
+import type { ReadFile } from "../decide/review.ts";
+import { readReviewFiles } from "./review-files.ts";
 import { doesLeaveDocs } from "../decide/kind.ts";
 import {
 	type Change,
@@ -107,12 +109,15 @@ export type LandContext = {
 	readonly now: () => number;
 	readonly judge: ModelCall;
 	/** A fresh review run on the change that ends at `head`, at its level's tier; it saves its verdict. */
-	readonly reviewRun: (change: { readonly head: string; readonly diff: string; readonly level: string; readonly patch: string | undefined }) => Promise<ReviewOutcome>;
+	readonly reviewRun: (change: ReviewedChange & { readonly files: readonly ReadFile[] }) => Promise<ReviewOutcome>;
 	/** The time past which no merge starts, as when the GitHub token's hour runs short; the landing stays saved for the next wake. */
 	readonly mergesBefore?: number;
 	/** Makes the state outlast a crash of this process; called before each act on the remote that lands the change, so the next pass finds the landing and settles it. */
 	readonly save: () => Promise<void>;
 };
+
+/** The change a review run at landing judges: the head it ends at, its diff, the level it placed at and its patch id. */
+export type ReviewedChange = { readonly head: string; readonly diff: string; readonly level: string; readonly patch: string | undefined };
 
 /** What a review run at landing came to: its verdict, or the result that stopped it, such as a usage limit. */
 export type ReviewOutcome = { readonly verdict: Verdict } | { readonly halted: ThinResult };
@@ -620,11 +625,18 @@ export const carriedVerdict = async (ctx: Pick<LandContext, "git" | "config">, v
 	return verdict.event === REVIEW_APPROVAL && (await isProseBetween(ctx, verdict.head, head)) ? { ...verdict, head, patch } : undefined;
 };
 
+/** A fresh review run on the change, reading the files named for its review as the base holds them; one it may not read ends the item stuck, naming it. */
+const freshReview = async (ctx: LandContext, change: ReviewedChange): Promise<ReviewOutcome> => {
+	const read = await readReviewFiles(ctx.git, `origin/${ctx.base}`, ctx.item, ctx.config.hum);
+
+	return read.ok ? ctx.reviewRun({ ...change, files: read.files }) : { halted: { outcome: "stuck", item: ctx.id, detail: read.why } };
+};
+
 /** The verdict on the change at `head`: the saved one carried to it, kept under that head, else a fresh review run. */
-const verdictOn = async (ctx: LandContext, change: Parameters<LandContext["reviewRun"]>[0]): Promise<ReviewOutcome> => {
+const verdictOn = async (ctx: LandContext, change: ReviewedChange): Promise<ReviewOutcome> => {
 	const carried = await carriedVerdict(ctx, ctx.state.verdicts.get(ctx.id), change);
 
-	if (carried === undefined) return ctx.reviewRun(change);
+	if (carried === undefined) return freshReview(ctx, change);
 
 	ctx.state.verdicts.put(ctx.id, carried);
 

@@ -16,7 +16,7 @@ import { type Kind, type Naming, OWNER_WAIT_TAG, PURPOSES, STUCK_TAG } from "../
 import { commandTimeoutMs } from "../exec.ts";
 import { doesLeaveDocs } from "../decide/kind.ts";
 import { type EventPick, isProsePurpose, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, requestedChanges, SPLIT, type SplitPart } from "../decide/prose.ts";
-import { answerOnce, foldItem, type ItemFold, keepPick, machineStarted, ownerAnswered } from "../state/item-log.ts";
+import { answerOnce, foldItem, type ItemFold, keepPick, machineStarted, ownerAnswered, rebuilt } from "../state/item-log.ts";
 import type { State } from "../state/open.ts";
 import type { SavedRepro } from "../state/saved.ts";
 import { type SavedSnapshot, persistedSnapshot } from "../state/items.ts";
@@ -27,7 +27,8 @@ import { BASE_CONTENDED, carriedVerdict, changeOn, declaredChange, type LandCont
 import { OWNER_APPROVAL, REVIEW_APPROVAL } from "../decide/merge.ts";
 import { askDecision, askedQuestion, isOverCapStop, isWaitQuestion, OVER_CAP_OPTIONS, PLAIN_QUESTIONS, type PlainQuestion, RunReason } from "../decide/question.ts";
 import { RUN_AGAIN, type Stage } from "../decide/answer.ts";
-import { type ItemText, reviewInput } from "../decide/review.ts";
+import { type ItemText, type ReadFile, reviewInput } from "../decide/review.ts";
+import { NO_REVIEW_FILES, readReviewFiles } from "./review-files.ts";
 import { forgetProgress, keepKind, kindAnswered, pickKind } from "./kind.ts";
 import { settleAnswers } from "./answers.ts";
 import { queueQuestion } from "./questions.ts";
@@ -117,6 +118,8 @@ export type ThinResult =
 	| { readonly outcome: "lost" | "waiting"; readonly item: string }
 	/** The item's change showed it is another kind: it runs again from the start as that kind, on the same branch restarted at the base. */
 	| { readonly outcome: "moved"; readonly item: string; readonly kind: string }
+	/** The item's change no longer held on the newest base: it runs again from the start, on its branch restarted at the base. */
+	| { readonly outcome: "restarted"; readonly item: string; readonly why: string }
 	| { readonly outcome: "merged" | "asked" | "stuck" | "review" | "landing"; readonly item: string; readonly detail?: string }
 	| { readonly outcome: "limited"; readonly item: string; readonly until: number }
 	| { readonly outcome: "held"; readonly item: string; readonly why: string };
@@ -341,7 +344,7 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 			const published = await (o.publish ?? publishInProcess(o, judge, gathered))({ item: id, intents: outbox.drain(), bundle: await bundleOf(git, { branch, item: id, gathered, folder: evidence }) }, worked);
 			const result = park(o, published ?? worked);
 
-			if (result.outcome === "moved") forgetProgress(o.state, id);
+			if (doesStartOver(result)) forgetProgress(o.state, id);
 
 			if (result.outcome === "merged") o.state.items.remove(id);
 
@@ -353,6 +356,9 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 		await taken.giveBack();
 	}
 };
+
+/** Whether the item runs again from the start after this result, so nothing its earlier runs left stands. */
+export const doesStartOver = ({ outcome }: ThinResult): boolean => outcome === "moved" || outcome === "restarted";
 
 /** The checks an item brings of its own: a split part's, which publish kept as it filed the part. */
 const ownChecksOf = (state: State, id: string): string[] => {
@@ -843,11 +849,15 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 				return send(carried.event);
 			}
 
+			const read = purpose === "review" ? await readReviewFiles(d.git, `origin/${base}`, item, config.hum) : NO_REVIEW_FILES;
+
+			if (!read.ok) throw failed(read.why);
+
 			const left = role === REVIEW_ROLE ? undefined : await changedFiles(d.git);
 
 			const { pick, models } = await decideProse({
 				purpose,
-				prompt: PROSE_PROMPTS[purpose](config, item, diff, role),
+				prompt: PROSE_PROMPTS[purpose](config, item, diff, role, read.files),
 				diff,
 				model: (await tierFor(role)).model,
 				run: (text, schema) => runAgent(role, text, schema, signal, { head }),
@@ -1031,7 +1041,10 @@ const roleOf = (config: RunConfig, name: string): string => {
 };
 
 
-/** What a plan or review run reads. A plan run, and a repo's own review role, read the repo too; the engine's review reads only the item and the diff, so no author's reasoning reaches it. */
+/**
+ * What a plan or review run reads. A plan run, and a repo's own review role, read the repo too; the engine's review
+ * reads only the item, the files named for its review and the diff, so no author's reasoning reaches it.
+ */
 export const PROSE_PROMPTS = {
 	plan: (config: RunConfig, item: ItemText, _diff = "", role = "plan"): string =>
 		[
@@ -1039,8 +1052,8 @@ export const PROSE_PROMPTS = {
 			`# Item ${item.id}: ${item.title}\n\n${item.body}`,
 			"Plan the change: read the repo, edit nothing. A plan-ready answer holds the plan; a needs-split answer names each part: its title, the files it may touch, the earlier parts it waits on by their place in the list from 1, and the one command that proves it; a plan-blocked answer asks the owner one question.",
 		].join("\n\n"),
-	review: (config: RunConfig, item: ItemText, diff: string, role = REVIEW_ROLE): string => [roleOf(config, role), reviewInput(item, diff, config.hum)].join("\n\n"),
-} as const satisfies Record<ProsePurpose, (config: RunConfig, item: ItemText, diff: string, role?: string) => string>;
+	review: (config: RunConfig, item: ItemText, diff: string, role = REVIEW_ROLE, files: readonly ReadFile[] = []): string => [roleOf(config, role), reviewInput(item, diff, config.hum, files)].join("\n\n"),
+} as const satisfies Record<ProsePurpose, (config: RunConfig, item: ItemText, diff: string, role?: string, files?: readonly ReadFile[]) => string>;
 
 /** A pick as the item's log keeps it: a split's parts by title, which is all a measure reads of them. */
 const keptPick = (pick: EventPick) => ({ ...pick, parts: pick.parts.map(({ title }) => title) });
@@ -1135,12 +1148,13 @@ const pauseOf = (id: string, outcome: Paused): ThinResult => {
 };
 
 /**
- * A fresh review at landing, for a level that asks for one: a model call with no tool, which reads only the item and
- * the diff, and whose verdict is saved. Publish makes it, so no verdict comes from the side that wrote the change.
+ * A fresh review at landing, for a level that asks for one: a model call with no tool, which reads only the item, the
+ * files named for its review and the diff, and whose verdict is saved. Publish makes it, so no verdict comes from the
+ * side that wrote the change.
  */
 export const reviewRunOf =
 	(o: Pick<ThinPathOptions, "runner" | "state" | "config">, item: Item, kindName: string) =>
-	async ({ head, diff, level, patch }: Parameters<LandContext["reviewRun"]>[0]): Promise<ReviewOutcome> => {
+	async ({ head, diff, level, patch, files }: Parameters<LandContext["reviewRun"]>[0]): Promise<ReviewOutcome> => {
 		const kind = kindNamed(o.config, kindName);
 		const row = pickTier(kind, { role: REVIEW_ROLE, purpose: "review", level, size: "small" });
 
@@ -1171,7 +1185,7 @@ export const reviewRunOf =
 			return new Promise<never>(() => {});
 		};
 
-		const decided = decideProse({ purpose: "review", prompt: PROSE_PROMPTS.review(o.config, item, diff), diff, model: o.config.hum.models[row.tier], run }).then(({ pick, models }): ReviewOutcome => ({ verdict: keepVerdict(o.state, { id: item.id, head, patch, pick, models }) }));
+		const decided = decideProse({ purpose: "review", prompt: PROSE_PROMPTS.review(o.config, item, diff, REVIEW_ROLE, files), diff, model: o.config.hum.models[row.tier], run }).then(({ pick, models }): ReviewOutcome => ({ verdict: keepVerdict(o.state, { id: item.id, head, patch, pick, models }) }));
 
 		return Promise.race([decided, halted]);
 	};
@@ -1309,11 +1323,20 @@ const handToPublish = async (d: Driven): Promise<ThinResult> => {
 
 	const stale = await rebaseOnto(d, d.baseSha);
 
-	if (stale) return { outcome: "review", item: d.id, detail: stale };
+	if (stale) return staleChange(d, stale);
 
 	d.outbox.add({ kind: "land", head: await head() });
 
 	return { outcome: "held", item: d.id, why: LANDING_HANDED };
+};
+
+/** A change that no longer holds on the newest base is built there again while rebuilds since the owner last answered are left; past them it waits for the owner. */
+const staleChange = (d: Driven, why: string): ThinResult => {
+	if (foldItem(d.state.events.list(d.id)).rebuilds >= d.config.hum.conflictRebuilds) return { outcome: "review", item: d.id, detail: why };
+
+	d.state.events.add(rebuilt(d.id, why));
+
+	return { outcome: "restarted", item: d.id, why };
 };
 
 type Parking = { readonly outcome: "stuck" | "review"; readonly item: string; readonly detail?: string };

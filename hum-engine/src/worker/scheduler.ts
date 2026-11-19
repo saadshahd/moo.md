@@ -1,16 +1,23 @@
 import type { Item } from "../adapter-api.ts";
+import type { HumConfig } from "../config/schema.ts";
+import { listedPaths } from "../decide/item-lines.ts";
 
-/** The paths an item will touch, as files or folders (a glob counts as its folder). `undefined` when the item does not say. */
+/** The paths an item will touch, as files or folders (a glob counts as its folder). `undefined` when unknown: it clashes with every other. */
 export type Footprint = readonly string[] | undefined;
 
-const TOUCHES = /^touches:[ \t]*(.+)$/im;
+const NO_FILES: Footprint = [];
 
-/** The item's declared footprint: a body line `touches: docs/a.md, src/`. An item that declares none is unknown, so it runs alone. */
+/**
+ * What an item with no `touches:` line holds while it runs: every file, so it runs alone, or none, where the owner
+ * lets such items run side by side and landing checks each change on the newest base.
+ */
+export const undeclaredFootprint = ({ undeclaredRunsAlone }: Pick<HumConfig, "undeclaredRunsAlone">): Footprint => (undeclaredRunsAlone ? undefined : NO_FILES);
+
+/** The item's declared footprint: a body line `touches: docs/a.md, src/`. An item that declares none is unknown. */
 export const footprintOf = (item: Pick<Item, "body">): Footprint => {
-	const line = TOUCHES.exec(item.body)?.[1];
-	const paths = line?.split(/[,\s]+/).filter(Boolean);
+	const paths = listedPaths(item.body, "touches");
 
-	return paths && paths.length > 0 ? paths : undefined;
+	return paths.length > 0 ? paths : undefined;
 };
 
 /** The folder a path or glob stands for: cut at the first glob character, then back to a whole segment. "" is the repo root. */
