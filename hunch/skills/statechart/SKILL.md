@@ -48,7 +48,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/statechart.ts SPEC.tla --view view.ts --out <fol
 
 It runs everystate, a TLC-compatible model checker, through `bunx`, so it needs only bun.
 
-It checks each rule in its own run, so one break hides no other rule's verdict, and gives the shortest path to each rule that breaks. It refuses a spec or config everystate cannot read, and a view that would make the chart claim what the model does not do; the message says what to change. Above 500 states it draws only the paths to broken rules. It exits 0 when every rule holds, 1 when one breaks, 2 when it refuses.
+It checks each rule in its own run, so one break hides no other rule's verdict, and gives the shortest path to each rule that breaks. It sets the config's ALIAS aside, because the chart shows the model's own variables. It refuses a spec or config everystate cannot read, and a view that would make the chart claim what the model does not do; the message says what to change. Above 500 states it draws only the paths to broken rules. It exits 0 when every rule holds, 1 when one breaks, 2 when it refuses.
 
 ## Prove it can fail
 

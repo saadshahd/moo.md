@@ -35,9 +35,10 @@ const KEYWORDS = ["CONSTANTS", "CONSTANT", "INIT", "NEXT", "SPECIFICATION", "INV
 const SECTION = new RegExp(String.raw`\b(${KEYWORDS.join("|")})\b`, "g");
 const withoutComments = (text: string) => text.replace(/\(\*[\s\S]*?\*\)/g, " ").replace(/\\\*.*$/gm, "");
 const namesIn = (body: string) => body.split(/[\s,]+/).filter(Boolean);
-const RULE_KEYWORDS = ["INVARIANT", "INVARIANTS", "PROPERTY", "PROPERTIES", "CHECK_DEADLOCK"];
+const OUTSIDE_THE_MODEL = ["INVARIANT", "INVARIANTS", "PROPERTY", "PROPERTIES", "CHECK_DEADLOCK", "ALIAS"];
 
-/** A config split into the rules it checks and the rest, kept as written. */
+/** A config split into the rules it checks and the model, kept as written. The model leaves out an ALIAS, which changes
+ * only how a run prints a trace's states: the chart reads the model's own variables. */
 export function readConfig(text: string): Config {
 	const clean = withoutComments(text);
 	const starts = [...clean.matchAll(SECTION)];
@@ -50,8 +51,8 @@ export function readConfig(text: string): Config {
 			.map((s) => (s.keyword + s.body).trim())
 			.join("\n");
 	return {
-		base: without(RULE_KEYWORDS),
-		stateBound: named("CONSTRAINT", "CONSTRAINTS").length ? without([...RULE_KEYWORDS, "ACTION_CONSTRAINT", "ACTION_CONSTRAINTS"]) : undefined,
+		base: without(OUTSIDE_THE_MODEL),
+		stateBound: named("CONSTRAINT", "CONSTRAINTS").length ? without([...OUTSIDE_THE_MODEL, "ACTION_CONSTRAINT", "ACTION_CONSTRAINTS"]) : undefined,
 		invariants: named("INVARIANT", "INVARIANTS"),
 		properties: named("PROPERTY", "PROPERTIES"),
 		checksDeadlock: deadlock === undefined || deadlock.body.trim() !== "FALSE",
