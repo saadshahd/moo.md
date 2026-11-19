@@ -1,12 +1,12 @@
 {
   "name": "@moo.md/hum",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "lockfileVersion": 3,
   "requires": true,
   "packages": {
     "": {
       "name": "@moo.md/hum",
-      "version": "0.12.0",
+      "version": "0.13.0",
       "license": "MIT",
       "dependencies": {
         "@actions/core": "3.0.1",

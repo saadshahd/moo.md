@@ -8,16 +8,20 @@ const clock = { offset: 0 };
 const now = () => Date.now() + clock.offset;
 const context: AdapterContext = { report: () => {}, now, env: process.env };
 
+/** The Agent each stubbed adapter acts as, and the owner that hands a Todo to it. */
+const AGENT = "7";
+const MINE = { kind: "agent", id: AGENT };
+
 describe("contract suite on a fake roundup", () => {
 	const roundup = new FakeRoundup();
-	const primary = roundupAdapter({ call: roundup.call }, context);
-	const secondary = roundupAdapter({ call: roundup.call }, context);
+	const primary = roundupAdapter({ call: roundup.call, agent: AGENT }, context);
+	const secondary = roundupAdapter({ call: roundup.call, agent: AGENT }, context);
 
 	const target: ContractTarget = {
 		name: "roundup (fake)",
 		adapter: primary,
 		other: async () => secondary,
-		seed: async (title) => ItemId.parse(String(roundup.seed(title))),
+		seed: async (title) => ItemId.parse(String(roundup.seed(title, { owner: MINE }))),
 		advance: async (ms) => void (clock.offset += ms),
 		spent: primary.spent,
 	};
@@ -26,23 +30,25 @@ describe("contract suite on a fake roundup", () => {
 });
 
 describe("what a Todo needs to be ready", () => {
-	test("a done, blocked or assigned Todo is not listed and cannot be claimed", async () => {
+	test("only an open, unblocked Todo hum's Agent owns is listed; any other cannot be claimed", async () => {
 		const roundup = new FakeRoundup();
-		const adapter = roundupAdapter({ call: roundup.call }, context);
-		const open = roundup.seed("open");
-		const done = roundup.seed("done", { done: true });
-		const blocked = roundup.seed("blocked", { blocked: true });
-		const owned = roundup.seed("owned", { owner: { kind: "agent", id: "7" } });
+		const adapter = roundupAdapter({ call: roundup.call, agent: AGENT }, context);
+		const mine = roundup.seed("mine", { owner: MINE });
+		const unowned = roundup.seed("unowned");
+		const another = roundup.seed("another Agent's", { owner: { kind: "agent", id: "8" } });
+		const user = roundup.seed("the user's, under the same id", { owner: { kind: "user", id: AGENT } });
+		const done = roundup.seed("done", { owner: MINE, done: true });
+		const blocked = roundup.seed("blocked", { owner: MINE, blocked: true });
 
-		expect((await adapter.workSource.listReady()).map((ref) => ref.id)).toEqual([ItemId.parse(String(open))]);
+		expect((await adapter.workSource.listReady()).map((ref) => ref.id)).toEqual([ItemId.parse(String(mine))]);
 
-		for (const id of [done, blocked, owned]) await expect(adapter.workSource.claim(ItemId.parse(String(id)), Holder.parse("a"), 1000)).rejects.toThrow("not ready to claim");
+		for (const id of [unowned, another, user, done, blocked]) await expect(adapter.workSource.claim(ItemId.parse(String(id)), Holder.parse("a"), 1000)).rejects.toThrow("not ready to claim");
 	});
 
 	test("claim comments stay off the thread, and a person's reply reads as a comment", async () => {
 		const roundup = new FakeRoundup();
-		const adapter = roundupAdapter({ call: roundup.call }, context);
-		const id = roundup.seed("threaded");
+		const adapter = roundupAdapter({ call: roundup.call, agent: AGENT }, context);
+		const id = roundup.seed("threaded", { owner: MINE });
 
 		await adapter.workSource.claim(ItemId.parse(String(id)), Holder.parse("a"), 1000);
 		await adapter.questions.ask(ItemId.parse(String(id)), { text: "Which?", options: ["approve", "change"] });
@@ -55,8 +61,8 @@ describe("what a Todo needs to be ready", () => {
 
 	test("a claim a newer worker wrote with a field this engine does not know still holds the Todo", async () => {
 		const roundup = new FakeRoundup();
-		const adapter = roundupAdapter({ call: roundup.call }, context);
-		const id = roundup.seed("claimed");
+		const adapter = roundupAdapter({ call: roundup.call, agent: AGENT }, context);
+		const id = roundup.seed("claimed", { owner: MINE });
 
 		roundup.say(id, `<!-- hum-claim ${JSON.stringify({ holder: "newer", at: now(), expiresAt: now() + 60_000, addedLater: true })} -->`);
 
@@ -67,7 +73,7 @@ describe("what a Todo needs to be ready", () => {
 describe("follow-ups", () => {
 	test("a follow-up filed again after its note failed to post is the Todo already created", async () => {
 		const roundup = new FakeRoundup();
-		const adapter = roundupAdapter({ call: roundup.call }, context);
+		const adapter = roundupAdapter({ call: roundup.call, agent: AGENT }, context);
 		const from = String(roundup.seed("origin"));
 
 		roundup.failsOnce.add("todo_comment");
@@ -84,7 +90,7 @@ describe("follow-ups", () => {
 describe("a roundup comment is one line", () => {
 	test("a question or reply that fits is one comment, whole", async () => {
 		const roundup = new FakeRoundup();
-		const adapter = roundupAdapter({ call: roundup.call }, context);
+		const adapter = roundupAdapter({ call: roundup.call, agent: AGENT }, context);
 		const id = String(roundup.seed("short"));
 
 		await adapter.questions.ask(ItemId.parse(id), { text: "Which title?", options: ["a", "b"] });
@@ -96,7 +102,7 @@ describe("a roundup comment is one line", () => {
 
 	test("one that is too long or spans lines goes whole into a Pad, and its comment names the Pad", async () => {
 		const roundup = new FakeRoundup();
-		const adapter = roundupAdapter({ call: roundup.call }, context);
+		const adapter = roundupAdapter({ call: roundup.call, agent: AGENT }, context);
 		const id = String(roundup.seed("short"));
 		const detail = "why ".repeat(120);
 
@@ -117,19 +123,14 @@ describe("a roundup comment is one line", () => {
 });
 
 describe("refusal", () => {
-	test("outside a run roundup started, the stdio adapter refuses", () => {
-		const saved = { agent: process.env.ROUNDUP_AGENT_ID, socket: process.env.RUPD_SOCKET };
+	const outside: AdapterContext = { ...context, env: {} };
 
-		delete process.env.ROUNDUP_AGENT_ID;
-		delete process.env.RUPD_SOCKET;
+	test("without an Agent to act as, the adapter refuses", () => {
+		expect(() => roundupAdapter({ call: new FakeRoundup().call }, outside)).toThrow("ROUNDUP_AGENT_ID is not set");
+	});
 
-		try {
-			expect(() => roundupAdapter({}, context)).toThrow("only in a run roundup started");
-		} finally {
-			if (saved.agent !== undefined) process.env.ROUNDUP_AGENT_ID = saved.agent;
-
-			if (saved.socket !== undefined) process.env.RUPD_SOCKET = saved.socket;
-		}
+	test("outside a Terminal roundup started, the stdio adapter refuses", () => {
+		expect(() => roundupAdapter({ agent: AGENT }, outside)).toThrow("RUPD_SOCKET is not set");
 	});
 });
 
@@ -159,8 +160,9 @@ describe.skipIf(!env.success)("contract suite on the scratch roundup Project (li
 		return result;
 	};
 
-	const adapter = roundupAdapter({ call }, context);
-	const second = roundupAdapter({ call }, context);
+	const agent = env.success ? env.data.HUM_ROUNDUP_AGENT : AGENT;
+	const adapter = roundupAdapter({ call, agent }, context);
+	const second = roundupAdapter({ call, agent }, context);
 
 	afterAll(async () => {
 		if (created.length > 0) await client().call("todo_delete", { operation: `hum-contract-${Date.now()}`, ids: created });
@@ -176,7 +178,7 @@ describe.skipIf(!env.success)("contract suite on the scratch roundup Project (li
 		name: "roundup (scratch Project)",
 		adapter,
 		other: async () => second,
-		seed: async (title) => ItemId.parse(String(Created.parse(await call("todo_create", { title, body: `${title} body` })).id)),
+		seed: async (title) => ItemId.parse(String(Created.parse(await call("todo_create", { title, body: `${title} body`, owner: { kind: "agent", id: agent } })).id)),
 		advance: async (ms) => void (clock.offset += ms),
 		spent: adapter.spent,
 	};

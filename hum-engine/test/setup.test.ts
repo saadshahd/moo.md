@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "bun:test";
-import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { gitIn, type GitIdentityRead, readGitIdentity } from "../src/adapters/git.ts";
 import { loadConfig, readConfigDir } from "../src/config/load.ts";
@@ -357,6 +357,35 @@ test("writing setup answers writes a config that loads and carries only the sett
 	expect(loadConfig(readConfigDir(join(repo, ".hum")), { env: { installedSkills: installedSkills() } }).ok).toBe(true);
 });
 
+test("where roundup serves a slot, setup writes no service unit and gives the start that runs hum serve in a roundup Terminal as the Agent whose shell runs it", () => {
+	const repo = repoWith({ "README.md": "x" });
+	const home = join(repo, "home");
+	const bun = join(repo, "it's a runtime", "bun");
+	const result = writeSetup(repo, { hum: { checks: ["true"], runPlaces: ["mac"], integrations: { "work-source": "roundup" } }, waitHours: {} }, { installedSkills: installedSkills(), home, runtime: { bun, path: "/usr/bin" }, gitIdentity: OWNER_GIT });
+	const stubs = join(repo, "stubs");
+
+	mkdirSync(stubs);
+	writeFileSync(join(stubs, "rup"), '#!/bin/sh\nprintf "%s\\n" "$@"\n');
+	chmodSync(join(stubs, "rup"), 0o755);
+
+	const path = `${stubs}:/usr/bin:/bin`;
+	const ran = Bun.spawnSync(["/bin/sh", "-c", (result.ok && result.start) || "false"], { env: { PATH: path, ROUNDUP_AGENT_ID: "42" } });
+	const [env = "", ...args] = ran.stdout.toString().trimEnd().split("\n").toReversed();
+	const hum = join(repo, "node_modules", ".bin", "hum");
+
+	expect(args.toReversed()).toEqual(["terminal", "spawn", repo, "120", "40", "--command", bun, "--command", hum, "--command", "serve", "--env"]);
+	expect(JSON.parse(env)).toEqual({ PATH: path, ROUNDUP_AGENT_ID: "42" });
+	expect(existsSync(home)).toBe(false);
+});
+
+test("setup refuses CI runs where roundup serves a slot, and writes nothing", () => {
+	const repo = repoWith({ "README.md": "x" });
+	const result = writeSetup(repo, { hum: { checks: ["true"], runPlaces: ["mac", "ci"], integrations: { answers: "roundup" } }, waitHours: {} }, { installedSkills: installedSkills(), home: join(repo, "home"), gitIdentity: OWNER_GIT });
+
+	expect(!result.ok && result.refusal.code).toBe("roundup-in-ci");
+	expect(existsSync(join(repo, ".hum"))).toBe(false);
+});
+
 /** transferwise/selective's byte ratchet: agent context and the other docs are each summed on their own, and either growing needs `grow`. */
 const SELECTIVE_GROWTH = [
 	{ label: "grow", paths: ["AGENTS.md", ".claude/**", ".github/**"] },
@@ -471,6 +500,19 @@ test("proving a written setup on a scratch copy passes its checks and contract, 
 
 	expect(byName).toMatchObject({ config: "passed", checks: "passed", contract: "passed", "engine pin": "skipped", item: "skipped" });
 	expect(steps.filter(({ status }) => status === "failed")).toEqual([]);
+});
+
+test("proving with --item skips the item where a slot writes to a live target, whose real items the run would take", async () => {
+	const repo = repoWith({ "package.json": PINNED });
+
+	expect(writeSetup(repo, { hum: { checks: ["true"], runPlaces: ["mac"], integrations: { "work-source": "roundup" } }, waitHours: {} }, { installedSkills: installedSkills(), home: join(repo, "home"), gitIdentity: OWNER_GIT }).ok).toBe(true);
+	sh(repo, ["add", "-A"]);
+	sh(repo, ["commit", "-q", "-m", "setup"]);
+	sh(repo, ["push", "-q", "origin", "main"]);
+
+	const steps = await proveSetup(repo, { now: Date.now, installedSkills: installedSkills(), base: "main", item: true, published: async () => "unpublished", newSessionId: randomUUID, processEnv: {} });
+
+	expect(steps.find(({ name }) => name === "item")).toMatchObject({ status: "skipped", detail: expect.stringContaining("live target") });
 });
 
 test("proving fails the checks step when a check command fails", async () => {

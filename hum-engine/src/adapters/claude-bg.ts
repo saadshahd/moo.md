@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import { z } from "zod";
 import type { HumConfig } from "../config/schema.ts";
-import { commandTimeoutMs, exec, withoutGitHubTokens } from "../exec.ts";
+import { commandTimeoutMs, exec, shellQuote, withoutGitHubTokens } from "../exec.ts";
 import { listRecords, orMissing } from "../state/fs.ts";
 import type { State } from "../state/open.ts";
 import { CARD_EXCERPT, type Card } from "../status/format.ts";
@@ -26,10 +26,6 @@ const SHORT_ID = /backgrounded\W+([0-9a-f]{8})\b/u;
 const AGENT_VIEW_KIND = "background";
 
 const AGENTS_UNREAD = "agents-unread";
-
-const SINGLE_QUOTE = /'/g;
-
-const shellQuote = (text: string): string => `'${text.replace(SINGLE_QUOTE, `'\\''`)}'`;
 
 /**
  * A hook command that saves the hook's input, which names the session and its transcript, as a file of its own. It

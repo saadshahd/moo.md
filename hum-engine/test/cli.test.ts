@@ -4,6 +4,7 @@ import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileS
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type HumConfig, SCHEMA_VERSION } from "../src/config/schema.ts";
+import { HELD_MS, HOLDING_SLOTS, writeHoldingAdapter } from "./fixtures/holding-adapter.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { MAIN } from "./fixtures/owner-repo.ts";
 import { sh, WorkRepo } from "./fixtures/work-repo.ts";
@@ -109,6 +110,17 @@ test("hum claim without --ttl lasts claimExpirySeconds from the repo's hum.json"
 
 	expect(claimed.claim.expiresAt - Date.now()).toBeGreaterThan(100_000);
 	expect(claimed.claim.expiresAt - Date.now()).toBeLessThanOrEqual(120_000);
+});
+
+test("an op exits once it ends, done or failed, though its adapter holds the process open until closed", () => {
+	const worker = new WorkRepo().worker("w");
+	const exitOf = (...args: string[]) => spawnSync("bun", [MAIN, ...args], { cwd: worker, encoding: "utf8", timeout: HELD_MS }).status;
+
+	writeSettings(worker, { integrations: HOLDING_SLOTS });
+	writeHoldingAdapter(worker);
+
+	expect(exitOf("list-ready")).toBe(0);
+	expect(exitOf("publish", "1", "v1")).toBe(1);
 });
 
 test("an unknown op exits 2 and lists the ops", () => {

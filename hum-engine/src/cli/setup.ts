@@ -111,7 +111,7 @@ export const addSetupCommands = (root: Command, io: Io, done: (code: number) => 
 		.action(async ({ answers, home }: { answers: string; home?: string }) => {
 			const result = writeSetup(io.cwd, readAnswers(answers), { installedSkills: await installedSkills(), home, gitIdentity: await readGitIdentity(setupGit(io.cwd)), isPublicRepo: await isPublicRepo(io.cwd) });
 
-			io.stdout(`${JSON.stringify(result.ok ? { written: result.written } : { refused: result.refusal.message }, null, "\t")}\n`);
+			io.stdout(`${JSON.stringify(result.ok ? { written: result.written, start: result.start } : { refused: result.refusal.message }, null, "\t")}\n`);
 			done(result.ok ? EXIT_OK : EXIT_FAILED);
 		});
 

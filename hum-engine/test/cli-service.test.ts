@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
@@ -11,8 +11,10 @@ import { doneByOf, foldItem } from "../src/state/item-log.ts";
 import { openState } from "../src/state/open.ts";
 import { readStatus } from "../src/status/file.ts";
 import { DAY_MS } from "../src/time.ts";
+import { HELD_MS, HOLDING_SLOTS, writeHoldingAdapter } from "./fixtures/holding-adapter.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { MAIN, ownerRepo } from "./fixtures/owner-repo.ts";
+import { until } from "./fixtures/process.ts";
 import { sh } from "./fixtures/work-repo.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
@@ -220,6 +222,23 @@ test("a wake with a config that names no checks says what is missing and exits 1
 	expect(run.code).toBe(1);
 	expect(run.err).toContain("names no checks");
 });
+
+test("hum work exits once stopped, though its adapter holds the process open until closed", async () => {
+	const o = owner({}, {}, (raw) => void Object.assign(raw.hum, { integrations: HOLDING_SLOTS }));
+
+	writeHoldingAdapter(o.repo.owner);
+
+	const work = Bun.spawn({ ...humCommand(o, ["work"]), stdout: "ignore", stderr: "ignore" });
+
+	try {
+		await until(() => existsSync(join(stateDir(o), "heartbeat.json")), HELD_MS);
+		work.kill("SIGTERM");
+
+		expect(await Promise.race([work.exited, Bun.sleep(HELD_MS).then(() => "held open")])).toBe(0);
+	} finally {
+		work.kill("SIGKILL");
+	}
+}, 3 * HELD_MS);
 
 test("hum serve reads its crash limit from the config, restarts a worker that refuses the config until then, shows one card and exits 0", () => {
 	const o = owner({}, {}, (raw) => void Object.assign(raw.hum, { maxCrashes: 2, levels: [] }));

@@ -18,7 +18,7 @@ import { doesStopWake, reportCards, wakeUntilQuiet } from "../service/wake.ts";
 import { defaultStateDir, openState, STATUS_FILE } from "../state/open.ts";
 import { SECOND_MS } from "../time.ts";
 import { readStatus } from "../status/file.ts";
-import { npmLatest, type OpenWorkerOptions, workerOptions } from "../worker/open.ts";
+import { closingAfter, npmLatest, type OpenWorkerOptions, workerOptions } from "../worker/open.ts";
 import { Worker, type WorkerOptions } from "../worker/worker.ts";
 import { DEFAULT_BASE, publisherOf } from "../worker/thin-path.ts";
 import { tallyOf } from "../worker/tally.ts";
@@ -134,8 +134,8 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 
 			onStop(() => abort.abort());
 
-			const worker = new Worker(await optionsFor(io, flags, "mac"));
-			const ended = await worker.serve(abort.signal);
+			const options = await optionsFor(io, flags, "mac");
+			const ended = await closingAfter(options, () => new Worker(options).serve(abort.signal));
 
 			io.stderr(`hum work: stopped, ${ended.reason}\n`);
 			done(ended.reason === "stopped" ? EXIT_OK : EXIT_UPDATED);
@@ -193,13 +193,15 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 			const read = await restoreCiState(where);
 			const claimed = new Map<string, Item>();
 			const options = await optionsFor(io, flags, "ci", { ciJob: { kind: "gather", gathered: claimed }, judgmentsOnly: true });
-			const worker = new Worker(options);
+			await closingAfter(options, async () => {
+				const worker = new Worker(options);
 
-			for (let before = -1; claimed.size > before; ) {
-				before = claimed.size;
-				await worker.tick();
-				await worker.idle();
-			}
+				for (let before = -1; claimed.size > before; ) {
+					before = claimed.size;
+					await worker.tick();
+					await worker.idle();
+				}
+			});
 
 			const base = options.base ?? DEFAULT_BASE;
 			const saved = await saveCiState({ ...where, ...read, identity: options.config.hum.commitIdentity, at: Date.now() });
@@ -240,7 +242,7 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 
 			if (baseCheck !== undefined) writeBaseCheck(flags.outbox, baseCheck);
 
-			await wakeUntilQuiet(new Worker(options));
+			await closingAfter(options, () => wakeUntilQuiet(new Worker(options)));
 			writeOutboxState(flags.outbox, dir);
 
 			return dir;
@@ -273,7 +275,7 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 
 			const publisher = { ...publisherOf({ ...options, workSource: options.adapters.workSource, questions: options.adapters.questions }, judge, started + (APP_TOKEN_MINUTES - hum.ciMergeMarginMinutes) * MINUTE_MS), save };
 
-			await publishWake({ publisher, gathered, outbox, work: openState(outbox.stateDir, { now: Date.now }) });
+			await closingAfter(options, () => publishWake({ publisher, gathered, outbox, work: openState(outbox.stateDir, { now: Date.now }) }));
 
 			if (flags.event === SCHEDULE_EVENT) await recordCiTick({ repo: io.cwd, remote: "origin", at: Date.now(), identity: hum.commitIdentity, timeoutMs });
 

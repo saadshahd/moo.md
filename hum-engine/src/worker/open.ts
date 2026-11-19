@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { ADAPTER_API_VERSION, type Integrations } from "../adapter-api.ts";
 import type { WorkIntegrations } from "../publish/handover.ts";
-import { resolveAdapters } from "../adapters/registry.ts";
+import { type Resolved, resolveAdapters } from "../adapters/registry.ts";
 import { startBackgroundRunner } from "../adapters/claude-bg.ts";
 import { judgmentRunner, startRunner } from "../adapters/claude-p.ts";
 import { gitIn } from "../adapters/git.ts";
@@ -61,6 +61,15 @@ const isInBackground = ({ backgroundRuns }: Pick<HumConfig, "backgroundRuns">, w
  * remote on GitHub its pull requests and branch rules, so landing follows what the target branch requires.
  * Throws when the config is refused or the repo has no `origin`; the service unit shows that as a card.
  */
+/** Runs `use`, then ends what the worker's integrations hold open, however `use` ended, so the process can exit. */
+export const closingAfter = async <T>({ adapters }: Pick<WorkerOptions, "adapters">, use: () => Promise<T>): Promise<T> => {
+	try {
+		return await use();
+	} finally {
+		await adapters.close?.();
+	}
+};
+
 /** A worker on `repo`, as `workerOptions` opens it. */
 export const openWorker = async (repo: string, options: OpenWorkerOptions): Promise<Worker> => new Worker(await workerOptions(repo, options));
 
@@ -82,13 +91,15 @@ export const workerOptions = async (repo: string, options: OpenWorkerOptions): P
 
 	if (config.hum.checks.length === 0) throw new Error("hum.json names no checks: set \"checks\" to the commands a change must pass, or run /hum");
 
-	const adapters = options.integrations
-		? { "work-source": { apiVersion: ADAPTER_API_VERSION, ...options.integrations }, questions: { apiVersion: ADAPTER_API_VERSION, ...options.integrations }, answers: undefined }
+	const resolved: Resolved = options.integrations
+		? { slots: { "work-source": { apiVersion: ADAPTER_API_VERSION, ...options.integrations }, questions: { apiVersion: ADAPTER_API_VERSION, ...options.integrations } }, close: async () => {} }
 		: await resolveAdapters(repo, {
 				faults: state.faults,
 				guard: { lastReady: { load: () => state.ready.get("work-source")?.ids ?? [], save: (ids) => state.ready.put("work-source", { ids }) } },
 				context: { report: (fault) => void state.faults.raise(fault), now, env },
 			});
+
+	const adapters = resolved.slots;
 
 	// One adapter serves several slots; its calls go one at a time whichever slot they come through.
 	const ordered = new Map<Integrations, Integrations>();
@@ -118,5 +129,5 @@ export const workerOptions = async (repo: string, options: OpenWorkerOptions): P
 	/** A measurement writes the owner's `.hum/hum.json`, which a CI checkout throws away. */
 	const remeasure = rest.where === "ci" ? undefined : (measurement: Measurement, signal: AbortSignal) => measureOn(repo, measurement, { inherit: false, signal });
 
-	return { ...rest, remeasure, checks: config.hum.checks, checkout: rest.checkout ?? slots?.checkout, slots, repo, state, config, adapters: { workSource, questions, answers }, runner, remote, pulls, commits, loop, runnerVariables: new Set(Object.entries(withoutGitHubTokens(env)).flatMap(([name, value]) => (value === undefined ? [] : [name]))) };
+	return { ...rest, remeasure, checks: config.hum.checks, checkout: rest.checkout ?? slots?.checkout, slots, repo, state, config, adapters: { workSource, questions, answers, close: resolved.close }, runner, remote, pulls, commits, loop, runnerVariables: new Set(Object.entries(withoutGitHubTokens(env)).flatMap(([name, value]) => (value === undefined ? [] : [name]))) };
 };

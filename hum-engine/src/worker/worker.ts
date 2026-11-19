@@ -65,6 +65,8 @@ export type WorkerOptions = {
 		readonly workSource: WorkSource;
 		readonly questions: Questions;
 		readonly answers?: Answers;
+		/** Ends what the integrations hold open; whoever opened them calls it once done with them. */
+		readonly close?: () => Promise<void>;
 	};
 	readonly runner: Runner;
 	/** The cheap model call; by default the config's decision model through the runner. */

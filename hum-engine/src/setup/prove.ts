@@ -11,7 +11,8 @@ import { SlotPool } from "../slots/pool.ts";
 import { orMissing } from "../state/fs.ts";
 import { openState } from "../state/open.ts";
 import { checkLimits, runChecks } from "../worker/checks.ts";
-import { openWorker } from "../worker/open.ts";
+import { closingAfter, workerOptions } from "../worker/open.ts";
+import { Worker } from "../worker/worker.ts";
 import { Scratch } from "./scratch.ts";
 
 type StepStatus = "passed" | "failed" | "skipped";
@@ -96,10 +97,13 @@ const checksStep = async (repo: string, config: Config): Promise<Outcome> => {
 const markdownOver = (repo: string, base: string, hum: Config["hum"], context: AdapterContext) =>
 	markdownAdapter({ repo, base, claimPrefix: hum.claimPrefix, itemsDir: hum.itemsDir, identity: hum.commitIdentity, writeRaceRetries: hum.writeRaceRetries, itemReadsAtOnce: hum.itemReadsAtOnce, mergeMethod: hum.mergeMethod, alwaysPullRequest: hum.alwaysPullRequest, ownerBranchPrefix: hum.ownerBranchPrefix, growthLabels: hum.growthLabels, timeoutMs: commandTimeoutMs(hum) }, context);
 
-const contractStep = async (config: Config, scratch: Scratch, { base, now, processEnv }: Pick<ProveEnv, "base" | "now" | "processEnv">): Promise<Outcome> => {
-	const others = Object.entries(config.hum.integrations ?? {}).filter(([, adapter]) => adapter !== "markdown");
+/** Each slot `hum.json` hands to an adapter other than the markdown source, as "slot: adapter": each writes to a live target. */
+const liveSlots = (config: Config): string[] => Object.entries(config.hum.integrations ?? {}).flatMap(([slot, adapter]) => (adapter === "markdown" ? [] : [`${slot}: ${adapter}`]));
 
-	if (others.length > 0) return skipped(`${others.map(([slot, adapter]) => `${slot}: ${adapter}`).join(", ")} write to a live target; run its contract suite there`);
+const contractStep = async (config: Config, scratch: Scratch, { base, now, processEnv }: Pick<ProveEnv, "base" | "now" | "processEnv">): Promise<Outcome> => {
+	const live = liveSlots(config);
+
+	if (live.length > 0) return skipped(`${live.join(", ")} write to a live target; run its contract suite there`);
 
 	let skew = 0;
 	let count = 0;
@@ -158,6 +162,10 @@ const SETUP_ITEM = { id: "hum-setup-proof", title: "Add a file named hum-setup-p
 const itemStep = async (repo: string, config: Config, env: ProveEnv): Promise<Outcome> => {
 	if (!env.item) return skipped("run without --item: no live run was made");
 
+	const live = liveSlots(config);
+
+	if (live.length > 0) return skipped(`${live.join(", ")} write to a live target, whose real items an item run would take`);
+
 	if (Bun.which("claude") === null) return skipped("claude is not installed on this machine");
 
 	const scratch = await Scratch.from(repo, env.base, config.hum);
@@ -174,7 +182,7 @@ const runItem = async (scratch: Scratch, env: ProveEnv): Promise<Outcome> => {
 
 	const results: string[] = [];
 
-	const worker = await openWorker(scratch.owner, {
+	const options = await workerOptions(scratch.owner, {
 		now: env.now,
 		env: env.processEnv,
 		newSessionId: env.newSessionId,
@@ -187,8 +195,12 @@ const runItem = async (scratch: Scratch, env: ProveEnv): Promise<Outcome> => {
 		onResult: (result) => results.push(result.outcome),
 	});
 
-	await worker.tick();
-	await worker.idle();
+	await closingAfter(options, async () => {
+		const worker = new Worker(options);
+
+		await worker.tick();
+		await worker.idle();
+	});
 
 	return results.includes("merged") ? passed("one item ran end to end and merged") : failed(`the item ended as ${results.join(", ") || "nothing"}`);
 };
