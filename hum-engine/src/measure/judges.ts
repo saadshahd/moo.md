@@ -5,7 +5,7 @@ import { BOUNDARIES, type Boundary, type HumConfig, type Score } from "../config
 import { alignmentQuestion } from "../decide/alignment.ts";
 import { replyQuestion } from "../decide/answer.ts";
 import { kindQuestion } from "../decide/kind.ts";
-import { type ModelAsk, PROSE_STATES } from "../decide/prose.ts";
+import { measuredScore, type ModelAsk, PROSE_STATES } from "../decide/prose.ts";
 import { tasteQuestion } from "../decide/taste.ts";
 import { pairQuestion } from "../loop/pair.ts";
 import type { ReviewNote } from "../loop/records.ts";
@@ -45,7 +45,7 @@ export const staleScores = (config: RunConfig): StaleScore[] =>
 		const now = judgeHash(boundary, config);
 
 		return runModels(config.hum).flatMap((model) => {
-			const score = config.hum.measuredModels[boundary]?.[model];
+			const score = measuredScore(config.hum.measuredModels, boundary, model);
 
 			return score !== undefined && score.judgeHash !== now ? [{ boundary, model, score }] : [];
 		});

@@ -273,7 +273,7 @@ type Pooled = { readonly boundary: Boundary; readonly rate: number; readonly ans
 
 /**
  * Sets each pooled rate, beside its judge's hash, in the owner's `hum.json` at the current schema, where trust reads
- * it, under the model as named and each id that answered for it; every other rate stays as the config had it.
+ * it, under the model as named and the model each id that answered for it names; every rate for another model stays.
  */
 const recordRates = async (folder: string, pooled: readonly Pooled[]): Promise<void> => {
 	const file = join(folder, "hum.json");

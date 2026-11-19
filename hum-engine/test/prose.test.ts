@@ -4,7 +4,7 @@ import { FakeProvider } from "../src/adapters/fake.ts";
 import { configuredModelCall, modelCallOver } from "../src/adapters/model-call.ts";
 import { alignedPlacement, AlignmentAnswer, doesRaiseLevel } from "../src/decide/alignment.ts";
 import { declaredKind } from "../src/decide/kind.ts";
-import { doesCiteDiff, fenced, pickSchema, readPick } from "../src/decide/prose.ts";
+import { doesCiteDiff, fenced, isTrusted, measuredScore, pickSchema, readPick } from "../src/decide/prose.ts";
 import { reviewInput } from "../src/decide/review.ts";
 import { openState } from "../src/state/open.ts";
 import { keepKind, pickKind } from "../src/worker/kind.ts";
@@ -98,6 +98,26 @@ test("a model id is trusted at a boundary only when its measured rate meets minJ
 	const belowBar = await configuredModelCall(runnerOf(async () => finished({ structured: SOUND, models: [SHIM_MODEL] })), bar)({ boundary: "kind", prompt: "kind", answer: AlignmentAnswer });
 
 	expect(belowBar).toMatchObject({ kind: "abstained" });
+});
+
+test("an id Bedrock or a gateway answers under finds the rate of the model it names; another model, such as Haiku 4.5, or an unknown id finds none", () => {
+	const bar = configWith((raw) => {
+		raw.hum.minJudgeRate = 0.8;
+		raw.hum.measuredModels.alignment = Object.fromEntries(["haiku", "sonnet", "opus", "claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5", "anthropic.claude-v2"].map((id) => [id, { rate: 0.9 }]));
+	}).hum;
+
+	const trusts = (id: string) => isTrusted([id], "alignment", bar);
+	const named = ["global.anthropic.claude-haiku-5-5", "global.anthropic.claude-sonnet-5-5[1m]", "global.anthropic.claude-opus-5-5[1m]"];
+
+	expect(named.filter(trusts)).toEqual(named);
+	expect(["us.anthropic.claude-haiku-4-5-20251001-v1:0", "claude-haiku-4-5", "anthropic.claude-v2:1", "eu.anthropic.claude-haiku-5-6", "gpt-5"].filter(trusts)).toEqual([]);
+});
+
+test("where two recorded ids name one model, its lower rate stands", () => {
+	const measuredModels = { ...configWith().hum.measuredModels, alignment: { "claude-haiku-5-5": { rate: 0.7 }, "global.anthropic.claude-haiku-5-5": { rate: 0.95 } } };
+
+	expect(measuredScore(measuredModels, "alignment", "global.anthropic.claude-haiku-5-5")).toEqual({ rate: 0.7 });
+	expect(isTrusted(["global.anthropic.claude-haiku-5-5"], "alignment", { measuredModels, minJudgeRate: 0.8 })).toBe(false);
 });
 
 test("the alignment grades raise a level at most one step, only when they move the merge-risk score across a cut, and never lower it", () => {
