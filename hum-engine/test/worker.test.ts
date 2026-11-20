@@ -398,6 +398,22 @@ test("an item someone else claims never starts and carries a card naming them, w
 	expect(w.state.faults.list().map(({ code }) => code)).not.toContain("item-claimed");
 });
 
+test("an item hum started goes on though another pull request closes it, and a claim card it carried from before goes", async () => {
+	const w = await workerWorld({ items: { a: { writeForItem: true } } });
+	const source = w.adapter.workSource!;
+	const worker = w.workerWith({ adapters: { workSource: { ...source, read: async (id: ItemId) => ({ ...(await source.read(id)), claimedBy: ["pull request #7"] }) }, questions: w.adapter.questions!, answers: w.adapter.answers } });
+
+	w.item("a", "docs/a.md");
+	w.state.itemKinds.put("a", { item: "a", kind: "docs", from: "source" });
+	w.state.items.save("a", w.config.kinds.docs!, { status: "active", value: "building", context: {} });
+	w.state.faults.raise({ code: "item-claimed", item: "a", cause: "a is already taken by pull request #7, so hum starts no rival change.", fix: "Close the pull request." });
+
+	expect(await worker.tick()).toEqual({ kind: "ran", started: ["a"] });
+	expect(w.state.faults.list().map(({ code }) => code)).not.toContain("item-claimed");
+
+	await worker.idle();
+});
+
 test("a fix item run again after its window passed reruns the repro, and opens the window again only when the repro changed", async () => {
 	const repro = (command: string) => ({ write: { "docs/repro.sh": "grep -q fixed docs/note.md\n" }, structured: { status: "done", repro: { command } } });
 

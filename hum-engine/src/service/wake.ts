@@ -2,7 +2,8 @@ import * as core from "@actions/core";
 import { CREDENTIAL_CHANGED } from "../adapters/claude-p.ts";
 import { SIGNAL_NOT_APPLIED } from "../loop/pass.ts";
 import type { Card } from "../status/format.ts";
-import { UNREAD_CODE, type Worker } from "../worker/worker.ts";
+import { PARKED_CODES } from "../worker/thin-path.ts";
+import { CLAIMED_CODE, UNREAD_CODE, type Worker } from "../worker/worker.ts";
 import { CARD_CODES } from "./cards.ts";
 
 /**
@@ -21,8 +22,12 @@ export const wakeUntilQuiet = async (worker: Pick<Worker, "tick" | "idle">, afte
 	}
 };
 
-/** The cards that only inform: hum's work goes on as it would without them. A thread a tick could not read leaves out only its own item, which the next tick reads again. */
-const INFORMING_CARDS: ReadonlySet<string> = new Set([SIGNAL_NOT_APPLIED, CARD_CODES.tokenExpiring, CREDENTIAL_CHANGED, UNREAD_CODE]);
+/**
+ * The cards that only inform: hum's work goes on as it would without them. A card that stops only its own item leaves
+ * the other items to go on: a thread a tick could not read is read again next tick, a parked item sits out until the
+ * owner acts, and an item someone else works on waits until they let it go.
+ */
+const INFORMING_CARDS: ReadonlySet<string> = new Set([SIGNAL_NOT_APPLIED, CARD_CODES.tokenExpiring, CREDENTIAL_CHANGED, UNREAD_CODE, CLAIMED_CODE, ...PARKED_CODES]);
 
 /** Whether a card ends a CI wake: every card does but one that only informs. */
 export const doesStopWake = ({ code }: Pick<Card, "code">): boolean => !INFORMING_CARDS.has(code);
