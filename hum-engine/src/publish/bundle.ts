@@ -30,6 +30,9 @@ const FIELD = "\u001f";
 /** One new commit: its sha, its parents, its author and its committer. */
 const COMMIT_FORMAT = ["%H", "%P", "%an", "%ae", "%cn", "%ce"].join("%x1f");
 
+/** A commit's author as `newCommits` names it. */
+const AUTHOR_FORMAT = "%an <%ae>";
+
 /** The one file mode GitHub's API writes. A link, a submodule or an executable bit comes back as another tree. */
 const API_MODE = "100644";
 
@@ -63,17 +66,28 @@ const newCommits = async (git: Git, tips: readonly string[], trust: BundleTrust)
 		});
 
 /**
- * Why the commits break the owner's rules: each is by commitIdentity, and each parent is another new commit, gather's
- * base or an inbox head. Only an evidence ref's tip has no parent. The identity check stops a commit made under the
- * wrong name by mistake; a hostile work job writes any name it likes, so the walls against it are the ref check and
- * publish placing the change from its own diff and config.
+ * The authors of the commits the inbox heads reach past gather's base. A rebase keeps each commit's author, so a hum
+ * branch GitHub's API made and the work job rebased stays the GitHub App's.
  */
-const commitFault = (commits: readonly NewCommit[], evidenceTips: ReadonlySet<string>, trust: BundleTrust): string | undefined => {
+const handedOnAuthors = async (git: Git, trust: BundleTrust): Promise<string[]> =>
+	trust.heads.length === 0 ? [] : (await git.raw(["log", `--format=${AUTHOR_FORMAT}`, ...trust.heads, "--not", trust.base])).split("\n").filter(Boolean);
+
+/**
+ * Why the commits break the owner's rules: commitIdentity commits each and writes each, unless a rebase kept the
+ * author of a commit gather handed on; each parent is another new commit, gather's base or an inbox head. Only an
+ * evidence ref's tip has no parent. The identity check stops a commit made under the wrong name by mistake; a hostile
+ * work job writes any name it likes, so the walls against it are the ref check and publish placing the change from
+ * its own diff and config.
+ */
+const commitFault = (commits: readonly NewCommit[], evidenceTips: ReadonlySet<string>, trust: BundleTrust, handedOn: readonly string[]): string | undefined => {
 	const owner = `${trust.identity.name} <${trust.identity.email}>`;
+	const authors = new Set([owner, ...handedOn]);
 	const known = new Set([trust.base, ...trust.heads, ...commits.map(({ sha }) => sha)]);
 
 	for (const { sha, parents, author, committer } of commits) {
-		if (author !== owner || committer !== owner) return `commit ${sha} is by ${author}, committed by ${committer}, not by commitIdentity ${owner}`;
+		if (committer !== owner) return `commit ${sha} is committed by ${committer}, not by commitIdentity ${owner}`;
+
+		if (!authors.has(author)) return `commit ${sha} is by ${author}, who is neither commitIdentity ${owner} nor the author of a commit gather handed on`;
 
 		if (parents.length === 0 && !evidenceTips.has(sha)) return `commit ${sha} has no parent and is no evidence ref's tip`;
 
@@ -99,9 +113,9 @@ const uncarried = async (git: Git, tip: string, base: string): Promise<string | 
 
 /**
  * Reads an outbox's bundle into publish's repo under `OUTBOX_REFS` and checks it before any write: every ref is one
- * hum writes, every object passes git's own check, every new commit is by commitIdentity and grows from gather's base
- * or a hum branch it handed on, and on a base that requires signed commits no branch changes a mode GitHub's API
- * cannot carry. The repo must already hold gather's base and heads.
+ * hum writes, every object passes git's own check, commitIdentity commits every new commit and writes it unless a
+ * rebase kept a handed-on commit's author, every new commit grows from gather's base or a hum branch it handed on,
+ * and on a base that requires signed commits no branch changes a mode GitHub's API cannot carry. The repo must already hold gather's base and heads.
  */
 export const checkBundle = async (git: Git, bundle: string, trust: BundleTrust): Promise<BundleCheck> => {
 	const verified = await git.run(["bundle", "verify", "-q", bundle]);
@@ -116,7 +130,7 @@ export const checkBundle = async (git: Git, bundle: string, trust: BundleTrust):
 	await git.raw(["-c", "transfer.fsckObjects=true", "fetch", "-q", "--no-tags", bundle, ...[...refs.keys()].map((ref) => `+${ref}:${OUTBOX_REFS}${ref.slice("refs/".length)}`)]);
 
 	const evidenceTips = new Set([...refs].flatMap(([ref, sha]) => (ref.startsWith(EVIDENCE_REFS) ? [sha] : [])));
-	const fault = commitFault(await newCommits(git, [...refs.values()], trust), evidenceTips, trust);
+	const fault = commitFault(await newCommits(git, [...refs.values()], trust), evidenceTips, trust, await handedOnAuthors(git, trust));
 
 	if (fault !== undefined) return { ok: false, why: fault };
 

@@ -105,6 +105,9 @@ const selected = (selection: SelectionSetNode, value: Json): Json => {
 	return isObject(value) ? Object.fromEntries(fieldsOf(selection, value)) : value;
 };
 
+/** The author and committer GitHub writes on a commit its API makes with a GitHub App's token. */
+export const APP_COMMIT_ENV = { GIT_AUTHOR_NAME: "app[bot]", GIT_AUTHOR_EMAIL: "app@users.noreply.github.com", GIT_COMMITTER_NAME: "GitHub", GIT_COMMITTER_EMAIL: "noreply@github.com" } as const;
+
 /** The commit the fake names as a merged pull request's merge on the base. */
 export const mergeCommitOf = (number: number): string => `merge-of-${number}`;
 
@@ -284,7 +287,7 @@ export class FakeGitHub {
 		if (head !== v.expected) return refused("STALE_DATA", `Expected branch to point to "${v.expected}" but it did not.  Pull and try again.`);
 
 		const scratch = mkdtempSync(join(tmpdir(), "fake-index-"));
-		const env = { ...process.env, GIT_INDEX_FILE: join(scratch, "index"), GIT_AUTHOR_NAME: "app[bot]", GIT_AUTHOR_EMAIL: "app@users.noreply.github.com", GIT_COMMITTER_NAME: "GitHub", GIT_COMMITTER_EMAIL: "noreply@github.com" };
+		const env = { ...process.env, GIT_INDEX_FILE: join(scratch, "index"), ...APP_COMMIT_ENV };
 		const indexed = (args: readonly string[], input?: Buffer) => spawnSync("git", args, { cwd: bare, env, input, encoding: "utf8" }).stdout.trim();
 
 		try {
