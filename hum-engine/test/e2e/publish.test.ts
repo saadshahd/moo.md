@@ -128,7 +128,7 @@ const refusals: readonly [string, (w: WorkerWorld, id: ItemId, outbox: PassOutbo
 		const forged = forgedBundle(w, id, STRANGER);
 
 		return { item: id, intents: [{ kind: "land", head: forged.head }], bundle: forged.file };
-	}, /is by Stranger/],
+	}, /committed by Stranger <stranger@example.com>, not by commitIdentity/],
 	["a head neither its bundle's tip, the base nor its branch's head", (_, id, outbox) => ({ ...outbox, intents: [{ kind: "land", head: "0".repeat(40) }] }), /names 0{40} as the head/],
 	["evidence its bundle does not hold", (_, id, outbox) => ({ ...outbox, intents: [{ kind: "keep-evidence" }, ...outbox.intents] }), new RegExp(`evidence its bundle does not hold on ${evidenceRef("seed-1")}`)],
 	["more follow-ups than followUpsPerPass", (w, id, outbox) => ({ ...outbox, intents: [...Array.from({ length: w.config.hum.followUpsPerPass + 1 }, (): Intent => ({ kind: "file-follow-up", title: "More", body: "More." })), ...outbox.intents] }), /files 11 follow-ups/],
