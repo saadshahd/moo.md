@@ -6,7 +6,7 @@ import { docsJudge } from "../fixtures/judge.ts";
 import { configWith } from "../fixtures/config.ts";
 import { type PassOutbox, publishPass } from "../../src/publish/publisher.ts";
 import { readOutbox, writeBaseCheck, writeOutboxState, writePass } from "../../src/publish/handover.ts";
-import { publisherOf, runThinPath } from "../../src/worker/thin-path.ts";
+import { claimTtlMs, publisherOf, runThinPath } from "../../src/worker/thin-path.ts";
 
 import { markdownOn, sh } from "../fixtures/work-repo.ts";
 import { tempDir } from "../fixtures/temp.ts";
@@ -175,6 +175,33 @@ test("publish refuses a work job's move to the kind the item has, keeps the kind
 	expect(w.state.itemKinds.get(id)).toEqual(kind);
 	expect(snapshotOf(w).refs).toBe(refs);
 	expect(saves).toBe(3);
+});
+
+test("publish takes a pass past the owner's wait gather settled their answer to, though the thread GitHub gives holds that answer as a plain reply", async () => {
+	const w = await workerWorld({});
+	const id = ItemId.parse(w.repo.seed("Write the note"));
+	const now = () => w.clock.at;
+	const feature = w.config.kinds.feature!;
+	const publisher = publisherOf(w.thinPath({ now }), docsJudge);
+	const work = openState(tempDir("work-state"), { now });
+	const reply = { kind: "comment", text: "Take the second way.", at: now() + 2, author: "person" } as const;
+	const thread = [{ kind: "question", text: "How should the run go on?", at: now() + 1 } as const, reply];
+
+	w.state.itemKinds.put(id, { item: id, kind: "feature", from: "source" });
+	w.state.items.save(id, feature, { status: "active", value: "asking", context: {} });
+	w.state.answers.put(`${id}#1`, { item: id, ordinal: 1, text: reply.text, disposition: "applied", why: "The run goes on with your answer.", at: now() + 3, source: "free" });
+	work.items.save(id, feature, { status: "active", value: "merging", context: {} });
+	await publisher.workSource.claim(id, publisher.holder, claimTtlMs(w.config));
+
+	const results = await publishWake({
+		publisher: { ...publisher, workSource: { ...publisher.workSource, read: async (item) => ({ ...(await publisher.workSource.read(item)), thread }) }, save: async () => {} },
+		gathered: { holder: publisher.holder, base: "main", baseSha: sh(w.repo.remote, ["rev-parse", "main"]).trim(), heads: {}, claimed: [id] },
+		outbox: { passes: [{ item: id, result: { outcome: "waiting", item: id }, intents: [], bundle: undefined }], baseCheck: undefined, stateDir: tempDir("work-state"), bundleOf: () => undefined },
+		work,
+	});
+
+	expect(results).toEqual([{ outcome: "waiting", item: id }]);
+	expect(w.state.items.savedOf(id)?.state).toBe("merging");
 });
 
 const KILL_LANDING = join(import.meta.dir, "../fixtures/kill-landing.ts");

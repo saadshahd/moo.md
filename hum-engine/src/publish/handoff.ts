@@ -16,7 +16,7 @@ export type InboxItem = {
 	readonly kind: Kind;
 	/** The machine's state in the inbox, or undefined when the item had none. */
 	readonly at: string | undefined;
-	/** The inbox thread holds the owner's answer to the wait the item is in. */
+	/** The item's thread holds the owner's answer to the wait the item is in, as the answers publish saved settle it. */
 	readonly answered: boolean;
 	/** The wait the item is in timed out unanswered into work, which a pass goes on to. */
 	readonly timedOut: boolean;

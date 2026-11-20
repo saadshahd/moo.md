@@ -48,11 +48,12 @@ import { recentlyAsked, releaseQuestions } from "./questions.ts";
 import { OWNER_APPROVAL } from "../decide/merge.ts";
 import { answerTo, type Checkout, doesStartOver, ownerWaitStage, claimTtlMs, DEFAULT_BASE, gatherItem, hasEndedStuck, isGathered, park, rememberKinds, runThinPath, type ThinPathOptions, type ThinResult, isWaitingOnOwner } from "./thin-path.ts";
 import { ownerAnswered } from "../state/item-log.ts";
+import { hasProgress } from "./kind.ts";
 
 export type { TickResult } from "./lifecycle.ts";
 
 /** The card on an item someone else already works on. */
-const CLAIMED_CODE = "item-claimed";
+export const CLAIMED_CODE = "item-claimed";
 
 /** Where the loop keeps the base it read, so a fetch elsewhere cannot move it mid-pass. */
 const LOOP_REF = "refs/hum/loop-base";
@@ -800,11 +801,13 @@ export class Worker {
 
 		const resumed = [...this.#resuming].flatMap((id) => (isFresh(id) && !ready.some((ref) => ref.id === id) ? [learned(id).then((known) => ({ id, answered: true, known }))] : []));
 
-		const candidates = (await Promise.all([...fresh, ...answered, ...resumed])).flatMap(({ id, answered, known }) => (known ? [{ id, answered, known }] : []));
+		/** Who else works on an item hum has not started; no one rivals an item the owner answered or hum goes on with. */
+		const rivalsOf = (id: string, answered: boolean, known: Known): readonly string[] => (answered || hasProgress(state, id) ? [] : known.claimedBy);
+		const candidates = (await Promise.all([...fresh, ...answered, ...resumed])).flatMap(({ id, answered, known }) => (known ? [{ id, answered, known, rivals: rivalsOf(id, answered, known) }] : []));
 
-		for (const { id, known } of candidates.filter((candidate) => !candidate.answered)) this.#showClaim(id, known.claimedBy);
+		for (const { id, rivals } of candidates) this.#showClaim(id, rivals);
 
-		const waiting = candidates.filter((candidate) => candidate.answered || candidate.known.claimedBy.length === 0);
+		const waiting = candidates.filter(({ rivals }) => rivals.length === 0);
 		const knownOf = new Map(waiting.map((w) => [w.id, w.known]));
 
 		const { start } = pick({
