@@ -1,6 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { z } from "zod";
 import { Json } from "../config/json.ts";
 import { atomicWrite, dropInto, hasCode, listFiles, orMissing, slug } from "../state/fs.ts";
@@ -30,6 +30,9 @@ export const runFolderAt = (root: string): RunFolder => ({
 	row: join(root, "row.json"),
 	noted: join(root, "noted"),
 });
+
+/** The folder of every run under hum's state; the secret beside them is no run. */
+export const runFolders = (stateDir: string): RunFolder[] => listFiles(join(stateDir, ROWS_DIR)).filter((root) => basename(root) !== SECRET_FILE).map(runFolderAt);
 
 /** The folder of the run named `name`: the same name always names the same folder. */
 export const runFolder = (stateDir: string, name: string): RunFolder => runFolderAt(join(stateDir, ROWS_DIR, slug(name)));

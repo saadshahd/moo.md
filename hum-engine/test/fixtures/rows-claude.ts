@@ -1,6 +1,7 @@
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
+import { SHIM_MODEL } from "./shim.ts";
 
 /**
  * The rig's claude. Claude Code's own checks go to the real claude; a session reads its `--settings` file, takes its
@@ -14,6 +15,22 @@ if (PASSED_ON.includes(args[0] ?? "")) {
 	const passed = Bun.spawnSync([process.env.HUM_ROWS_CLAUDE ?? "claude", ...args], { stdio: ["inherit", "inherit", "inherit"] });
 
 	process.exit(passed.exitCode ?? 1);
+}
+
+/** What the rig answers a cheap model call hum makes with `claude -p`, by the property its schema asks for: the start check, a kind, an alignment. */
+const JUDGMENTS = { ok: { ok: true }, kind: { kind: "docs" }, alignment: { alignment: "sound", verification: "sound" } };
+
+if (args.includes("-p")) {
+	const schema = args[args.indexOf("--json-schema") + 1] ?? "";
+	const asked = Object.entries(JUDGMENTS).find(([name]) => schema.includes(`"${name}"`));
+
+	appendFileSync(join(process.env.HUM_ROWS_RIG ?? "", "stub-p.log"), `${asked?.[0] ?? `refused: ${args.join(" ")}`}\n`);
+
+	if (asked === undefined) process.exit(1);
+
+	console.log(JSON.stringify({ type: "system", subtype: "init", plugins: [{ name: "hope" }] }));
+	console.log(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "", structured_output: asked[1], modelUsage: { [SHIM_MODEL]: { inputTokens: 1, outputTokens: 1 } } }));
+	process.exit(0);
 }
 
 const Hooks = z.record(z.string(), z.array(z.looseObject({ hooks: z.array(z.looseObject({ command: z.string() })) })));
@@ -30,6 +47,8 @@ const log = (line: string): void => appendFileSync(join(rig, `stub-${scenario}.l
 writeFileSync(transcript, `${JSON.stringify({ type: "assistant", message: { id: "m1", model: "claude-haiku-5-5", usage: { input_tokens: 10, output_tokens: 5 } } })}\n`);
 
 writeFileSync(join(rig, `argv-${scenario}.txt`), args.join("\n"));
+
+writeFileSync(join(rig, `cwd-${scenario}.txt`), process.cwd());
 
 writeFileSync(join(rig, `key-${scenario}.txt`), env.HUM_RUN_KEY ?? "");
 
@@ -102,6 +121,10 @@ const SCENARIOS = new Map<string, () => Promise<void>>(Object.entries({
 	},
 	restart: async () => {
 		await until(() => existsSync(join(rig, "go-restart")));
+		await turn(() => answer(DONE));
+	},
+	build: async () => {
+		await until(() => existsSync(join(rig, "go-build")));
 		await turn(() => answer(DONE));
 	},
 }));

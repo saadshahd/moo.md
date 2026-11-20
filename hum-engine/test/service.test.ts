@@ -5,9 +5,11 @@ import { CI_TICK_REF, readCiTick, recordCiTick } from "../src/service/ci-tick.ts
 import { backoffFor, type Child, EXIT_UPDATED, supervise, type Supervision } from "../src/service/supervise.ts";
 import { checkTokenAge } from "../src/service/token.ts";
 import { doesStopWake, wakeUntilQuiet } from "../src/service/wake.ts";
+import { programDifferences } from "../src/service/program.ts";
+import { programStatus, statusReport } from "../src/service/program-status.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { openState } from "../src/state/open.ts";
-import { readStatus, writeHeartbeat } from "../src/status/file.ts";
+import { emptyStatus, readStatus, writeHeartbeat } from "../src/status/file.ts";
 import { configWith } from "./fixtures/config.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { until } from "./fixtures/process.ts";
@@ -213,4 +215,31 @@ test("CI wake: ticks until a tick starts nothing, so a run that frees another it
 
 	expect(w.results.filter((r) => r.outcome === "merged").map((r) => r.item).sort()).toEqual(["a", "b"]);
 	expect(mergedAtEachSave).toEqual([1, 2, 2]);
+});
+
+test("a Program entry that differs from the one setup printed names each field that differs, in the App's words; a matching entry in its own Terminal names none", () => {
+	const printed = { argv: ["/bin/bun", "/repo/node_modules/.bin/hum", "serve"], dir: ".", adoptDir: ".hum-slots" };
+
+	expect(programDifferences({ entry: printed, isThisProcess: true }, printed)).toEqual([]);
+	expect(programDifferences({ entry: null, isThisProcess: false }, printed)).toEqual(["this Project names no Program"]);
+	expect(programDifferences({ entry: { argv: ["bunx", "hum", "serve"], dir: "." }, isThisProcess: true }, printed)).toEqual([
+		'its Command is "bunx hum serve", where setup printed "/bin/bun /repo/node_modules/.bin/hum serve"',
+		'its Worktree path is "", where setup printed ".hum-slots"',
+	]);
+	expect(programDifferences({ entry: printed, isThisProcess: false }, printed)).toEqual(["this hum serve is not the Program roundup started"]);
+});
+
+/** The state and label an OSC 7501 report carries. */
+const reported = (report: string) => ({ state: /;state=(\w+)/u.exec(report)?.[1], label: Buffer.from(/:msg=([A-Za-z0-9+/=]*)/u.exec(report)?.[1] ?? "", "base64").toString() });
+
+test("hum's status reads as one OSC 7501 record: its newest fault first, then the items in flight, else idle; its label is one line of at most 200 characters", () => {
+	const status = emptyStatus("1.0.0", 0);
+	const fault = (cause: string, since: number) => ({ kind: "fault" as const, key: cause, code: cause, cause, fix: "fix it", since });
+	const item = (id: string) => ({ item: id, title: `item ${id}`, state: "building", since: 0, unclear: false });
+
+	expect(reported(statusReport(programStatus({ ok: false, reason: "missing", message: "gone" })))).toEqual({ state: "idle", label: "" });
+	expect(reported(statusReport(programStatus({ ok: true, status })))).toEqual({ state: "idle", label: "no item in flight" });
+	expect(reported(statusReport(programStatus({ ok: true, status: { ...status, inFlight: [item("12"), item("13")] } })))).toEqual({ state: "working", label: "#12 item 12: building and 1 more" });
+	expect(reported(statusReport(programStatus({ ok: true, status: { ...status, inFlight: [item("12")], cards: [fault("old", 1), fault("new\nline", 2)] } })))).toEqual({ state: "error", label: "new line and 1 more" });
+	expect(reported(statusReport(programStatus({ ok: true, status: { ...status, cards: [fault("x".repeat(300), 1)] } }))).label).toBe(`${"x".repeat(199)}…`);
 });

@@ -12,11 +12,16 @@ import { commandTimeoutMs, exec, SHIPPED_COMMAND_TIMEOUT_MS, spawn } from "../ex
 import { CI_STATE_REF, CiStateRaced, restoreCiState, saveCiState } from "../service/ci-state.ts";
 import { readCiTick, recordCiTick } from "../service/ci-tick.ts";
 import { EXIT_UPDATED, supervise } from "../service/supervise.ts";
+import { CARD_CODES, CARD_KINDS } from "../service/cards.ts";
+import { programDifferences, programEntry, readProgram } from "../service/program.ts";
+import { reportStatus } from "../service/program-status.ts";
 import { installPlugins } from "../service/plugins.ts";
 import { doesStopWake, reportCards, wakeUntilQuiet } from "../service/wake.ts";
-import { defaultStateDir, openState, STATUS_FILE } from "../state/open.ts";
+import { defaultStateDir, openState, type State, STATUS_FILE } from "../state/open.ts";
+import { ENGINE_VERSION } from "../state/format.ts";
 import { SECOND_MS } from "../time.ts";
-import { readStatus } from "../status/file.ts";
+import { readStatus, writeCards } from "../status/file.ts";
+import type { Card } from "../status/format.ts";
 import { closingAfter, npmLatest, type OpenWorkerOptions, workerOptions } from "../worker/open.ts";
 import { Worker, type WorkerOptions } from "../worker/worker.ts";
 import { DEFAULT_BASE, publisherOf } from "../worker/thin-path.ts";
@@ -78,6 +83,7 @@ const ServiceSettings = z.looseObject({
 	crashWindowSeconds: HumConfig.shape.crashWindowSeconds,
 	restartBackoff: HumConfig.shape.restartBackoff,
 	commandTimeoutSeconds: HumConfig.shape.commandTimeoutSeconds,
+	runSlots: HumConfig.shape.runSlots,
 });
 
 /**
@@ -122,6 +128,52 @@ const spawnWorker = (cwd: string, workArgs: readonly string[]) => {
 };
 
 /**
+ * Where `hum serve` runs, chosen once at its start. A service unit starts it again only after a failure, so it may
+ * exit. roundup starts its Project program again after any exit, so there it exits only when stopped, shows hum's
+ * status on its row, and starts no worker while its entry differs from the one setup printed.
+ */
+type ServeHost = {
+	readonly differences: readonly string[];
+	/** Shows the status file's state where the host reads one, until the returned function stops it. */
+	readonly report: (statusPath: string) => () => void;
+	/** Resolves once `hum serve` may exit. */
+	readonly leave: (stop: AbortSignal) => Promise<void>;
+	readonly close: () => void;
+};
+
+const UNIT_HOST: ServeHost = { differences: [], report: () => () => {}, leave: async () => {}, close: () => {} };
+
+const stopped = (stop: AbortSignal): Promise<void> =>
+	new Promise((resolve) => {
+		if (stop.aborted) resolve();
+		else stop.addEventListener("abort", () => resolve(), { once: true });
+	});
+
+const serveHost = async ({ cwd: repo, env, stdout }: Io, pool: string): Promise<ServeHost> => {
+	const program = await readProgram(env);
+
+	if (!program) return UNIT_HOST;
+
+	return {
+		differences: programDifferences(program, programEntry(repo, pool, process.execPath)),
+		report: (statusPath) => reportStatus(statusPath, stdout),
+		leave: stopped,
+		close: program.client.close,
+	};
+};
+
+/** Shows the card for a Program that differs from the one setup printed, else clears it; the status file is written here, as no worker runs to. */
+const showProgramCard = ({ faults, statusPath }: Pick<State, "faults" | "statusPath">, differences: readonly string[], now: number): Readonly<Card> | undefined => {
+	faults.clear({ code: CARD_CODES.programEntry });
+
+	const card = differences.length > 0 ? faults.raise(CARD_KINDS.programEntry({ differences })) : undefined;
+
+	writeCards(statusPath, faults.list(), ENGINE_VERSION, now);
+
+	return card;
+};
+
+/**
  * `hum work`, `hum serve` and `hum wake`'s jobs: the processes a service unit and a CI workflow start. They are not ops:
  * roles and machines never name them, so they stay out of the table `hum help --json` prints. A CI job's git dir dies
  * with it, so gather brings back the state the last wake saved first and saves it for publish, which saves it again.
@@ -142,28 +194,41 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 
 	root
 		.command("serve")
-		.description("The service unit's start script: run `hum work` with the arguments after `--`, start it again when it exits, and stop after too many crashes.")
+		.description(
+			"Keep `hum work` running with the arguments after `--`: start it again when it exits, and stop after too many crashes. As roundup's Project program it shows hum's status on its row, starts no worker while its entry differs from the one setup printed, and exits only when stopped.",
+		)
 		.argument("[work-args...]", "options of `hum work`, after `--`")
 		.action(async (workArgs: string[]) => {
 			const abort = new AbortController();
 			const settings = serviceSettings(io.cwd);
+			const state = openState(await defaultStateDir(io.cwd), { now: Date.now });
+			const host = await serveHost(io, settings.runSlots.pool);
+			const card = showProgramCard(state, host.differences, Date.now());
+			const stopReport = host.report(state.statusPath);
 
 			onStop(() => abort.abort());
 
-			const ended = await supervise({
-				state: openState(await defaultStateDir(io.cwd), { now: Date.now }),
-				spawn: () => spawnWorker(io.cwd, workArgs),
-				now: Date.now,
-				intervalMs: settings.tickIntervalSeconds * SECOND_MS,
-				workerDownTicks: settings.workerDownTicks,
-				maxCrashes: settings.maxCrashes,
-				crashWindowMs: settings.crashWindowSeconds * SECOND_MS,
-				backoffMs: settings.restartBackoff.firstSeconds * SECOND_MS,
-				maxBackoffMs: settings.restartBackoff.maxSeconds * SECOND_MS,
-				stop: abort.signal,
-			});
+			if (card) io.stderr(`hum serve: ${card.cause} ${card.fix}\n`);
+
+			const ended = card
+				? "refused"
+				: await supervise({
+						state,
+						spawn: () => spawnWorker(io.cwd, workArgs),
+						now: Date.now,
+						intervalMs: settings.tickIntervalSeconds * SECOND_MS,
+						workerDownTicks: settings.workerDownTicks,
+						maxCrashes: settings.maxCrashes,
+						crashWindowMs: settings.crashWindowSeconds * SECOND_MS,
+						backoffMs: settings.restartBackoff.firstSeconds * SECOND_MS,
+						maxBackoffMs: settings.restartBackoff.maxSeconds * SECOND_MS,
+						stop: abort.signal,
+					});
 
 			io.stderr(`hum serve: ${ended}\n`);
+			await host.leave(abort.signal);
+			stopReport();
+			host.close();
 			done(EXIT_STAY_DOWN);
 		});
 

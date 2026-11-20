@@ -4,19 +4,18 @@ import { z } from "zod";
 import type { HumConfig } from "../config/schema.ts";
 import type { Json } from "../config/json.ts";
 import { commandTimeoutMs, type Env, shellQuote } from "../exec.ts";
-import { atomicWrite, listFiles, orMissing } from "../state/fs.ts";
+import { atomicWrite, orMissing } from "../state/fs.ts";
 import type { State } from "../state/open.ts";
+import { PROGRAM_FIX, readProgram } from "../service/program.ts";
 import { SECOND_MS } from "../time.ts";
 import { type RunOutcome, type RunRequest, type Runner } from "./claude-p.ts";
 import { gitIn } from "./git.ts";
 import { failedWith, finishedOf, hookReports, runSettings, STOP_EVENT, succeededWith, tokensOf } from "./hooked-run.ts";
 import { limitOf, savedLimitUntil, settleLimit } from "./limit.ts";
 import { itemWorkstream, RailNode, railName, railTree } from "./rail.ts";
-import { HUM_EXT, type RoundupCall, type RoundupClient, RoundupRefusal, roundupRpc } from "./roundup-rpc.ts";
-import { keepSchema, ROWS_DIR, type RunFolder, runFolder, runFolderAt, runKey, takeAnswer } from "./run-answer.ts";
+import { HUM_EXT, type RoundupCall, type RoundupClient, RoundupRefusal } from "./roundup-rpc.ts";
+import { keepSchema, type RunFolder, runFolder, runFolders, runKey, takeAnswer } from "./run-answer.ts";
 import { readTranscript, type RunTranscript } from "./transcript.ts";
-
-const ProgramRun = z.looseObject({ state: z.string(), terminalId: z.string().optional() });
 
 const RowRecord = z.strictObject({ id: z.string(), name: z.string() });
 
@@ -36,9 +35,6 @@ export const NOT_PROGRAM_CODE = "rows-not-program";
 
 /** The card for a row roundup would not start. */
 export const ROW_REFUSED_CODE = "row-refused";
-
-/** What roundup answers a program whose entry names no folder to adopt worktrees in. */
-const NO_ADOPT_FOLDER = /outside_program_directory/u;
 
 /** The command a row pipes its answer to: this hum's own, so the answer reaches the engine that started the row. */
 const RUN_ANSWER = [process.execPath, fileURLToPath(new URL("../cli/main.ts", import.meta.url)), "run-answer"].map(shellQuote).join(" ");
@@ -284,9 +280,7 @@ export const railRunner = ({ call, state, config, fallback, now }: RowsOptions):
 		card: state.faults.raise({
 			code: ROW_REFUSED_CODE,
 			cause: `roundup refused hum's run: ${error.message}`,
-			fix: NO_ADOPT_FOLDER.test(error.message)
-				? "In roundup's Settings for this Project, set the Program's adopt folder to .hum-slots, then start the Program again."
-				: "hum serve must run as this Project's Program in roundup's Settings, so roundup takes its runs' settings; start the Program again there.",
+			fix: PROGRAM_FIX,
 		}),
 	});
 
@@ -326,7 +320,7 @@ export const railRunner = ({ call, state, config, fallback, now }: RowsOptions):
 	/** The names of the runs whose rows are alive. */
 	const liveRuns = async (): Promise<ReadonlySet<string>> => {
 		const live = new Set((await tree()).filter((node) => node.status?.kind !== ENDED).map(({ id }) => id));
-		const rows = listFiles(`${state.dir}/${ROWS_DIR}`).flatMap((root) => orMissing(() => [RowRecord.parse(JSON.parse(readFileSync(runFolderAt(root).row, "utf8")))], []));
+		const rows = runFolders(state.dir).flatMap(({ row }) => orMissing(() => [RowRecord.parse(JSON.parse(readFileSync(row, "utf8")))], []));
 
 		return new Set(rows.filter(({ id }) => live.has(id)).map(({ name }) => name));
 	};
@@ -337,39 +331,24 @@ export const railRunner = ({ call, state, config, fallback, now }: RowsOptions):
 /**
  * The roundup client of a hum that runs as its Project's program, as roundup names it: the Terminal roundup started
  * the program in is the one this process inherited. Under roundup but not as its program, one card says runs are not
- * rows and why. Outside roundup, or where its socket no longer answers, as in a shell left from an earlier start, nothing.
+ * rows and why. Outside roundup, or where its socket no longer answers, nothing.
  */
 export const roundupProgram = async (env: Env, faults: State["faults"]): Promise<RoundupClient | undefined> => {
-	if (env.RUPD_SOCKET === undefined) return undefined;
+	const program = await readProgram(env);
 
-	const client = roundupRpc(env.RUPD_SOCKET);
+	if (program === undefined) return undefined;
 
-	const run = await client.call("project.programRun").then(
-		(answer) => ProgramRun.parse(answer),
-		(error: Error) => {
-			if (error instanceof RoundupRefusal) throw error;
-
-			return undefined;
-		},
-	);
-
-	if (run === undefined) {
-		client.close();
-
-		return undefined;
-	}
-
-	if (run.state === "running" && run.terminalId !== undefined && run.terminalId === env.ROUNDUP_TERMINAL) {
+	if (program.isThisProcess) {
 		faults.clear({ code: NOT_PROGRAM_CODE });
 
-		return client;
+		return program.client;
 	}
 
-	client.close();
+	program.client.close();
 	faults.raise({
 		code: NOT_PROGRAM_CODE,
 		cause: `roundup serves this Project, and this hum is not its Program, so runs are not Rail rows (it acts as ${HUM_EXT} there).`,
-		fix: "In roundup's Settings for this Project, set the Program's command to hum serve and its adopt folder to .hum-slots, then start it there.",
+		fix: PROGRAM_FIX,
 	});
 
 	return undefined;

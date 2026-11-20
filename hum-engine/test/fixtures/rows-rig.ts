@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { x } from "tinyexec";
 import { z } from "zod";
@@ -56,8 +56,11 @@ const waitFor = async (found: () => boolean, timeoutMs: number, what: string): P
 	}
 };
 
-/** A scratch repo with an origin and the run slots, a stub claude, and a roundup Daemon on a fresh data folder, whose program runs `driver`. */
-export const startRig = async (driver = DRIVER): Promise<Rig> => {
+/**
+ * A scratch repo with an origin and `slots` run slots, a stub claude first on every PATH the Daemon gives, and a
+ * roundup Daemon on a fresh data folder, whose program runs `driver`.
+ */
+export const startRig = async (driver = DRIVER, { slots = SLOTS }: { readonly slots?: number } = {}): Promise<Rig> => {
 	const dir = runTempDir("rows");
 	const repo = join(dir, "repo");
 	const socket = join(dir, "rupd.sock");
@@ -73,10 +76,12 @@ export const startRig = async (driver = DRIVER): Promise<Rig> => {
 
 	for (const args of [["config", "user.name", "rig"], ["config", "user.email", "rig@example.invalid"], ["add", "README.md"], ["commit", "-qm", "init"], ["remote", "add", "origin", join(dir, "origin.git")], ["push", "-q", "origin", "main"]]) await git(repo, args);
 
-	for (let slot = 1; slot <= SLOTS; slot++) await git(repo, ["worktree", "add", "-q", join(SLOTS_DIR, `s${slot}`), "-b", `hum/slot-${slot}`]);
+	for (let slot = 1; slot <= slots; slot++) await git(repo, ["worktree", "add", "-q", join(SLOTS_DIR, `s${slot}`), "-b", `hum/slot-${slot}`]);
 
-	const stub = join(dir, "claude");
+	const bin = join(dir, "bin");
+	const stub = join(bin, "claude");
 
+	mkdirSync(bin);
 	writeFileSync(stub, `#!/bin/sh\nexec ${process.execPath} ${STUB} "$@"\n`, { mode: 0o755 });
 
 	const home = process.env.HOME ?? "";
@@ -86,7 +91,7 @@ export const startRig = async (driver = DRIVER): Promise<Rig> => {
 			HOME: home,
 			USER: process.env.USER ?? "",
 			TMPDIR: process.env.TMPDIR ?? "/tmp",
-			PATH: [join(home, ".local", "bin"), join(home, ".bun", "bin"), "/opt/homebrew/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"].join(":"),
+			PATH: [bin, join(home, ".local", "bin"), join(home, ".bun", "bin"), "/opt/homebrew/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"].join(":"),
 			ROUNDUP_DATA_DIR: join(dir, "data"),
 			RUPD_SOCKET: socket,
 			ROUNDUP_CLAUDE_BIN: stub,

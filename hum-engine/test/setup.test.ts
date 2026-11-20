@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { gitIn, type GitIdentityRead, readGitIdentity } from "../src/adapters/git.ts";
 import { loadConfig, readConfigDir } from "../src/config/load.ts";
@@ -16,6 +16,7 @@ import { OWNER } from "./fixtures/identity.ts";
 import { MAIN } from "./fixtures/owner-repo.ts";
 import { commitFiles, sh } from "./fixtures/work-repo.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
+import { PROGRAM_PLACE, PROGRAM_START } from "../src/service/program.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
 /** A git repo on `main` holding the files, with its remote as `origin`. */
@@ -357,24 +358,18 @@ test("writing setup answers writes a config that loads and carries only the sett
 	expect(loadConfig(readConfigDir(join(repo, ".hum")), { env: { installedSkills: installedSkills() } }).ok).toBe(true);
 });
 
-test("where roundup serves a slot, setup writes no service unit and gives the start that runs hum serve in a roundup Terminal on the PATH of the shell that runs it", () => {
+test("where roundup serves a slot, setup writes no service unit and prints the Program step: the pinned engine's hum serve, a blank Folder, and the slot pool as the Worktree path, whose folder it makes", () => {
 	const repo = repoWith({ "README.md": "x" });
 	const home = join(repo, "home");
 	const bun = join(repo, "it's a runtime", "bun");
 	const result = writeSetup(repo, { hum: { checks: ["true"], runPlaces: ["mac"], integrations: { "work-source": "roundup" } }, waitHours: {} }, { installedSkills: installedSkills(), home, runtime: { bun, path: "/usr/bin" }, gitIdentity: OWNER_GIT });
-	const stubs = join(repo, "stubs");
 
-	mkdirSync(stubs);
-	writeFileSync(join(stubs, "rup"), '#!/bin/sh\nprintf "%s\\n" "$@"\n');
-	chmodSync(join(stubs, "rup"), 0o755);
-
-	const path = `${stubs}:/usr/bin:/bin`;
-	const ran = Bun.spawnSync(["/bin/sh", "-c", (result.ok && result.start) || "false"], { env: { PATH: path, ROUNDUP_AGENT_ID: "42" } });
-	const [env = "", ...args] = ran.stdout.toString().trimEnd().split("\n").toReversed();
-	const hum = join(repo, "node_modules", ".bin", "hum");
-
-	expect(args.toReversed()).toEqual(["terminal", "spawn", repo, "120", "40", "--command", bun, "--command", hum, "--command", "serve", "--env"]);
-	expect(JSON.parse(env)).toEqual({ PATH: path });
+	expect(result.ok && result.program).toEqual({
+		open: PROGRAM_PLACE,
+		fields: { Command: `"${bun}" ${join(realpathSync(repo), "node_modules", ".bin", "hum")} serve`, Folder: "", "Worktree path": ".hum-slots" },
+		start: PROGRAM_START,
+	});
+	expect(existsSync(join(repo, ".hum-slots"))).toBe(true);
 	expect(existsSync(home)).toBe(false);
 });
 

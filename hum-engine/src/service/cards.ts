@@ -1,4 +1,6 @@
-export const CARD_CODES = { workerDown: "worker-down", tokenExpiring: "token-expiring", tokenRejected: "token-rejected" } as const;
+import { PROGRAM_FIX } from "./program.ts";
+
+export const CARD_CODES = { workerDown: "worker-down", tokenExpiring: "token-expiring", tokenRejected: "token-rejected", programEntry: "program-entry" } as const;
 
 const WORKER_FIX = "Look at the unit's log for the cause. Starting the unit again lets the worker start again.";
 
@@ -21,4 +23,5 @@ export const CARD_KINDS = {
 	),
 	tokenExpiring: kind(CARD_CODES.tokenExpiring, TOKEN_FIX, ({ setUp, validUntil }: { setUp: string; validUntil: string }) => `The CI token made on ${setUp} is valid until ${validUntil}.`),
 	tokenRejected: kind(CARD_CODES.tokenRejected, TOKEN_FIX, ({ said }: { said: string }) => `claude was refused with a 401: ${said.slice(0, ERROR_EXCERPT)}`),
+	programEntry: kind(CARD_CODES.programEntry, PROGRAM_FIX, ({ differences }: { differences: readonly string[] }) => `roundup's Program is not the one hum setup printed: ${differences.join("; ")}. The worker has not started.`),
 };

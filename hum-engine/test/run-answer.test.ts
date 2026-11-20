@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { keepSchema, runFolder, runKey, saveAnswer, takeAnswer } from "../src/adapters/run-answer.ts";
+import { keepSchema, runFolder, runFolders, runKey, saveAnswer, takeAnswer } from "../src/adapters/run-answer.ts";
 import { RUN_SCHEMA } from "../src/worker/thin-path.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
@@ -17,4 +17,14 @@ test("a saved answer counts only under its own run's key", () => {
 	saveAnswer(folder, runKey(stateDir, RUN), RUN, JSON.stringify({ status: "done" }));
 
 	expect(takeAnswer(folder, runKey(stateDir, RUN), RUN)).toEqual({ status: "done" });
+});
+
+test("the run folders under hum's state are the runs' own: the secret beside them is no run", () => {
+	const stateDir = tempDir("run-answer");
+	const folder = runFolder(stateDir, RUN);
+
+	keepSchema(folder, { schema: RUN_SCHEMA });
+	runKey(stateDir, RUN);
+
+	expect(runFolders(stateDir)).toEqual([folder]);
 });

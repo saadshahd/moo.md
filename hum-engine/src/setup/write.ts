@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { z } from "zod";
 import type { GitIdentityRead } from "../adapters/git.ts";
@@ -13,7 +13,7 @@ import { type HumConfig, Kind, READABLE_SCHEMA_VERSIONS, SCHEMA_VERSION } from "
 import { isGitHubHosted } from "../config/wake-job.ts";
 import { which } from "../exec.ts";
 import { ciWorkflows } from "../service/workflows.ts";
-import { roundupStart } from "../service/roundup-start.ts";
+import { type ProgramStep, programEntry, programStep, serveCommand } from "../service/program.ts";
 import { renderUnit, type UnitKind } from "../service/unit.ts";
 import { atomicWrite } from "../state/fs.ts";
 import { shippedRaw } from "./shipped.ts";
@@ -56,8 +56,8 @@ export type SetupResult =
 			readonly ok: true;
 			readonly written: readonly string[];
 			readonly config: Config;
-			/** The command that starts `hum serve` in a roundup Terminal, where roundup serves a slot and so no unit can. */
-			readonly start?: string;
+			/** The one step the owner takes so roundup runs `hum serve` as the Project's program, where roundup serves a slot and so no unit can. */
+			readonly program?: ProgramStep;
 	  }
 	| { readonly ok: false; readonly refusal: Refusal };
 
@@ -188,9 +188,11 @@ export const writeSetup = (repo: string, answers: SetupAnswers, env: SetupEnv): 
 
 	for (const { path, text } of files) atomicWrite(path, text);
 
+	if (mac?.kind === "program") mkdirSync(mac.slotFolder, { recursive: true });
+
 	const done = { ok: true, written: files.map(({ path }) => path), config: loaded.value } as const;
 
-	return mac?.kind === "roundup" ? { ...done, start: mac.command } : done;
+	return mac?.kind === "program" ? { ...done, program: mac.step } : done;
 };
 
 /** The kind files that parse. One that does not stays as it is, so the config check refuses it by name. */
@@ -205,14 +207,17 @@ const parsedKinds = (raw: RawConfig): Record<string, Kind> =>
 
 const bunOf = (env: SetupEnv): string => env.runtime?.bun ?? process.execPath;
 
-/** `hum serve` from the repo's pinned engine, on the runtime setup runs on. */
-const serveCommand = (repo: string, env: SetupEnv): string[] => [bunOf(env), join(repo, "node_modules", ".bin", "hum"), "serve"];
-
-/** How `hum serve` starts on this machine: from a unit file, or from a roundup Terminal where roundup serves a slot. */
-type MacStart = { readonly kind: "unit"; readonly file: FileToWrite } | { readonly kind: "roundup"; readonly command: string };
+/**
+ * How `hum serve` starts on this machine: from a unit file, or as the Project's program, which roundup starts where it
+ * serves a slot. roundup takes a program's Worktree path only where its folder exists, and the slot pool fills that
+ * folder only once hum serve runs, so setup makes it.
+ */
+type MacStart = { readonly kind: "unit"; readonly file: FileToWrite } | { readonly kind: "program"; readonly step: ProgramStep; readonly slotFolder: string };
 
 const macStart = (repo: string, config: Config, env: SetupEnv): MacStart =>
-	doesUseRoundup(config.hum.integrations) ? { kind: "roundup", command: roundupStart(repo, serveCommand(repo, env)) } : { kind: "unit", file: serviceFile(repo, config, env) };
+	doesUseRoundup(config.hum.integrations)
+		? { kind: "program", step: programStep(programEntry(repo, config.hum.runSlots.pool, bunOf(env))), slotFolder: resolve(repo, config.hum.runSlots.pool) }
+		: { kind: "unit", file: serviceFile(repo, config, env) };
 
 const serviceFile = (repo: string, config: Config, env: SetupEnv): FileToWrite => {
 	const kind: UnitKind = (env.platform ?? process.platform) === "darwin" ? "launchd" : "systemd";
@@ -225,7 +230,7 @@ const serviceFile = (repo: string, config: Config, env: SetupEnv): FileToWrite =
 		text: renderUnit(kind, {
 			label,
 			repo,
-			command: serveCommand(repo, env),
+			command: serveCommand(repo, bun),
 			path: env.runtime?.path ?? [dirname(bun), dirname(which("git") ?? "/usr/bin/git"), dirname(which("claude") ?? "/usr/local/bin/claude"), "/usr/bin", "/bin"].join(":"),
 			env: {},
 			log: join(home, kind === "launchd" ? join("Library", "Logs") : join(".local", "state"), `${label}.log`),
