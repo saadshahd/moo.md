@@ -13,6 +13,9 @@ const STUB = join(import.meta.dir, "rows-claude.ts");
 
 const DRIVER = join(import.meta.dir, "rows-driver.ts");
 
+/** The program that runs hum's items scenarios on the rig. */
+export const ITEMS_DRIVER = join(import.meta.dir, "items-driver.ts");
+
 const CLI = join(import.meta.dir, "..", "..", "src", "cli", "main.ts");
 
 /** The run slots the rig's repo holds, one per scenario, each a worktree on a branch of its own. */
@@ -53,8 +56,8 @@ const waitFor = async (found: () => boolean, timeoutMs: number, what: string): P
 	}
 };
 
-/** A scratch repo with an origin and the run slots, a stub claude, and a roundup Daemon on a fresh data folder. */
-export const startRig = async (): Promise<Rig> => {
+/** A scratch repo with an origin and the run slots, a stub claude, and a roundup Daemon on a fresh data folder, whose program runs `driver`. */
+export const startRig = async (driver = DRIVER): Promise<Rig> => {
 	const dir = runTempDir("rows");
 	const repo = join(dir, "repo");
 	const socket = join(dir, "rupd.sock");
@@ -105,7 +108,7 @@ export const startRig = async (): Promise<Rig> => {
 
 	const runProgram = async (scenario: string): Promise<void> => {
 		await stopProgram();
-		await user.call("project.setProgram", { argv: [process.execPath, DRIVER, scenario, dir], dir: ".", adoptDir: SLOTS_DIR });
+		await user.call("project.setProgram", { argv: [process.execPath, driver, scenario, dir], dir: ".", adoptDir: SLOTS_DIR });
 		await user.call("project.startProgram");
 	};
 

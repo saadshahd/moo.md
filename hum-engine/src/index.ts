@@ -155,7 +155,7 @@ export { type BranchRules, gitHubPullRequests, methodFor, type Pull, type PullRe
 
 export { land, type LandContext, prepareLanding, ruleGlobFor } from "./worker/land.ts";
 
-export { roundupAdapter, type RoundupOptions, stdioCall, type ToolCall } from "./adapters/roundup.ts";
+export { roundupAdapter, type RoundupOptions } from "./adapters/roundup.ts";
 
 export { type CallScope, onceCalls } from "./adapters/once.ts";
 

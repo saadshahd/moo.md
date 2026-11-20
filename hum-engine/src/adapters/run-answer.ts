@@ -1,5 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import { Json } from "../config/json.ts";
@@ -99,14 +99,16 @@ export const saveAnswer = (folder: RunFolder, key: string, name: string, text: s
 
 const readSaved = (file: string): Saved | undefined => orThrown(() => Saved.safeParse(JSON.parse(orMissing(() => readFileSync(file, "utf8"), ""))).data);
 
+const savedAt = (file: string): number => orMissing(() => statSync(file).mtimeMs, 0);
+
 /**
- * The first saved answer that carries the run's MAC and matches its schema. Every saved answer before it, one written
- * without the run's key or of the wrong shape, is removed unread by the run.
+ * The first answer saved from `since` on that carries the run's MAC and matches its schema. Every saved answer before
+ * it, one saved earlier, written without the run's key or of the wrong shape, is removed unread by the run.
  */
-export const takeAnswer = (folder: RunFolder, key: string, name: string): Json | undefined => {
+export const takeAnswer = (folder: RunFolder, key: string, name: string, since = 0): Json | undefined => {
 	for (const file of listFiles(folder.answers)) {
 		const saved = readSaved(file);
-		const checked = saved !== undefined && hasMacOf(key, name, saved) ? checkAnswer(readSchema(folder), saved.text) : undefined;
+		const checked = saved !== undefined && savedAt(file) >= since && hasMacOf(key, name, saved) ? checkAnswer(readSchema(folder), saved.text) : undefined;
 
 		if (checked?.ok) return checked.answer;
 

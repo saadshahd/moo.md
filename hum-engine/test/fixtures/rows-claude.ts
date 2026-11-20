@@ -33,8 +33,11 @@ writeFileSync(join(rig, `argv-${scenario}.txt`), args.join("\n"));
 
 writeFileSync(join(rig, `key-${scenario}.txt`), env.HUM_RUN_KEY ?? "");
 
-const hook = (event: string): void => {
-	const input = JSON.stringify({ session_id: session, transcript_path: transcript, hook_event_name: event, cwd: process.cwd() });
+/** Claude Code's question dialog, as its `PermissionRequest` hook reports it. */
+const QUESTION = { tool_name: "AskUserQuestion", tool_input: { questions: [{ question: "Which title?", header: "Title", options: [{ label: "a" }, { label: "b" }], multiSelect: false }] } };
+
+const hook = (event: string, payload: Partial<typeof QUESTION> = {}): void => {
+	const input = JSON.stringify({ session_id: session, transcript_path: transcript, hook_event_name: event, cwd: process.cwd(), ...payload });
 
 	for (const group of settings.hooks[event] ?? []) for (const { command } of group.hooks) Bun.spawnSync(["sh", "-c", command], { env, stdin: Buffer.from(input) });
 };
@@ -56,6 +59,9 @@ const until = async (found: () => boolean): Promise<void> => {
 };
 
 const DONE = JSON.stringify({ status: "done", pullRequest: { title: "rig change", body: "rig body" } });
+
+/** A question row acts only for the item the rig's question scenario names; any other waits. */
+const askedItem = env.HUM_RUN?.split(" ")[1] ?? "";
 
 const SCENARIOS = new Map<string, () => Promise<void>>(Object.entries({
 	finish: () => turn(() => answer(DONE)),
@@ -81,6 +87,17 @@ const SCENARIOS = new Map<string, () => Promise<void>>(Object.entries({
 		await turn(() => answer(DONE));
 	},
 	stopped: async () => undefined,
+	ask: async () => {
+		if (!existsSync(join(rig, `go-ask-${askedItem}`))) return;
+
+		await turn(async () => {
+			answer(JSON.stringify({ text: "early", option: "a" }));
+			await Bun.sleep(1500);
+			hook("PermissionRequest", QUESTION);
+			await Bun.sleep(1000);
+			answer(JSON.stringify({ text: "after", option: "b" }));
+		});
+	},
 	restart: async () => {
 		await until(() => existsSync(join(rig, "go-restart")));
 		await turn(() => answer(DONE));

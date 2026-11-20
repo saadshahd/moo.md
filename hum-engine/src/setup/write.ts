@@ -56,7 +56,7 @@ export type SetupResult =
 			readonly ok: true;
 			readonly written: readonly string[];
 			readonly config: Config;
-			/** The command hum's Agent runs to start `hum serve`, where roundup serves a slot and so no unit can. */
+			/** The command that starts `hum serve` in a roundup Terminal, where roundup serves a slot and so no unit can. */
 			readonly start?: string;
 	  }
 	| { readonly ok: false; readonly refusal: Refusal };

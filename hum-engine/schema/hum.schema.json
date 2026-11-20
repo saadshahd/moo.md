@@ -460,6 +460,12 @@
 			"minLength": 1,
 			"description": "The folder of the repo that holds the markdown items."
 		},
+		"roundupWorkstream": {
+			"default": "hum",
+			"type": "string",
+			"minLength": 1,
+			"description": "The Workstream at the roundup Project's root whose open Todos are hum's items."
+		},
 		"providerTimeoutSeconds": {
 			"default": 30,
 			"type": "integer",

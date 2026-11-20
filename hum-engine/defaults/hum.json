@@ -134,6 +134,7 @@
 	"ciSchedule": "*/15 * * * *",
 	"ciTickCacheSeconds": 300,
 	"itemsDir": ".hum/work",
+	"roundupWorkstream": "hum",
 	"providerTimeoutSeconds": 30,
 	"providerBackoff": {
 		"firstSeconds": 0.5,

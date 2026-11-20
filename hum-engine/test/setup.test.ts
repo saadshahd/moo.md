@@ -357,7 +357,7 @@ test("writing setup answers writes a config that loads and carries only the sett
 	expect(loadConfig(readConfigDir(join(repo, ".hum")), { env: { installedSkills: installedSkills() } }).ok).toBe(true);
 });
 
-test("where roundup serves a slot, setup writes no service unit and gives the start that runs hum serve in a roundup Terminal as the Agent whose shell runs it", () => {
+test("where roundup serves a slot, setup writes no service unit and gives the start that runs hum serve in a roundup Terminal on the PATH of the shell that runs it", () => {
 	const repo = repoWith({ "README.md": "x" });
 	const home = join(repo, "home");
 	const bun = join(repo, "it's a runtime", "bun");
@@ -374,7 +374,7 @@ test("where roundup serves a slot, setup writes no service unit and gives the st
 	const hum = join(repo, "node_modules", ".bin", "hum");
 
 	expect(args.toReversed()).toEqual(["terminal", "spawn", repo, "120", "40", "--command", bun, "--command", hum, "--command", "serve", "--env"]);
-	expect(JSON.parse(env)).toEqual({ PATH: path, ROUNDUP_AGENT_ID: "42" });
+	expect(JSON.parse(env)).toEqual({ PATH: path });
 	expect(existsSync(home)).toBe(false);
 });
 

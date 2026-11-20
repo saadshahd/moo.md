@@ -1,30 +1,20 @@
 import { mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import type { ItemRef } from "../adapter-api.ts";
 import type { HumConfig } from "../config/schema.ts";
 import type { Json } from "../config/json.ts";
 import { commandTimeoutMs, type Env, shellQuote } from "../exec.ts";
-import { atomicWrite, listFiles, orMissing, slug } from "../state/fs.ts";
+import { atomicWrite, listFiles, orMissing } from "../state/fs.ts";
 import type { State } from "../state/open.ts";
 import { SECOND_MS } from "../time.ts";
 import { type RunOutcome, type RunRequest, type Runner } from "./claude-p.ts";
 import { gitIn } from "./git.ts";
 import { failedWith, finishedOf, hookReports, runSettings, STOP_EVENT, succeededWith, tokensOf } from "./hooked-run.ts";
 import { limitOf, savedLimitUntil, settleLimit } from "./limit.ts";
+import { itemWorkstream, RailNode, railName, railTree } from "./rail.ts";
 import { HUM_EXT, type RoundupCall, type RoundupClient, RoundupRefusal, roundupRpc } from "./roundup-rpc.ts";
 import { keepSchema, ROWS_DIR, type RunFolder, runFolder, runFolderAt, runKey, takeAnswer } from "./run-answer.ts";
 import { readTranscript, type RunTranscript } from "./transcript.ts";
-
-const RailNode = z.looseObject({
-	id: z.string(),
-	name: z.string(),
-	kind: z.string(),
-	parent: z.string().nullable().optional(),
-	status: z.looseObject({ kind: z.string() }).nullish(),
-});
-
-type RailNode = z.infer<typeof RailNode>;
 
 const ProgramRun = z.looseObject({ state: z.string(), terminalId: z.string().optional() });
 
@@ -33,18 +23,10 @@ const RowRecord = z.strictObject({ id: z.string(), name: z.string() });
 /** hum's note to a row, with how many turns the row had ended when hum sent it. */
 const NotedMark = z.strictObject({ stops: z.number() });
 
-/** The longest name roundup gives a Rail row. */
-const RAIL_NAME_LENGTH = 42;
-
-/** Hex characters of the hash that keeps two long names apart once each is cut to fit. */
-const NAME_HASH = 8;
-
 /** A row's status once it has ended, whoever ended it. */
 const ENDED = "done";
 
 const IDLE = "idle";
-
-const WORKSTREAM = "workstream";
 
 /** A run whose row ended, or that hum stopped, without an answer hum took. */
 export const ROW_STOPPED = "stopped";
@@ -57,12 +39,6 @@ export const ROW_REFUSED_CODE = "row-refused";
 
 /** What roundup answers a program whose entry names no folder to adopt worktrees in. */
 const NO_ADOPT_FOLDER = /outside_program_directory/u;
-
-/** Run names past this length are cut and hashed to fit a Rail row. */
-export const railName = (name: string): string => (name.length <= RAIL_NAME_LENGTH ? name : `${name.slice(0, RAIL_NAME_LENGTH - NAME_HASH - 1)} ${slug(name).slice(0, NAME_HASH)}`);
-
-/** The Workstream an item's rows sit in, "#<id> <title>". */
-export const itemWorkstreamName = ({ id, title }: ItemRef): string => railName(`#${id} ${title}`);
 
 /** The command a row pipes its answer to: this hum's own, so the answer reaches the engine that started the row. */
 const RUN_ANSWER = [process.execPath, fileURLToPath(new URL("../cli/main.ts", import.meta.url)), "run-answer"].map(shellQuote).join(" ");
@@ -89,11 +65,83 @@ const orderOf = (name: string): Json => ({
 /** What a row may not do beyond every run's rules: make a Todo, which hum would read as new work. */
 const ROW_DENY = ["mcp__roundup__todo_create", "Bash(rup todo create *)"];
 
-/** A row's settings: every run's, auto mode, which the row starts in, the denials above, and what `hum run-answer` reads. */
-const rowSettings = (config: RowsOptions["config"], folder: RunFolder, env: Readonly<Record<string, string>>): Json => {
+/** A row's settings: every run's, hum's exact model, auto mode, which the row starts in, the denials above, and what `hum run-answer` reads. */
+const rowSettings = (config: RowConfig, folder: RunFolder, env: Readonly<Record<string, string>>, model: string): Json => {
 	const settings = runSettings(config, folder.hooks, env);
 
-	return { ...settings, permissions: { defaultMode: "auto", deny: [...settings.permissions.deny, ...ROW_DENY] } };
+	return { ...settings, model, permissions: { defaultMode: "auto", deny: [...settings.permissions.deny, ...ROW_DENY] } };
+};
+
+/** What starting a row reads of the owner's config: every run's rules, and how long a git command may take. */
+export type RowConfig = Pick<HumConfig, "deniedRunCommands" | "runAutoMode" | "commandTimeoutSeconds">;
+
+/** One row to start, under its item's Workstream. */
+export type RowStart = {
+	readonly name: string;
+	readonly folder: RunFolder;
+	readonly request: Pick<RunRequest, "prompt" | "schema" | "cwd" | "model" | "effort" | "env">;
+	readonly workstream: string;
+	/** The row adopts its run's slot; a row that changes no file starts in the Project's own folder instead. */
+	readonly adopt: boolean;
+};
+
+const writeBrief = async (call: RoundupCall, name: string, request: RowStart["request"], workstream: string): Promise<void> => {
+	const pad = briefName(name);
+	const text = briefOf(request);
+
+	await call("pad.create", { name: pad, text, visibility: "internal" }).catch(async (error: Error) => {
+		if (!(error instanceof RoundupRefusal)) throw error;
+
+		await call("pad.write", { name: pad, text });
+	});
+	await call("pad.move", { name: pad, home: workstream });
+};
+
+/** Where a row starts: its run's slot, on the branch the slot holds, or the Project's folder. */
+const placeOf = async (config: RowConfig, { request: { cwd }, name, adopt }: RowStart): Promise<{ readonly method: string; readonly params: Record<string, Json> }> =>
+	adopt
+		? { method: "agent.adopt", params: { path: cwd, branch: (await gitIn(cwd, { timeoutMs: commandTimeoutMs(config) }).raw(["rev-parse", "--abbrev-ref", "HEAD"])).trim() } }
+		: { method: "agent.spawn", params: { cwd, name: railName(name) } };
+
+const ModelList = z.looseObject({ models: z.array(z.looseObject({ id: z.string() })) });
+
+const ProjectModels = z.looseObject({ models: z.looseObject({ roles: z.array(z.looseObject({ role: z.string(), model: z.string().nullish() })) }) });
+
+/** The role roundup starts a row under: a model the Project names for it replaces the one a row's settings carry. */
+const ROW_ROLE = "subagent";
+
+/**
+ * The model roundup launches a row on. hum's exact model id rides in the row's settings, and roundup passes a model of
+ * its own only where the Project names one for the row's role; there the name roundup lists that hum's id names goes
+ * in its place, as "claude-haiku-5-5" names "haiku", and an id that names none is refused.
+ */
+const launchModel = async (call: RoundupCall, model: string): Promise<string | null> => {
+	if (!ProjectModels.parse(await call("project.get")).models.roles.some((role) => role.role === ROW_ROLE && role.model)) return null;
+
+	const words = new Set(model.split(/[^a-z0-9]+/i));
+	const listed = ModelList.parse(await call("models.list")).models.map(({ id }) => id);
+	const named = listed.find((id) => id === model || words.has(id));
+
+	if (named === undefined) throw new Error(`roundup's Project names a model for its Agents, which would replace hum's ${model}, and ${model} names none of roundup's ${listed.join(", ")}: clear that model in roundup's Settings, or set hum.json models to ids that name one`);
+
+	return named;
+};
+
+/** Starts a row and records it in its run's folder. Settings carry the run's key, so they reach no Pad, Message, argv or order. */
+export const startRow = async (call: RoundupCall, { stateDir, config }: { readonly stateDir: string; readonly config: RowConfig }, start: RowStart): Promise<RailNode> => {
+	const { name, folder, request, workstream } = start;
+
+	await writeBrief(call, name, request, workstream);
+
+	const env = { ...request.env, HUM_RUN: name, HUM_RUN_KEY: runKey(stateDir, name), HUM_RUN_DIR: folder.root };
+	const place = await placeOf(config, start);
+
+	const node = RailNode.parse(await call(place.method, { ...place.params, parent: workstream, order: orderOf(name), model: await launchModel(call, request.model), effort: request.effort, settings: rowSettings(config, folder, env, request.model), visibility: "internal" }));
+
+	atomicWrite(folder.row, JSON.stringify({ id: node.id, name }));
+	await call("rail.rename", { id: node.id, name: railName(name) });
+
+	return node;
 };
 
 export type RowsOptions = {
@@ -119,14 +167,7 @@ export const railRunner = ({ call, state, config, fallback, now }: RowsOptions):
 	const pollMs = config.backgroundPollSeconds * SECOND_MS;
 	const noteWaitMs = config.rowNoteWaitSeconds * SECOND_MS;
 
-	const tree = async (): Promise<RailNode[]> => z.array(RailNode).parse(await call("rail.tree"));
-
-	const workstreamOf = async (item: ItemRef): Promise<string> => {
-		const name = itemWorkstreamName(item);
-		const found = (await tree()).find((node) => node.kind === WORKSTREAM && node.name === name);
-
-		return found?.id ?? RailNode.parse(await call("rail.createWorkstream", { name })).id;
-	};
+	const tree = (): Promise<RailNode[]> => railTree(call);
 
 	/** The live row of a run: the one its folder records, else one of its name in the item's Workstream, as after a crash between start and record. */
 	const liveRow = async (folder: RunFolder, name: string, workstream: string): Promise<string | undefined> => {
@@ -134,35 +175,6 @@ export const railRunner = ({ call, state, config, fallback, now }: RowsOptions):
 		const live = (await tree()).filter((node) => node.status?.kind !== ENDED);
 
 		return live.find((node) => node.id === recorded)?.id ?? live.find((node) => node.parent === workstream && node.name === railName(name))?.id;
-	};
-
-	const writeBrief = async (name: string, request: RunRequest, workstream: string): Promise<void> => {
-		const pad = briefName(name);
-		const text = briefOf(request);
-
-		await call("pad.create", { name: pad, text, visibility: "internal" }).catch(async (error: Error) => {
-			if (!(error instanceof RoundupRefusal)) throw error;
-
-			await call("pad.write", { name: pad, text });
-		});
-		await call("pad.move", { name: pad, home: workstream });
-	};
-
-	/** Adopts the run's slot as a row. Settings carry the run's key, so they reach no Pad, Message, argv or order. */
-	const startRow = async (name: string, folder: RunFolder, request: RunRequest, workstream: string): Promise<string> => {
-		await writeBrief(name, request, workstream);
-
-		const env = { ...request.env, HUM_RUN: name, HUM_RUN_KEY: runKey(state.dir, name), HUM_RUN_DIR: folder.root };
-		const branch = (await gitIn(request.cwd, { timeoutMs: commandTimeoutMs(config) }).raw(["rev-parse", "--abbrev-ref", "HEAD"])).trim();
-
-		const node = RailNode.parse(
-			await call("agent.adopt", { path: request.cwd, branch, parent: workstream, order: orderOf(name), model: request.model, effort: request.effort, settings: rowSettings(config, folder, env), visibility: "internal" }),
-		);
-
-		atomicWrite(folder.row, JSON.stringify({ id: node.id, name }));
-		await call("rail.rename", { id: node.id, name: railName(name) });
-
-		return node.id;
 	};
 
 	const stop = async (row: string): Promise<void> => {
@@ -294,8 +306,8 @@ export const railRunner = ({ call, state, config, fallback, now }: RowsOptions):
 		mkdirSync(folder.hooks, { recursive: true });
 
 		try {
-			const workstream = await workstreamOf(item);
-			const row = (await liveRow(folder, name, workstream)) ?? (await startRow(name, folder, request, workstream));
+			const workstream = await itemWorkstream(call, item);
+			const row = (await liveRow(folder, name, workstream)) ?? (await startRow(call, { stateDir: state.dir, config }, { name, folder, request, workstream, adopt: true })).id;
 
 			state.faults.clear({ code: ROW_REFUSED_CODE });
 

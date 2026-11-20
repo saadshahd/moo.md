@@ -12,7 +12,7 @@ export const HELD_MS = 10_000;
 
 /**
  * Writes an owner adapter into `repo` that holds the process open from the moment it is built until `close`, as
- * roundup's live `rup mcp` client does, and lists nothing ready.
+ * roundup's socket client does, and lists nothing ready.
  */
 export const writeHoldingAdapter = (repo: string): void => {
 	mkdirSync(join(repo, "adapters"), { recursive: true });

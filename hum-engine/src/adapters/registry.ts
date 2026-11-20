@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import { ADAPTER_API_VERSION, type Adapter, type AdapterContext, type AdapterFactory, type Integrations, PermanentError } from "../adapter-api.ts";
 import { readSettings } from "../config/settings.ts";
+import { defaultStateDir } from "../state/open.ts";
 import { HumConfig, SLOTS, type Slot } from "../config/schema.ts";
 import { commandTimeoutMs, type Env } from "../exec.ts";
 import type { Faults } from "../state/faults.ts";
@@ -29,6 +30,10 @@ const AdapterSettings = z.looseObject({
 	claimPrefix: HumConfig.shape.claimPrefix,
 	runBranchPrefix: HumConfig.shape.runBranchPrefix,
 	itemsDir: HumConfig.shape.itemsDir,
+	roundupWorkstream: HumConfig.shape.roundupWorkstream,
+	models: HumConfig.shape.models,
+	deniedRunCommands: HumConfig.shape.deniedRunCommands,
+	runAutoMode: HumConfig.shape.runAutoMode,
 	commitIdentity: HumConfig.shape.commitIdentity,
 	readyLabel: HumConfig.shape.readyLabel,
 	ownerLogins: HumConfig.shape.ownerLogins,
@@ -88,7 +93,7 @@ const BUILT_IN = {
 
 		return githubAdapter({ repo: await githubRepo(path, timeoutMs), base: await defaultBase(path, timeoutMs), claimPrefix: settings.claimPrefix, runBranchPrefix: settings.runBranchPrefix, readyLabel: settings.readyLabel, mergeMethod: settings.mergeMethod, ownerLogins: settings.ownerLogins, timeoutMs }, context);
 	},
-	[ROUNDUP]: async ({ context }) => roundupAdapter({}, context),
+	[ROUNDUP]: async ({ path, settings, context }) => roundupAdapter({ workstream: settings.roundupWorkstream, stateDir: await defaultStateDir(path), repo: path, config: settings }, context),
 } satisfies Readonly<Record<string, (repo: Repo) => Promise<Adapter>>>;
 
 const isBuiltIn = (name: string): name is keyof typeof BUILT_IN => Object.hasOwn(BUILT_IN, name);

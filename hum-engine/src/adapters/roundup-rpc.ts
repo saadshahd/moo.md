@@ -1,6 +1,7 @@
 import { createConnection, type Socket } from "node:net";
 import { createInterface } from "node:readline";
-import { isJSONRPCResponse, JSONRPCClient, JSONRPCErrorException } from "json-rpc-2.0";
+import { JSONRPCClient, JSONRPCErrorException, JSONRPCServer, JSONRPCServerAndClient } from "json-rpc-2.0";
+import { z } from "zod";
 import { Json } from "../config/json.ts";
 
 /**
@@ -22,68 +23,112 @@ export class RoundupRefusal extends Error {
 	}
 }
 
+/** One entry of roundup's Event log, numbered in the order the Daemon saved it. */
+export const RoundupEvent = z.looseObject({ seq: z.int().nonnegative(), name: z.string(), actor: z.looseObject({ kind: z.string(), id: z.string() }).optional(), data: Json.optional() });
+
+export type RoundupEvent = z.infer<typeof RoundupEvent>;
+
+const Subscribed = z.looseObject({ head: z.int().nonnegative() });
+
 export type RoundupCall = (method: string, params?: Record<string, Json>) => Promise<Json>;
 
-export type RoundupClient = { readonly call: RoundupCall; readonly close: () => void };
+export type RoundupClient = {
+	readonly call: RoundupCall;
+	/** Opens the connection where it is closed; a client that follows events is following again once it resolves. */
+	readonly open: () => Promise<void>;
+	/** The last Event this client handed over, else the head it began following from; undefined before it follows. */
+	readonly position: () => number | undefined;
+	readonly close: () => void;
+};
 
-type Connection = { readonly conn: Socket; readonly client: JSONRPCClient };
+/** What a client that follows the Event log does with each Event, and the Event it follows on from, else the head. */
+export type Follow = { readonly onEvent: (event: RoundupEvent) => void; readonly from?: number };
 
-/** One reply line from the Daemon; a line that is no JSON-RPC reply, such as an event, says nothing to a caller. */
-const replyOf = (line: string) => {
+type Connection = { readonly conn: Socket; readonly peer: JSONRPCServerAndClient };
+
+/** What one line from the Daemon holds: a reply or an event; a line that is no JSON holds nothing. */
+const messageOf = (line: string): Json | undefined => {
 	try {
-		const parsed: unknown = JSON.parse(line);
-
-		return isJSONRPCResponse(parsed) ? parsed : undefined;
+		return Json.parse(JSON.parse(line));
 	} catch {
 		return undefined;
 	}
 };
 
-const connect = (socket: string, ext: string | null, dropped: () => void): Promise<Connection> =>
-	new Promise((resolve, reject) => {
-		const conn = createConnection(socket);
-		const client = new JSONRPCClient((request) => void conn.write(`${JSON.stringify(request)}\n`));
-
-		createInterface({ input: conn }).on("line", (line) => {
-			const reply = replyOf(line);
-
-			if (reply) client.receive(reply);
-		});
-
-		conn.on("close", () => {
-			dropped();
-			client.rejectAllPendingRequests(`roundup's socket ${socket} closed`);
-		});
-		conn.once("error", reject);
-		conn.once("connect", () => {
-			if (ext === null) return resolve({ conn, client });
-
-			client.request("daemon.identify", { actor: { kind: "ext", id: ext, parent: null } }).then(() => resolve({ conn, client }), reject);
-		});
-	});
-
 /**
- * JSON-RPC on the Daemon's socket, one request per line, claiming the Ext name `ext`, or no name at all when it is
- * null. The connection opens at the first call and again at the next call after it drops; a call in flight when
- * it drops fails.
+ * JSON-RPC on the Daemon's socket, one message per line, claiming the Ext name `ext`, or no name at all when it is
+ * null. The connection opens at the first call and again at the next call after it drops; a call in flight when it
+ * drops fails. With `follow`, each connection subscribes to the Event log and hands every Event to it, each from the
+ * last one handed over, so no Event is missed across a drop.
  */
-export const roundupRpc = (socket: string, ext: string | null = HUM_EXT): RoundupClient => {
+export const roundupRpc = (socket: string, ext: string | null = HUM_EXT, follow?: Follow): RoundupClient => {
 	let open: Promise<Connection> | undefined;
+	let seen = follow?.from;
+
+	const handOver = (event: RoundupEvent): void => {
+		seen = event.seq;
+		follow?.onEvent(event);
+	};
+
+	const connect = (): Promise<Connection> =>
+		new Promise((resolve, reject) => {
+			const conn = createConnection(socket);
+			const peer = new JSONRPCServerAndClient(new JSONRPCServer(), new JSONRPCClient((request) => void conn.write(`${JSON.stringify(request)}\n`)));
+
+			peer.addMethod("event", (params) => {
+				const event = RoundupEvent.safeParse(params);
+
+				if (event.success) handOver(event.data);
+			});
+
+			createInterface({ input: conn }).on("line", (line) => {
+				const message = messageOf(line);
+
+				if (message !== undefined) void peer.receiveAndSend(message, undefined, undefined);
+			});
+
+			conn.on("close", () => {
+				open = undefined;
+				peer.rejectAllPendingRequests(`roundup's socket ${socket} closed`);
+			});
+			conn.once("error", reject);
+			conn.once("connect", () => {
+				const identified = ext === null ? Promise.resolve() : peer.request("daemon.identify", { actor: { kind: "ext", id: ext, parent: null } }, undefined);
+				const subscribed = async (after: number | undefined) => Subscribed.parse(await peer.request("events.subscribe", after === undefined ? {} : { after }, undefined)).head;
+
+				/* A log that no longer reaches `seen`, as after its data folder changed, is followed from its head. */
+				const followed = async () => {
+					if (!follow) return;
+
+					const head = await subscribed(seen).catch((error: Error) => {
+						if (seen === undefined || !(error instanceof JSONRPCErrorException)) throw error;
+
+						seen = undefined;
+
+						return subscribed(undefined);
+					});
+
+					seen ??= head;
+				};
+
+				Promise.resolve(identified)
+					.then(followed)
+					.then(() => resolve({ conn, peer }), reject);
+			});
+		});
 
 	const opened = (): Promise<Connection> =>
-		(open ??= connect(socket, ext, () => {
-			open = undefined;
-		}).catch((error: Error) => {
+		(open ??= connect().catch((error: Error) => {
 			open = undefined;
 
 			throw error;
 		}));
 
 	const call: RoundupCall = async (method, params) => {
-		const { client } = await opened();
+		const { peer } = await opened();
 
 		try {
-			return Json.parse((await client.request(method, params ?? null)) ?? null);
+			return Json.parse((await peer.request(method, params ?? null, undefined)) ?? null);
 		} catch (error) {
 			if (error instanceof JSONRPCErrorException) throw new RoundupRefusal(error.code, `${method}: ${error.message}`);
 
@@ -93,6 +138,8 @@ export const roundupRpc = (socket: string, ext: string | null = HUM_EXT): Roundu
 
 	return {
 		call,
+		open: async () => void (await opened()),
+		position: () => seen,
 		close: () => {
 			void open?.then(({ conn }) => conn.end(), () => {});
 			open = undefined;
