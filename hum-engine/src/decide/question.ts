@@ -70,6 +70,7 @@ export const PLAIN_QUESTIONS = {
 	unsure: "How should the run go on?",
 	"over-cap": "Keep working past the token cap?",
 	"owner-review": "Approve this change?",
+	stuck: "Run this item again?",
 	kind: "Which kind of work is this?",
 	level: "Which level do these paths belong to?",
 	repro: "The repro passes without a fix; how should the run go on?",

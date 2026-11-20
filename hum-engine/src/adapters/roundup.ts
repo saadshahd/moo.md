@@ -264,6 +264,11 @@ export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterCon
 	const questionsOf = (id: string) => questionFolders().filter(({ asked }) => asked.item === id);
 
 	/** Takes each open question's answer that its row saved after roundup showed it waiting on the owner, and stops the row. */
+	/** An item has one open question, the newest: asking another stops the rows of those before it. */
+	const stopOpen = async (id: string): Promise<void> => {
+		for (const open of questionsOf(id).filter((asking) => takenOf(asking) === undefined)) await stop(open.row);
+	};
+
 	const takeAnswers = async (id: string, nodes: readonly RailNode[]): Promise<void> => {
 		for (const asking of questionsOf(id).filter((open) => takenOf(open) === undefined)) {
 			const status = nodes.find((node) => node.id === asking.row)?.status;
@@ -327,6 +332,8 @@ export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterCon
 		mkdirSync(folder.hooks, { recursive: true });
 
 		const request = { prompt: askPrompt(question), schema, cwd: options.repo, model: options.config.models.light, effort: QUESTION_EFFORT } as const;
+
+		await stopOpen(id);
 
 		const row = await startRow(call, { stateDir: options.stateDir, config: options.config }, { name, folder, request, workstream: await itemWorkstream(call, { id, title: todo.title }), adopt: false });
 
@@ -396,12 +403,17 @@ export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterCon
 			},
 		},
 		answers: {
-			/** On roundup a question is its row: the owner answers there, so an answer through hum is refused with the row's link. */
+			onlyToQuestions: true,
+			/** On roundup a question is its row: the owner answers there, so an answer through hum is refused with the open row's link. */
 			answer: async (id) => {
 				const { projectKey } = Ping.parse(await call("daemon.ping"));
-				const links = questionsOf(id).flatMap((asking) => (takenOf(asking) === undefined && asking.row !== undefined ? [`roundup://agent/${asking.row}?project=${projectKey}`] : []));
 
-				throw new PermanentError(links.length > 0 ? `On roundup the owner answers in the question's row: ${links.join(", ")}` : `On roundup the owner answers only in a question's row, and #${id} has no open question`);
+				const open = questionsOf(id)
+					.filter((asking) => takenOf(asking) === undefined && asking.row !== undefined)
+					.toSorted((one, other) => one.asked.at - other.asked.at)
+					.at(-1);
+
+				throw new PermanentError(open ? `On roundup the owner answers in the question's row: roundup://agent/${open.row}?project=${projectKey}` : `On roundup the owner answers only in a question's row, and #${id} has no open question`);
 			},
 			/** The socket is local: none of this spends rate limit. */
 			watch: async (since?: string): Promise<Watch> => {

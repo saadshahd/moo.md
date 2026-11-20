@@ -18,7 +18,7 @@ import { doesLeaveDocs } from "../decide/kind.ts";
 import { type EventPick, isProsePurpose, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, requestedChanges, SPLIT, type SplitPart } from "../decide/prose.ts";
 import { answerOnce, foldItem, type ItemFold, keepPick, machineStarted, ownerAnswered, rebuilt } from "../state/item-log.ts";
 import type { State } from "../state/open.ts";
-import type { SavedRepro } from "../state/saved.ts";
+import type { Parked, SavedRepro } from "../state/saved.ts";
 import { type SavedSnapshot, persistedSnapshot } from "../state/items.ts";
 import { dueClock, isDue } from "./due.ts";
 import { HOUR_MS, SECOND_MS } from "../time.ts";
@@ -26,7 +26,7 @@ import { checkLimits, firstFailing, runChecks } from "./checks.ts";
 import { BASE_CONTENDED, carriedVerdict, changeOn, declaredChange, type LandContext, patchOf, placementOf, rebaseOnto, type ReviewOutcome, tierOf } from "./land.ts";
 import { OWNER_APPROVAL, REVIEW_APPROVAL } from "../decide/merge.ts";
 import { askDecision, askedQuestion, isOverCapStop, isWaitQuestion, OVER_CAP_OPTIONS, PLAIN_QUESTIONS, type PlainQuestion, RunReason } from "../decide/question.ts";
-import { RUN_AGAIN, type Stage } from "../decide/answer.ts";
+import { PARK_OPTIONS, RUN_AGAIN, type Stage } from "../decide/answer.ts";
 import { type ItemText, type ReadFile, reviewInput } from "../decide/review.ts";
 import { NO_REVIEW_FILES, readReviewFiles } from "./review-files.ts";
 import { forgetProgress, keepKind, kindAnswered, pickKind } from "./kind.ts";
@@ -1351,6 +1351,7 @@ const PARKING = {
 		cause: (item: string, why: string) => `${item} ended stuck: ${why}`,
 		fix: "Fix the cause, then run it again.",
 		action: { label: "Run it again", answer: RUN_AGAIN },
+		plain: "stuck",
 	},
 	review: {
 		code: "item-review",
@@ -1358,8 +1359,9 @@ const PARKING = {
 		cause: (item: string, why: string) => `${item} is ready to merge but needs your review: ${why}`,
 		fix: "Review the branch, then approve it on the item, or answer retry to run it again.",
 		action: { label: "Approve", answer: OWNER_APPROVAL },
+		plain: "owner-review",
 	},
-} as const satisfies Record<Parking["outcome"], { code: string; fallback: string; cause: (item: string, why: string) => string; fix: string; action: { label: string; answer: string } }>;
+} as const satisfies Record<Parking["outcome"], { code: string; fallback: string; cause: (item: string, why: string) => string; fix: string; action: { label: string; answer: string }; plain: PlainQuestion }>;
 
 /** The card on a parked item, one code for each reason it sits out. */
 export const PARKED_CODES: readonly string[] = Object.values(PARKING).map(({ code }) => code);
@@ -1381,4 +1383,11 @@ export const park = (o: Pick<ThinPathOptions, "state" | "now">, result: ThinResu
 	});
 
 	return result;
+};
+
+/** The question a park asks where the owner answers only a question hum asked: why the item parked, and what they may answer. */
+export const parkQuestion = ({ item, why, cause }: Parked) => {
+	const rule = PARKING[why];
+
+	return { question: { text: rule.cause(item, cause.slice(0, CARD_EXCERPT)), options: PARK_OPTIONS[why], detail: rule.fix } satisfies Question, plain: rule.plain };
 };

@@ -6,6 +6,7 @@ import { Holder, ItemId } from "../src/adapter-api.ts";
 import { itemWorkstreamName } from "../src/adapters/rail.ts";
 import { roundupAdapter } from "../src/adapters/roundup.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
+import { RUN_AGAIN } from "../src/decide/answer.ts";
 import { INBOX_DIR } from "../src/state/open.ts";
 import { ITEMS_DRIVER, ROUNDUP_APP, type Rig, startRig } from "./fixtures/rows-rig.ts";
 
@@ -23,7 +24,15 @@ const Node = z.looseObject({ id: z.string(), name: z.string(), kind: z.string(),
 
 const Entry = z.looseObject({ kind: z.string(), text: z.string(), option: z.string().optional() });
 
-const Result = z.looseObject({ error: z.string().optional(), refusal: z.string().optional(), thread: z.array(Entry).optional(), results: z.array(z.looseObject({ name: z.string(), failure: z.string().optional() })).optional() });
+const Result = z.looseObject({
+	error: z.string().optional(),
+	refusal: z.string().optional(),
+	thread: z.array(Entry).optional(),
+	results: z.array(z.looseObject({ name: z.string(), failure: z.string().optional() })).optional(),
+	outcomes: z.array(z.string()).optional(),
+	asked: z.array(z.array(z.string()).optional()).optional(),
+	runs: z.array(z.int()).optional(),
+});
 
 const HOLDER = Holder.parse("rig");
 
@@ -120,6 +129,15 @@ test.skipIf(!live)("a question row's answer counts only once roundup showed the 
 
 	expect(thread.filter(({ kind }) => kind === "answer")).toEqual([expect.objectContaining({ text: "after", option: "b" })]);
 	expect(refusal).toMatch(/roundup:\/\/agent\/\d+\?project=/u);
+}, RIG_MS);
+
+test.skipIf(!live)("a parked item asks a row with the owner's park actions, and the row's Run it again runs the item again", async () => {
+	const { outcomes = [], asked = [], runs = [] } = await run("park");
+
+	expect(asked).toEqual([[RUN_AGAIN]]);
+	expect(outcomes.at(0)).toBe("stuck");
+	expect(outcomes.at(-1)).toBe("merged");
+	expect(runs[1]).toBeGreaterThan(runs[0] ?? Infinity);
 }, RIG_MS);
 
 test.skipIf(!live)("the roundup adapter keeps the adapter contract as the Project's program", async () => {

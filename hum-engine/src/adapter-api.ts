@@ -120,6 +120,8 @@ export interface Answers {
 	answer(id: ItemId, answer: Answer): Promise<void>;
 	/** The one cheap read: has anything changed since `since`. An idle call costs no rate limit. */
 	watch(since?: string): Promise<Watch>;
+	/** The owner answers only a question hum asked, as on roundup, where a question is its row; so an item waiting on the owner, as a parked one, asks one. */
+	readonly onlyToQuestions?: true;
 }
 
 export interface Release {

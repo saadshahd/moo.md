@@ -153,6 +153,7 @@ export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoff
 			decide: (id, text) => once(() => questions.decide(id, text), none),
 		},
 		answers: answers && {
+			...answers,
 			answer: (id, answer) => once(() => answers.answer(id, answer), none),
 			watch: (since) => retried(() => answers.watch(since), Watch),
 		},

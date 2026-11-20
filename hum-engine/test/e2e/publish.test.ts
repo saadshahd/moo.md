@@ -67,8 +67,8 @@ test("publish starts no merge past its token's hour: the landing stays saved, an
 });
 
 const approvedEarlier = async (w: WorkerWorld, id: ItemId) => {
-	await w.markdown.questions!.ask(id, { text: "Approve this change?" });
-	await w.markdown.answers!.answer(id, { text: "approve", option: "approve" });
+	await w.source.questions!.ask(id, { text: "Approve this change?" });
+	await w.source.answers!.answer(id, { text: "approve", option: "approve" });
 };
 
 test.each([

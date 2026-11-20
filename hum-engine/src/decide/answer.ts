@@ -7,6 +7,9 @@ import { bareWord, isOverCapStop } from "./question.ts";
 /** The answer option that runs a parked item again from the start. */
 export const RUN_AGAIN = "retry";
 
+/** What the owner may answer an item parked for each reason. */
+export const PARK_OPTIONS = { stuck: [RUN_AGAIN], review: [OWNER_APPROVAL, RUN_AGAIN] } as const;
+
 /** What the model call answers when none of the question's options fits the reply. */
 export const NONE_OF_THESE = "none of these";
 

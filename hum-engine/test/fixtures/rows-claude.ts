@@ -60,8 +60,8 @@ const until = async (found: () => boolean): Promise<void> => {
 
 const DONE = JSON.stringify({ status: "done", pullRequest: { title: "rig change", body: "rig body" } });
 
-/** A question row acts only for the item the rig's question scenario names; any other waits. */
-const askedItem = env.HUM_RUN?.split(" ")[1] ?? "";
+/** A question row acts only for an item the rig named, by a file that holds the option the owner picks; any other waits. */
+const pickFile = join(rig, `go-ask-${env.HUM_RUN?.split(" ")[1] ?? ""}`);
 
 const SCENARIOS = new Map<string, () => Promise<void>>(Object.entries({
 	finish: () => turn(() => answer(DONE)),
@@ -88,14 +88,16 @@ const SCENARIOS = new Map<string, () => Promise<void>>(Object.entries({
 	},
 	stopped: async () => undefined,
 	ask: async () => {
-		if (!existsSync(join(rig, `go-ask-${askedItem}`))) return;
+		if (!existsSync(pickFile)) return;
+
+		const option = readFileSync(pickFile, "utf8");
 
 		await turn(async () => {
-			answer(JSON.stringify({ text: "early", option: "a" }));
+			answer(JSON.stringify({ text: "early", option }));
 			await Bun.sleep(1500);
 			hook("PermissionRequest", QUESTION);
 			await Bun.sleep(1000);
-			answer(JSON.stringify({ text: "after", option: "b" }));
+			answer(JSON.stringify({ text: "after", option }));
 		});
 	},
 	restart: async () => {

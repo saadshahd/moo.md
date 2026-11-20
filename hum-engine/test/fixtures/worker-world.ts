@@ -16,7 +16,7 @@ import { configWith } from "./config.ts";
 import { makeShim, type ShimSpec } from "./shim.ts";
 import { WorkRepo, itemFile, markdownSettings } from "./work-repo.ts";
 import { settleAtTestEnd, tempDir } from "./temp.ts";
-import { Holder } from "../../src/adapter-api.ts";
+import { type Adapter, type AdapterContext, Holder } from "../../src/adapter-api.ts";
 
 export const NOW = 1_800_000_000_000;
 export const TTL = SHIPPED_DEFAULTS.claimExpirySeconds * 1000;
@@ -29,9 +29,11 @@ export type WorldOptions = {
 	readonly worker?: Partial<WorkerOptions>;
 	/** Runs go to Claude Code's background service instead of `claude -p`. */
 	readonly background?: boolean;
+	/** The adapter the worker reads its items through, given the world's clone of the remote; by default a markdown source in that clone. */
+	readonly source?: (context: AdapterContext, clone: string) => Adapter;
 };
 
-/** A temp bare remote, a markdown work source on it, a shim for `claude`, one worker, and the options of one thin-path pass. */
+/** A temp bare remote, a work source, by default markdown on that remote, a shim for `claude`, one worker, and the options of one thin-path pass. */
 export const workerWorld = async (spec: ShimSpec, options: WorldOptions = {}) => {
 	const repo = new WorkRepo();
 	const clock = { at: NOW };
@@ -42,8 +44,9 @@ export const workerWorld = async (spec: ShimSpec, options: WorldOptions = {}) =>
 	const clone = repo.worker("w");
 	const base = options.config ?? configWith();
 	const config: Config = { ...base, hum: { ...base.hum, ...options.settings } };
-	const markdown = guarded(markdownAdapter({ ...markdownSettings, repo: clone }, { report: (f) => reports.push(f.code), now, env: process.env }), { provider: "markdown", faults: state.faults, ...guardTimings(config.hum) });
-	const adapter = serialized(markdown);
+	const sourceOf = options.source ?? ((context: AdapterContext, repo: string) => markdownAdapter({ ...markdownSettings, repo }, context));
+	const source = guarded(sourceOf({ report: (f) => reports.push(f.code), now, env: process.env }, clone), { provider: "source", faults: state.faults, ...guardTimings(config.hum) });
+	const adapter = serialized(source);
 	const results: { outcome: string; item?: string; detail?: string }[] = [];
 
 	const runnerOptions = { state, model: config.hum.models.light, binary: shim.binary, env: shim.env, now, lockBackoffMs: 1 };
@@ -85,7 +88,7 @@ export const workerWorld = async (spec: ShimSpec, options: WorldOptions = {}) =>
 		shim,
 		state,
 		adapter,
-		markdown,
+		source,
 		config,
 		reports,
 		results,
@@ -102,8 +105,8 @@ export const workerWorld = async (spec: ShimSpec, options: WorldOptions = {}) =>
 		},
 		/** One pass of the thin path over the unserialized work source, in a work folder of its own. */
 		thinPath: (over: Partial<ThinPathOptions> = {}): ThinPathOptions => ({
-			workSource: markdown.workSource!,
-			questions: markdown.questions!,
+			workSource: source.workSource!,
+			questions: source.questions!,
 			state,
 			runner,
 			config,

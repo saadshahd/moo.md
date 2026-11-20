@@ -43,10 +43,10 @@ import { type Signature, signatureOf } from "./signature.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import type { SlotPool } from "../slots/pool.ts";
 import { type AnswerScope, settleAnswers } from "./answers.ts";
-import { RUN_AGAIN } from "../decide/answer.ts";
-import { recentlyAsked, releaseQuestions } from "./questions.ts";
-import { OWNER_APPROVAL } from "../decide/merge.ts";
-import { answerTo, type Checkout, doesStartOver, ownerWaitStage, claimTtlMs, DEFAULT_BASE, gatherItem, hasEndedStuck, isGathered, park, rememberKinds, runThinPath, type ThinPathOptions, type ThinResult, isWaitingOnOwner } from "./thin-path.ts";
+import { PARK_OPTIONS, RUN_AGAIN } from "../decide/answer.ts";
+import { queueQuestion, recentlyAsked, releaseQuestions } from "./questions.ts";
+import type { Parked } from "../state/saved.ts";
+import { answerTo, type Checkout, doesStartOver, ownerWaitStage, claimTtlMs, DEFAULT_BASE, gatherItem, hasEndedStuck, isGathered, park, parkQuestion, rememberKinds, runThinPath, type ThinPathOptions, type ThinResult, isWaitingOnOwner } from "./thin-path.ts";
 import { ownerAnswered } from "../state/item-log.ts";
 import { hasProgress } from "./kind.ts";
 
@@ -382,13 +382,30 @@ export class Worker {
 		if (spent) state.spent.put(id, { ...spent, base: spent.total });
 	}
 
+	/** Where the owner answers only a question hum asked, each park asks one, so the owner can take the item back. An item that cannot be read raises its card and asks next tick. */
+	async #askParked(): Promise<void> {
+		const { state, config, adapters } = this.#o;
+
+		if (!adapters.answers?.onlyToQuestions) return;
+
+		const isAsked = ({ item, since }: Parked): boolean => state.questions.list().some((queued) => queued.item === item && queued.queuedAt >= since);
+
+		for (const parked of state.parked.list().filter((held) => !isAsked(held))) {
+			await this.#readThread(parked.item, async () => {
+				const { question, plain } = parkQuestion(parked);
+
+				queueQuestion({ state, config, now: this.#now }, await adapters.workSource.read(ItemId.parse(parked.item)), question, plain);
+			});
+		}
+	}
+
 	/** Where an item stands when its thread is read, for the disposition of an answer to it. */
 	#stageOf(id: string, ready: boolean, sleeping: ReadonlyMap<string, SavedSnapshot>): AnswerScope {
 		const parked = this.#o.state.parked.get(id);
 
 		if (this.#inFlight.has(id)) return { stage: "running" };
 
-		if (parked) return { stage: parked.why === "review" ? "approval" : "waiting", options: parked.why === "review" ? [OWNER_APPROVAL, RUN_AGAIN] : [RUN_AGAIN], since: parked.since };
+		if (parked) return { stage: parked.why === "review" ? "approval" : "waiting", options: PARK_OPTIONS[parked.why], since: parked.since };
 
 		const asleep = sleeping.get(id);
 		const kind = asleep && this.#kindNamed(asleep.kind)?.kind;
@@ -866,6 +883,7 @@ export class Worker {
 		const sources = await this.#readSources();
 
 		if (this.#o.ciJob?.kind !== "work") {
+			await this.#askParked();
 			await releaseQuestions({ state, config, workSource: this.#o.adapters.workSource, questions: this.#o.adapters.questions, now: this.#now }).catch((error: Error) => {
 				state.faults.raise({ code: "question-release", cause: `Queued questions could not be asked: ${error.message}`.slice(0, ERROR_EXCERPT), fix: "hum asks them again on the next tick." });
 			});
