@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { x } from "tinyexec";
 import { gitIn } from "../src/adapters/git.ts";
+import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { SLOT_ENV, slotEnv, slotFolder, slotName } from "../src/slots/env.ts";
 import { SLOT_KEPT_CODE, SLOT_OUT_CODE } from "../src/slots/pool.ts";
 import type { Slot } from "../src/state/saved.ts";
@@ -27,6 +28,11 @@ afterEach(async () => {
 		await made.slots.idle();
 	}
 });
+
+const excludedLines = (repo: string): string[] =>
+	readFileSync(join(repo, ".git", "info", "exclude"), "utf8")
+		.split("\n")
+		.filter((line) => line !== "" && !line.startsWith("#"));
 
 const statuses = (w: SlotWorld): string[] => w.slots.list().map(({ status }) => status);
 
@@ -213,4 +219,23 @@ test("a slot made by git clone is refused, and the other slots go on", async () 
 	expect(statuses(w)).toEqual(["free", "out"]);
 	expect(card?.cause).toContain("not a git worktree");
 	expect(card?.cause).toContain(clone);
+});
+
+test("the shipped pool lies inside the checkout, and the slots made there leave the checkout's git status empty and one line in its info/exclude", async () => {
+	const w = world({ runners: 2, pool: SHIPPED_DEFAULTS.runSlots.pool });
+	const { folder } = await w.ask("a");
+
+	await w.slots.maintain();
+
+	expect(folder.startsWith(join(w.repo.owner, SHIPPED_DEFAULTS.runSlots.pool))).toBe(true);
+	expect(sh(w.repo.owner, ["status", "--porcelain"])).toBe("");
+	expect(excludedLines(w.repo.owner)).toEqual([`/${SHIPPED_DEFAULTS.runSlots.pool}/`]);
+});
+
+test("a pool outside the checkout adds nothing to the checkout's info/exclude", async () => {
+	const w = world({ runners: 1 });
+
+	await w.ask("a");
+
+	expect(excludedLines(w.repo.owner)).toEqual([]);
 });

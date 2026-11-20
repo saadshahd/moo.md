@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { type PoolOptions, SlotPool } from "../../src/slots/pool.ts";
 import { type HumConfig, SHIPPED_DEFAULTS, type SlotRecipe } from "../../src/config/schema.ts";
 import { openState } from "../../src/state/open.ts";
@@ -9,6 +10,8 @@ export const BASE = "main";
 
 export type SlotSettings = {
 	readonly runners?: number;
+	/** The pool as hum.json names it, relative to the owner's checkout or absolute; a folder of its own outside the checkout when left out. */
+	readonly pool?: string;
 	/** The recipe, or a function of the owner's checkout when the recipe is read from what the checkout holds. */
 	readonly recipe?: Partial<SlotRecipe> | ((owner: string) => Partial<SlotRecipe>);
 	readonly services?: HumConfig["runSlots"]["services"];
@@ -27,10 +30,10 @@ export const poolConfig = (pool: string, { runners = 2, recipe = {}, services, p
 	runSlots: { ...SHIPPED_DEFAULTS.runSlots, enabled: true, pool, services: services ?? SHIPPED_DEFAULTS.runSlots.services, ports: ports ?? SHIPPED_DEFAULTS.runSlots.ports, projectPrefix: projectPrefix ?? SHIPPED_DEFAULTS.runSlots.projectPrefix, recipe: { ...SHIPPED_DEFAULTS.runSlots.recipe, ...recipe } },
 });
 
-/** An owner\'s checkout with a remote, a pool folder outside it, saved state, and a pool over them. Nothing leaves temp folders. */
+/** An owner\'s checkout with a remote, a pool folder, saved state, and a pool over them. Nothing leaves temp folders. */
 export const slotWorld = (settings: SlotSettings = {}, liveRuns?: PoolOptions["liveRuns"]) => {
 	const repo = new WorkRepo();
-	const pool = tempDir("pool");
+	const pool = settings.pool ?? tempDir("pool");
 	const stateDir = tempDir("slot-state");
 	settings.seed?.(repo);
 
@@ -47,7 +50,7 @@ export const slotWorld = (settings: SlotSettings = {}, liveRuns?: PoolOptions["l
 
 	return {
 		repo,
-		pool,
+		pool: resolve(repo.owner, pool),
 		stateDir,
 		config,
 		state,
