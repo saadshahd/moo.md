@@ -184,7 +184,7 @@ test("publish takes a pass past the owner's wait gather settled their answer to,
 	const feature = w.config.kinds.feature!;
 	const publisher = publisherOf(w.thinPath({ now }), docsJudge);
 	const work = openState(tempDir("work-state"), { now });
-	const reply = { kind: "comment", text: "Retarget it to the new gate.", at: now() + 2, author: "person" } as const;
+	const reply = { kind: "comment", text: "Take the second way.", at: now() + 2, author: "person" } as const;
 	const thread = [{ kind: "question", text: "How should the run go on?", at: now() + 1 } as const, reply];
 
 	w.state.itemKinds.put(id, { item: id, kind: "feature", from: "source" });

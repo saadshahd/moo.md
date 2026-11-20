@@ -401,12 +401,12 @@ test("an item someone else claims never starts and carries a card naming them, w
 test("an item hum started goes on though another pull request closes it, and a claim card it carried from before goes", async () => {
 	const w = await workerWorld({ items: { a: { writeForItem: true } } });
 	const source = w.adapter.workSource!;
-	const worker = w.workerWith({ adapters: { workSource: { ...source, read: async (id: ItemId) => ({ ...(await source.read(id)), claimedBy: ["pull request #88"] }) }, questions: w.adapter.questions!, answers: w.adapter.answers } });
+	const worker = w.workerWith({ adapters: { workSource: { ...source, read: async (id: ItemId) => ({ ...(await source.read(id)), claimedBy: ["pull request #7"] }) }, questions: w.adapter.questions!, answers: w.adapter.answers } });
 
 	w.item("a", "docs/a.md");
 	w.state.itemKinds.put("a", { item: "a", kind: "docs", from: "source" });
 	w.state.items.save("a", w.config.kinds.docs!, { status: "active", value: "building", context: {} });
-	w.state.faults.raise({ code: "item-claimed", item: "a", cause: "a is already taken by pull request #88, so hum starts no rival change.", fix: "Close the pull request." });
+	w.state.faults.raise({ code: "item-claimed", item: "a", cause: "a is already taken by pull request #7, so hum starts no rival change.", fix: "Close the pull request." });
 
 	expect(await worker.tick()).toEqual({ kind: "ran", started: ["a"] });
 	expect(w.state.faults.list().map(({ code }) => code)).not.toContain("item-claimed");
