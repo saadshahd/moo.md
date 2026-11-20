@@ -180,10 +180,10 @@ test("a 401 holds the item where it is with one card naming claude setup-token; 
 	expect(w.state.faults.list().map((c) => c.code)).not.toContain("token-rejected");
 });
 
-test("in a CI wake a card that only informs stops nothing, an unread thread among them, and every other card stops the wake", () => {
-	const codes = ["signal-not-applied", "token-expiring", "credential-changed", "item-unread", "token-rejected", "review-loop"];
+test("in a CI wake a card that only informs stops nothing, a card that stops only its own item among them, and every other card stops the wake", () => {
+	const codes = ["signal-not-applied", "token-expiring", "credential-changed", "item-unread", "item-stuck", "item-review", "item-claimed", "token-rejected", "review-loop", "run-error", "snapshot-unreadable"];
 
-	expect(codes.filter((code) => doesStopWake({ code }))).toEqual(["token-rejected", "review-loop"]);
+	expect(codes.filter((code) => doesStopWake({ code }))).toEqual(["token-rejected", "review-loop", "run-error", "snapshot-unreadable"]);
 });
 
 test("the scheduled workflow's tick is a ref on the remote; the Mac reads its time", async () => {

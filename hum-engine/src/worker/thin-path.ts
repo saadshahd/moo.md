@@ -1360,6 +1360,9 @@ const PARKING = {
 	},
 } as const satisfies Record<Parking["outcome"], { code: string; fallback: string; cause: (item: string, why: string) => string; fix: string; action: { label: string; answer: string } }>;
 
+/** The card on a parked item, one code for each reason it sits out. */
+export const PARKED_CODES: readonly string[] = Object.values(PARKING).map(({ code }) => code);
+
 /** An item that ended stuck, or whose change waits for a review, sits out until the owner acts. One card says why and how to run it again. */
 export const park = (o: Pick<ThinPathOptions, "state" | "now">, result: ThinResult): ThinResult => {
 	if (!isParking(result)) return result;
