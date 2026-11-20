@@ -147,8 +147,25 @@ export const settleAnswers = async (ctx: AnswerContext, item: Item, { stage, opt
 
 	await dropSuperseded(settling, new Set(replies.map(({ ordinal }) => ordinal)));
 
+	return withSettledAnswers(ctx.state, item);
+};
+
+/**
+ * The item with its thread as the engine reads it, from the answers `state` saved and with no call: a reply to hum's
+ * latest question whose saved answer applied is an answer carrying its option, one whose saved answer did not is a
+ * comment, and one with no saved answer stays as the source gave it.
+ */
+export const withSettledAnswers = (state: Pick<State, "answers">, item: Item): Item => {
+	const saved = new Map(
+		repliesOn(item.thread, latestQuestionAt(item.thread)).flatMap(({ ordinal, index }) => {
+			const record = state.answers.get(keyOf(item.id, ordinal));
+
+			return record ? [[index, record] as const] : [];
+		}),
+	);
+
 	const asEngineReads = (entry: ThreadEntry, index: number): ThreadEntry => {
-		const record = settled.get(index);
+		const record = saved.get(index);
 
 		return record ? normalized(entry, record) : entry;
 	};

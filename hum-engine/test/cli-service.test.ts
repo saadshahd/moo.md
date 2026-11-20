@@ -234,6 +234,29 @@ test("a wake while an item waits on the owner: gather claims nothing, the work j
 	expect(ran(jobs.publish()).code).toBe(0);
 });
 
+test("a wake whose saved state holds the cards of an item parked stuck, one parked for review and one someone else claimed warns of each, and the other item merges with each job exiting 0", async () => {
+	const o = owner({ items: { a: { writeForItem: true } } });
+	const codes = ["item-stuck", "item-review", "item-claimed"];
+
+	expect(wake(o, ["--event", "issue_comment"]).code).toBe(0);
+
+	for (const [n, code] of codes.entries()) await keepCard(o, { code, item: `b${n}`, cause: `b${n} sits out.`, fix: `Act on b${n}.` });
+
+	rmSync(stateDir(o), { recursive: true, force: true });
+	o.item("a");
+
+	const jobs = wakeJobs(o);
+	const gather = jobs.gather();
+
+	expect(gather.code).toBe(0);
+
+	for (const code of codes) expect(gather.out).toContain(`::warning title=hum ${code}::`);
+
+	expect(jobs.work().code).toBe(0);
+	expect(ran(jobs.publish()).code).toBe(0);
+	expect(sh(o.repo.remote, ["show", "main:docs/a.md"])).toBe("from a\n");
+});
+
 test("a wake with a config that names no checks says what is missing and exits 1", () => {
 	const o = owner({}, {}, (raw) => void Object.assign(raw.hum, { checks: [] }));
 	const run = wake(o);

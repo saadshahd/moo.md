@@ -60,6 +60,9 @@ export const kindAnswered = (known: ItemKind, item: Item, kinds: readonly string
 	return answer?.option === undefined ? undefined : { item: item.id, kind: answer.option, from: "source" };
 };
 
+/** Whether hum started the item and its next pass goes on from what it saved: a snapshot or a landing. */
+export const hasProgress = (state: State, id: string): boolean => state.items.savedOf(id) !== undefined || state.landings.get(id) !== undefined;
+
 /** Drops what an item's run on its earlier kind left: its snapshot, its landing, its plan, its verdict and its repro. Its next run restarts its branch at the base. */
 export const forgetProgress = (state: State, id: string): void => {
 	state.items.remove(id);
