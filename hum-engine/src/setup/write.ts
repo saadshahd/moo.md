@@ -96,6 +96,15 @@ const roundupInCiRefusal = ({ runPlaces, integrations }: HumConfig): Refusal | u
 			}
 		: undefined;
 
+/** On roundup every run is a Rail row in a run slot, so a Mac worker with slots off could start none. */
+const roundupWithoutSlotsRefusal = ({ runSlots, integrations }: HumConfig): Refusal | undefined =>
+	doesUseRoundup(integrations) && !runSlots.enabled
+		? {
+				code: "roundup-without-slots",
+				message: "integrations names roundup, where every run is a Rail row in a run slot, and runSlots.enabled is false. Set it to true. Nothing was written.",
+			}
+		: undefined;
+
 /** Settings migrated to the schema this engine writes, so the repo's file and the answers merge at one version; refused at a schema it does not read. */
 const atCurrentSchema = (hum: Json): Result<Readonly<Record<string, Json>>> => {
 	const migrated = migrateConfig(hum);
@@ -173,6 +182,10 @@ export const writeSetup = (repo: string, answers: SetupAnswers, env: SetupEnv): 
 	const inCi = roundupInCiRefusal(loaded.value.hum);
 
 	if (inCi) return { ok: false, refusal: inCi };
+
+	const withoutSlots = roundupWithoutSlotsRefusal(loaded.value.hum);
+
+	if (withoutSlots) return { ok: false, refusal: withoutSlots };
 
 	const mac = loaded.value.hum.runPlaces.includes("mac") ? macStart(repo, loaded.value, env) : undefined;
 

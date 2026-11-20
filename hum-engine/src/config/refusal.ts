@@ -34,7 +34,8 @@ export type Refusal =
 	| { readonly code: "change-from-run"; readonly branch: string; readonly message: string }
 	| { readonly code: "no-git-identity"; readonly missing: readonly string[]; readonly message: string }
 	| { readonly code: "own-runner-on-public-repo"; readonly message: string }
-	| { readonly code: "roundup-in-ci"; readonly message: string };
+	| { readonly code: "roundup-in-ci"; readonly message: string }
+	| { readonly code: "roundup-without-slots"; readonly message: string };
 
 export type Result<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly refusal: Refusal };
 

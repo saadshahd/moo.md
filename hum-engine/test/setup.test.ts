@@ -4,7 +4,7 @@ import { chmodSync, existsSync, readFileSync, realpathSync, writeFileSync } from
 import { join } from "node:path";
 import { gitIn, type GitIdentityRead, readGitIdentity } from "../src/adapters/git.ts";
 import { loadConfig, readConfigDir } from "../src/config/load.ts";
-import { SCHEMA_VERSION } from "../src/config/schema.ts";
+import { SCHEMA_VERSION, SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { kindCoverage, proposeSetup } from "../src/setup/propose.ts";
 import { proveSetup } from "../src/setup/prove.ts";
 import { scanRepo } from "../src/setup/scan.ts";
@@ -362,7 +362,7 @@ test("where roundup serves a slot, setup writes no service unit and prints the P
 	const repo = repoWith({ "README.md": "x" });
 	const home = join(repo, "home");
 	const bun = join(repo, "it's a runtime", "bun");
-	const result = writeSetup(repo, { hum: { checks: ["true"], runPlaces: ["mac"], integrations: { "work-source": "roundup" } }, waitHours: {} }, { installedSkills: installedSkills(), home, runtime: { bun, path: "/usr/bin" }, gitIdentity: OWNER_GIT });
+	const result = writeSetup(repo, { hum: { checks: ["true"], runPlaces: ["mac"], integrations: { "work-source": "roundup" }, runSlots: { ...SHIPPED_DEFAULTS.runSlots, enabled: true } }, waitHours: {} }, { installedSkills: installedSkills(), home, runtime: { bun, path: "/usr/bin" }, gitIdentity: OWNER_GIT });
 
 	expect(result.ok && result.program).toEqual({
 		open: PROGRAM_PLACE,
@@ -371,6 +371,14 @@ test("where roundup serves a slot, setup writes no service unit and prints the P
 	});
 	expect(existsSync(join(repo, ".hum-slots"))).toBe(true);
 	expect(existsSync(home)).toBe(false);
+});
+
+test("setup refuses roundup where run slots are off, and writes nothing", () => {
+	const repo = repoWith({ "README.md": "x" });
+	const result = writeSetup(repo, { hum: { checks: ["true"], runPlaces: ["mac"], integrations: { "work-source": "roundup" } }, waitHours: {} }, { installedSkills: installedSkills(), home: join(repo, "home"), gitIdentity: OWNER_GIT });
+
+	expect(!result.ok && result.refusal.code).toBe("roundup-without-slots");
+	expect(existsSync(join(repo, ".hum"))).toBe(false);
 });
 
 test("setup refuses CI runs where roundup serves a slot, and writes nothing", () => {
@@ -500,7 +508,7 @@ test("proving a written setup on a scratch copy passes its checks and contract, 
 test("proving with --item skips the item where a slot writes to a live target, whose real items the run would take", async () => {
 	const repo = repoWith({ "package.json": PINNED });
 
-	expect(writeSetup(repo, { hum: { checks: ["true"], runPlaces: ["mac"], integrations: { "work-source": "roundup" } }, waitHours: {} }, { installedSkills: installedSkills(), home: join(repo, "home"), gitIdentity: OWNER_GIT }).ok).toBe(true);
+	expect(writeSetup(repo, { hum: { checks: ["true"], runPlaces: ["mac"], integrations: { "work-source": "roundup" }, runSlots: { ...SHIPPED_DEFAULTS.runSlots, enabled: true } }, waitHours: {} }, { installedSkills: installedSkills(), home: join(repo, "home"), gitIdentity: OWNER_GIT }).ok).toBe(true);
 	sh(repo, ["add", "-A"]);
 	sh(repo, ["commit", "-q", "-m", "setup"]);
 	sh(repo, ["push", "-q", "origin", "main"]);
