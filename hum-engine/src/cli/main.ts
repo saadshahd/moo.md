@@ -6,4 +6,5 @@ process.exitCode = await runCli(process.argv.slice(2), {
 	env: process.env,
 	stdout: (text) => void process.stdout.write(text),
 	stderr: (text) => void process.stderr.write(text),
+	stdin: () => Bun.stdin.text(),
 });

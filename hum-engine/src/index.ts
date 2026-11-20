@@ -97,7 +97,9 @@ export { type Io, runCli, runOp } from "./cli/ops.ts";
 
 export { limitOf, type LimitEnded, parseLimit, settleLimit } from "./adapters/limit.ts";
 
-export { BACKGROUND_CHECK_CODE, FALLBACK_CODE, type BackgroundOptions, type BackgroundStartOptions, backgroundRunner, backgroundSettings, type StartedBackground, startBackgroundRunner } from "./adapters/claude-bg.ts";
+export { BACKGROUND_CHECK_CODE, FALLBACK_CODE, type BackgroundOptions, type BackgroundStartOptions, backgroundRunner, type StartedBackground, startBackgroundRunner } from "./adapters/claude-bg.ts";
+
+export { runSettings } from "./adapters/hooked-run.ts";
 
 export {
 	CLAUDE_FLOOR,

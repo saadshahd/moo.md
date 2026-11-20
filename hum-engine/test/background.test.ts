@@ -3,7 +3,8 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { x } from "tinyexec";
-import { BACKGROUND_CHECK_CODE, backgroundRunner, FALLBACK_CODE, backgroundSettings, HUM_PLUGIN, launchArgs, type Progress, progressOf, type Reading, startBackgroundRunner } from "../src/adapters/claude-bg.ts";
+import { BACKGROUND_CHECK_CODE, backgroundRunner, FALLBACK_CODE, launchArgs, type Progress, progressOf, type Reading, startBackgroundRunner } from "../src/adapters/claude-bg.ts";
+import { HUM_PLUGIN, runSettings } from "../src/adapters/hooked-run.ts";
 import { type Runner, type RunRequest, startRunner } from "../src/adapters/claude-p.ts";
 import { readTranscript, billedTokens } from "../src/adapters/transcript.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
@@ -86,7 +87,7 @@ test.each(PROGRESS)("progress: %s", (_name, at, cap, expected) => {
 });
 
 test("run settings turn hum's plugin off, deny the GitHub writes and report the run to the stops folder, and the prompt stays out of the flags", () => {
-	const settings = backgroundSettings(CONFIG, "/tmp/it's here/stops");
+	const settings = runSettings(CONFIG, "/tmp/it's here/stops");
 	const args = launchArgs({ name: "hum #68 build #0", model: MODEL, effort: "low", schema: { type: "object" }, settings });
 
 	expect(settings).toMatchObject({ enabledPlugins: { [HUM_PLUGIN]: false }, permissions: { deny: expect.arrayContaining(["Bash(git push *)"]) } });
@@ -99,7 +100,7 @@ test("the run's hook files its report whole: the stops folder lists no record un
 
 	mkdirSync(stops);
 
-	const hook = Bun.spawn(["sh", "-c", backgroundSettings(CONFIG, stops).hooks["Stop"]![0]!.hooks[0]!.command], { stdin: "pipe" });
+	const hook = Bun.spawn(["sh", "-c", runSettings(CONFIG, stops).hooks["Stop"]![0]!.hooks[0]!.command], { stdin: "pipe" });
 
 	hook.stdin.write('{"session_id":');
 	hook.stdin.flush();

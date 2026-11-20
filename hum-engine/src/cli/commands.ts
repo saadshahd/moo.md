@@ -29,6 +29,7 @@ const specs = {
 	publish: { summary: "Publish an item's artifact through the release integration.", args: "<item> <ref>" },
 	release: { summary: "Release a published artifact through the release integration.", args: "<item> <ref>" },
 	push: { summary: "Run git push with hooks off; every argument goes to git.", args: "[git push args...]" },
+	"run-answer": { summary: "Hand hum the answer of the run this shell belongs to, piped on stdin: it is checked against the run's schema and saved under the run's key.", args: "" },
 } as const satisfies Record<string, Spec>;
 
 export type OpName = keyof typeof specs;
