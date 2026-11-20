@@ -215,6 +215,25 @@ test("a wake whose saved state holds the signal card hum 0.7.0 kept for good run
 	expect((await savedState(o)).faults.list().map(({ code }) => code)).not.toContain("signal-not-applied");
 });
 
+test("a wake while an item waits on the owner: gather claims nothing, the work job reads nothing for the item, and each job exits 0", async () => {
+	const o = owner({ items: { a: { writeForItem: true, askUnlessAnswered: "Which?" } } });
+
+	o.item("a");
+
+	expect(wake(o, ["--event", "issue_comment"]).code).toBe(0);
+	expect((await savedState(o)).items.savedOf("a")).toMatchObject({ state: "asking" });
+
+	const jobs = wakeJobs(o);
+
+	expect(jobs.gather().code).toBe(0);
+
+	const work = jobs.work();
+
+	expect(work.out).not.toContain("item-unread");
+	expect(work.code).toBe(0);
+	expect(ran(jobs.publish()).code).toBe(0);
+});
+
 test("a wake with a config that names no checks says what is missing and exits 1", () => {
 	const o = owner({}, {}, (raw) => void Object.assign(raw.hum, { checks: [] }));
 	const run = wake(o);
