@@ -360,7 +360,7 @@
 	"breakCheck": true,
 	"runSlots": {
 		"enabled": false,
-		"pool": "../.hum-slots",
+		"pool": ".hum-slots",
 		"services": "per-slot",
 		"ports": {
 			"base": 20000,

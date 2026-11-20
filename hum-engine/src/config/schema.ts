@@ -336,7 +336,7 @@ const Shipped = z.object({
 			recipe: SlotRecipe,
 		})
 		.describe(
-			"Prewarmed run slots on the Mac: worktrees of the owner's checkout that background runs work in, as many as 'runners'. 'pool' is the folder that holds them, relative to the checkout or absolute, and never inside .git, where Claude Code writes nothing; 'services' gives each slot its own services or one shared set with a database per slot; 'ports' starts each slot's block of ports; 'recipe' is the owner's own setup commands.",
+			"Prewarmed run slots on the Mac: worktrees of the owner's checkout that background runs work in, as many as 'runners'. 'pool' is the folder that holds them, relative to the checkout or absolute, and never inside .git, where Claude Code writes nothing; a pool inside the checkout, as the default .hum-slots is, hum adds to the repo's .git/info/exclude, so git status stays empty; 'services' gives each slot its own services or one shared set with a database per slot; 'ports' starts each slot's block of ports; 'recipe' is the owner's own setup commands.",
 		),
 	ownerLogins: z
 		.array(name)

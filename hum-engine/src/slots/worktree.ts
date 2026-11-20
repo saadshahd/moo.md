@@ -2,7 +2,7 @@ import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { gitIn } from "../adapters/git.ts";
 
-const commonDirOf = async (folder: string, timeoutMs: number): Promise<string> => realpathSync(resolve(folder, (await gitIn(folder, { timeoutMs }).raw(["rev-parse", "--git-common-dir"])).trim()));
+export const commonDirOf = async (folder: string, timeoutMs: number): Promise<string> => realpathSync(resolve(folder, (await gitIn(folder, { timeoutMs }).raw(["rev-parse", "--git-common-dir"])).trim()));
 
 const gitDirOf = async (folder: string, timeoutMs: number): Promise<string> => realpathSync(resolve(folder, (await gitIn(folder, { timeoutMs }).raw(["rev-parse", "--git-dir"])).trim()));
 

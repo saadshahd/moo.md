@@ -11,6 +11,7 @@ import { SECOND_MS } from "../time.ts";
 import { runChecks } from "../worker/checks.ts";
 import type { Checkedout, Checkout } from "../worker/thin-path.ts";
 import { slotEnv, slotFolder, slotName } from "./env.ts";
+import { excludeFromRepo } from "./exclude.ts";
 import { isWorktreeOf } from "./worktree.ts";
 
 export const SLOT_OUT_CODE = "slot-out";
@@ -133,6 +134,7 @@ export class SlotPool {
 				return this.#out(slot, `${slot.folder} is not a git worktree of ${repo}.`, "A slot is a worktree of the checkout: Claude Code trusts a worktree of a trusted repo and refuses a repo of its own. Remove the folder; hum makes the slot again at its next start.");
 		} else {
 			mkdirSync(dirname(slot.folder), { recursive: true });
+			await excludeFromRepo(repo, dirname(slot.folder), commandTimeoutMs(this.#o.config));
 			await this.#git(repo).raw(["fetch", "-q", "origin"]);
 			await this.#git(repo).raw(["worktree", "add", "-q", "--detach", slot.folder, `origin/${base}`]);
 		}
