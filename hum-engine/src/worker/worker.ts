@@ -110,12 +110,12 @@ export type WorkerOptions = {
 
 /**
  * A wake's job that holds a token, `gather`, claims each item and settles its answers and kind, keeps it in `gathered`
- * and runs nothing. The job that holds none, `work`, runs each pass and hands its outbox to `publish`; it asks,
- * files and posts nothing itself. Either takes each item once.
+ * and runs nothing. The job that holds none, `work`, reads only the threads of the items gather `claimed`, runs each
+ * pass and hands its outbox to `publish`; it asks, files and posts nothing itself. Either takes each item once.
  */
 export type CiJob =
 	| { readonly kind: "gather"; readonly gathered: Map<string, Item> }
-	| { readonly kind: "work"; readonly publish: NonNullable<ThinPathOptions["publish"]> };
+	| { readonly kind: "work"; readonly claimed: ReadonlySet<string>; readonly publish: NonNullable<ThinPathOptions["publish"]> };
 
 /** What the tick read of its sources: whether the watch saw a change, and the ready list. */
 type Sources = {
@@ -138,7 +138,8 @@ type InFlight = {
 
 const ERROR_EXCERPT = 300;
 
-const UNREAD_CODE = "item-unread";
+/** The card for a thread a tick could not read. */
+export const UNREAD_CODE = "item-unread";
 
 /** The card for scores that gate on a judge that changed since they were measured. */
 const JUDGE_CODE = "judge-changed";
@@ -418,9 +419,10 @@ export class Worker {
 	/**
 	 * Reads the threads that can have changed, settles each new answer, and releases a parked item the owner answered.
 	 * Each item is read on its own: one that fails raises a card naming it and is read again next tick, and the rest go on.
+	 * A work job reads only the items gather claimed, the only ones its source holds; gather read every thread.
 	 */
 	async #readAnswers(sleeping: readonly SavedSnapshot[], changed: boolean): Promise<void> {
-		const { state, adapters, config } = this.#o;
+		const { state, adapters, config, ciJob } = this.#o;
 		const inbox = this.#inbox();
 
 		if (!changed && inbox.length === 0 && this.#unread.size === 0) return;
@@ -429,9 +431,10 @@ export class Worker {
 		const asleep = new Map(sleeping.map((s) => [s.itemId, s]));
 		const parked = state.parked.list();
 		const asked = recentlyAsked({ state, config, now: this.#now });
+		const mayHaveChanged = [...new Set([...waiting, ...parked.map((p) => p.item), ...inbox, ...asked, ...this.#unread])];
 
 		await Promise.all(
-			[...new Set([...waiting, ...parked.map((p) => p.item), ...inbox, ...asked, ...this.#unread])].map((id) =>
+			(ciJob?.kind === "work" ? mayHaveChanged.filter((id) => ciJob.claimed.has(id)) : mayHaveChanged).map((id) =>
 				this.#readThread(id, async () => {
 					const raw = await adapters.workSource.read(ItemId.parse(id));
 					const item = await settleAnswers({ state, workSource: adapters.workSource, judge: this.#judge, now: this.#now }, raw, this.#stageOf(id, raw.ready, asleep));

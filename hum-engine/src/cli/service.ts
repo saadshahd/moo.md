@@ -234,7 +234,7 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 			const options = await optionsFor(io, { holder: gathered.holder, base: gathered.base }, "ci", {
 				remote,
 				integrations: inboxIntegrations(inbox, Date.now),
-				ciJob: { kind: "work", publish: async (pass, worked) => void writePass(flags.outbox, { ...pass, result: worked }) },
+				ciJob: { kind: "work", claimed: new Set(gathered.claimed), publish: async (pass, worked) => void writePass(flags.outbox, { ...pass, result: worked }) },
 			});
 
 			const baseCheck = await checkMergesAt({ ...options, git: gitIn(io.cwd, { timeoutMs }) }, gathered.baseSha);
