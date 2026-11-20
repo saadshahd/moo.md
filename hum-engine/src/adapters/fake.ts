@@ -1,5 +1,5 @@
 import { ADAPTER_API_VERSION, type Claim, type Integrations, ItemId, type ItemRef, PermanentError, type ThreadEntry, type Watch } from "../adapter-api.ts";
-import { claimer, isLive } from "./claim.ts";
+import { claimer, isHeldBy, isLive } from "./claim.ts";
 import { questionText } from "./marked.ts";
 
 type Stored = { id: ItemId; title: string; body: string; ready: boolean; thread: ThreadEntry[]; claim?: Claim; from?: string };
@@ -116,6 +116,7 @@ export class FakeProvider {
 			workSource: {
 				listReady: async () =>
 					spend(() => this.listReplacement?.() ?? (this.#emptyList ? [] : [...this.#items.values()].flatMap((item) => (this.#isReady(item) ? [asRef(item)] : [])))),
+				listClaimed: async (holder) => spend(() => [...this.#items.values()].flatMap((item) => (item.ready && isHeldBy(item.claim, holder, this.#clock) ? [asRef(item)] : []))),
 				read: async (id) =>
 					spend(() => {
 						const item = this.#get(id);

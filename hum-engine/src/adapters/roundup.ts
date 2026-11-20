@@ -8,7 +8,7 @@ import type { HumConfig } from "../config/schema.ts";
 import { atomicWrite, dropInto, listFiles, orMissing, slug } from "../state/fs.ts";
 import { INBOX_DIR } from "../state/open.ts";
 import { parseArgument } from "./argument.ts";
-import { claimer, isLive } from "./claim.ts";
+import { claimer, isHeldBy, isLive } from "./claim.ts";
 import { commentText, cutLine, followUpBody, isFollowUpOf, type Marker, markedLine, parseComment, questionText } from "./marked.ts";
 import { itemWorkstream, type RailNode, railTree, rootWorkstream } from "./rail.ts";
 import { type RowConfig, startRow } from "./rail-rows.ts";
@@ -204,6 +204,19 @@ export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterCon
 
 	const isFree = (id: ItemId): boolean => !isLive(standing(id)?.claim, now());
 
+	/** The open Todos of hum's Workstream whose id `keep` takes. */
+	const openTodos = async (keep: (id: ItemId) => boolean): Promise<ItemRef[]> => {
+		const [list, nodes] = await Promise.all([todos(), railTree(call)]);
+
+		humWorkstream(nodes);
+
+		return list.flatMap((todo): ItemRef[] => {
+			const id = ItemId.parse(String(todo.id));
+
+			return isOpen(todo, nodes) && keep(id) ? [{ id, title: todo.title }] : [];
+		});
+	};
+
 	const isSame = (one: Claim | undefined, other: Claim | undefined): boolean => one?.holder === other?.holder && one?.expiresAt === other?.expiresAt;
 
 	/** Writes `claim` over `over` while no other worker wrote since; false when one did. */
@@ -346,17 +359,8 @@ export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterCon
 		spent: () => 0,
 		close: async () => client.close(),
 		workSource: {
-			listReady: async () => {
-				const [list, nodes] = await Promise.all([todos(), railTree(call)]);
-
-				humWorkstream(nodes);
-
-				return list.flatMap((todo): ItemRef[] => {
-					const id = ItemId.parse(String(todo.id));
-
-					return isOpen(todo, nodes) && isFree(id) ? [{ id, title: todo.title }] : [];
-				});
-			},
+			listReady: async () => openTodos(isFree),
+			listClaimed: async (holder) => openTodos((id) => isHeldBy(standing(id)?.claim, holder, now())),
 			read: async (id): Promise<Item> => {
 				const [todo, nodes] = await Promise.all([todoOf(id), railTree(call)]);
 

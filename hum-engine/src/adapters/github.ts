@@ -2,13 +2,13 @@ import ExpiryMap from "expiry-map";
 import hostedGitInfo from "hosted-git-info";
 import pMemoize from "p-memoize";
 import { z } from "zod";
-import { ADAPTER_API_VERSION, type AdapterContext, type Answers, type Claim, type Item, ItemId, PermanentError, type Integrations, type Questions, type Release, type Watch, type WorkSource } from "../adapter-api.ts";
+import { ADAPTER_API_VERSION, type AdapterContext, type Answers, type Claim, type Item, ItemId, type ItemRef, PermanentError, type Integrations, type Questions, type Release, type Watch, type WorkSource } from "../adapter-api.ts";
 import type { Json } from "../config/json.ts";
 import type { MERGE_METHODS } from "../config/schema.ts";
 import { TRUSTED_ASSOCIATIONS } from "../config/wake-job.ts";
 import { HOUR_MS } from "../time.ts";
 import { parseArgument } from "./argument.ts";
-import { claimCommit, claimCommitMessage, claimer, claimOfCommit, isLive } from "./claim.ts";
+import { claimCommit, claimCommitMessage, claimer, claimOfCommit, isHeldBy, isLive } from "./claim.ts";
 import { failureOf, type GitHubClient, ownerGitHub, raise } from "./github-client.ts";
 import { answerMarker, commentText, filedFollowUp, followUpBody, followUpNote, isFollowUpOf, type Marker, marked, parseComment, questionMarker, questionText } from "./marked.ts";
 import { gitHubPullRequests } from "./pull-requests.ts";
@@ -307,25 +307,29 @@ export const githubAdapter = (options: GitHubOptions, { now, env }: AdapterConte
 		now,
 	);
 
+	/** The issues labelled ready whose claim `keep` takes. */
+	const readyIssues = async (keep: (claim: Claim | undefined) => boolean): Promise<ItemRef[]> => {
+		const { issues, refs } = (await paged(ReadyItems, READY_ITEMS, { label: readyLabel, claimRefs })).repository;
+
+		if (refs.totalCount > refs.nodes.length) throw new PermanentError(`${repo} holds ${refs.totalCount} claim branches; hum reads ${refs.nodes.length}`);
+
+		const claims = new Map(refs.nodes.flatMap((ref) => {
+			const item = ItemId.safeParse(ref.name);
+
+			return item.success ? [[ref.name, claimFrom(item.data, ref.target)] as const] : [];
+		}));
+
+		return issues.nodes.flatMap(({ number, title }) => (keep(claims.get(String(number))) ? [{ id: ItemId.parse(String(number)), title }] : []));
+	};
+
 	const pulls = gitHubPullRequests(repo, { timeoutMs, client });
 
 	return {
 		apiVersion: ADAPTER_API_VERSION,
 		spent: () => spent,
 		workSource: {
-			listReady: async () => {
-				const { issues, refs } = (await paged(ReadyItems, READY_ITEMS, { label: readyLabel, claimRefs })).repository;
-
-				if (refs.totalCount > refs.nodes.length) throw new PermanentError(`${repo} holds ${refs.totalCount} claim branches; hum reads ${refs.nodes.length}`);
-
-				const claims = new Map(refs.nodes.flatMap((ref) => {
-					const item = ItemId.safeParse(ref.name);
-
-					return item.success ? [[ref.name, claimFrom(item.data, ref.target)] as const] : [];
-				}));
-
-				return issues.nodes.flatMap(({ number, title }) => (isLive(claims.get(String(number)), now()) ? [] : [{ id: ItemId.parse(String(number)), title }]));
-			},
+			listReady: async () => readyIssues((claim) => !isLive(claim, now())),
+			listClaimed: async (holder) => readyIssues((claim) => isHeldBy(claim, holder, now())),
 			read: async (id): Promise<Item> => {
 				const { issue, ref } = await fetchItem(parseArgument(IssueNumber, id));
 

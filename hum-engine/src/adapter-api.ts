@@ -5,7 +5,7 @@ import type { FaultInput } from "./state/faults.ts";
 export type { FaultInput };
 
 /** Bumped on every change to the API an adapter implements; a breaking change bumps the engine's major version. */
-export const ADAPTER_API_VERSION = 3;
+export const ADAPTER_API_VERSION = 4;
 
 /** Failure that retrying cannot fix: a reply of the wrong shape, a refused push. The engine surfaces it at once, as it does a `failed: "now"` answer. */
 export class PermanentError extends Error {
@@ -96,6 +96,8 @@ export type FollowUp = { readonly title: string; readonly body: string };
 /** The work source: the queue, the claims and the item threads. */
 export interface WorkSource {
 	listReady(): Promise<ItemRef[]>;
+	/** The ready items whose live claim `holder` holds: a hum restarted on the same state folder takes them back at once, where another holder waits for the claim to expire. */
+	listClaimed(holder: Holder): Promise<ItemRef[]>;
 	read(id: ItemId): Promise<Item>;
 	/** An atomic take. An unclaimed or expired item goes to the first caller; the same holder renews. */
 	claim(id: ItemId, holder: Holder, ttlMs: number): Promise<ClaimResult>;

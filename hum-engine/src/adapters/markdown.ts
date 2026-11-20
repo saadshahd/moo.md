@@ -8,7 +8,7 @@ import { type Adapter, ADAPTER_API_VERSION, type AdapterContext, type Claim, typ
 import type { HumConfig, MergeMethod } from "../config/schema.ts";
 import { growthLabelsOf } from "../decide/growth.ts";
 import { parseArgument } from "./argument.ts";
-import { claimCommitMessage, claimer, claimOfCommit, isLive } from "./claim.ts";
+import { claimCommitMessage, claimer, claimOfCommit, isHeldBy, isLive } from "./claim.ts";
 import { type GitIdentity, gitIn, push, readOrAbsent } from "./git.ts";
 import { appendEntry, DONE_STATE, type ItemFile, markDone, newItemFile, parseItemFile, READY_STATE } from "./item-file.ts";
 import { answerMarker, followUpBody, followUpKey, questionText } from "./marked.ts";
@@ -193,7 +193,8 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 
 	const isReady = (file: ItemFile | undefined, standing: StandingClaim | undefined): file is ItemFile => file?.state === READY_STATE && !isLive(standing?.claim, now());
 
-	const readyRef = async (name: string, claims: ReadonlyMap<string, StandingClaim>): Promise<ItemRef[]> => {
+	/** The item file `name` as a ref, when it is ready and `keep` takes its id. */
+	const readyRef = async (name: string, keep: (id: ItemId) => boolean): Promise<ItemRef[]> => {
 		const raw = name.slice(0, -ITEM_EXTENSION.length);
 		const parsed = ItemId.safeParse(raw);
 
@@ -206,7 +207,16 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 		const id = parsed.data;
 		const file = await loadItem(id);
 
-		return isReady(file, claims.get(id)) ? [{ id, title: file.title }] : [];
+		return file?.state === READY_STATE && keep(id) ? [{ id, title: file.title }] : [];
+	};
+
+	/** The ready items whose standing claim `keep` takes, read after a fetch. */
+	const readyRefs = async (keep: (standing: StandingClaim | undefined) => boolean): Promise<ItemRef[]> => {
+		await refetch();
+
+		const [claims, names] = await Promise.all([claimsNow(), itemFileNames()]);
+
+		return (await new PQueue({ concurrency: itemReadsAtOnce }).addAll(names.map((name) => () => readyRef(name, (id) => keep(claims.get(id)))))).flat();
 	};
 
 	/** A commit on `parent` with the base branch's tree, and `change` applied through a scratch index when given. */
@@ -341,13 +351,8 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 		/** Fetches and pushes so far. */
 		spent: () => spent,
 		workSource: {
-			listReady: async () => {
-				await refetch();
-
-				const [claims, names] = await Promise.all([claimsNow(), itemFileNames()]);
-
-				return (await new PQueue({ concurrency: itemReadsAtOnce }).addAll(names.map((name) => () => readyRef(name, claims)))).flat();
-			},
+			listReady: async () => readyRefs((standing) => !isLive(standing?.claim, now())),
+			listClaimed: async (holder) => readyRefs((standing) => isHeldBy(standing?.claim, holder, now())),
 			read,
 			claim: (id, holder, ttlMs) => take("claim", parseArgument(ItemId, id), holder, ttlMs),
 			renew: (id, holder, ttlMs) => take("renew", parseArgument(ItemId, id), holder, ttlMs),

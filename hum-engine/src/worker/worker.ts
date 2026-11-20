@@ -197,9 +197,12 @@ export class Worker {
 	readonly #timedOut = new Set<string>();
 	/**
 	 * Items this worker goes on with at its next tick, past its own standing claim, before anything else starts: a saved
-	 * change that lands again under this worker's config, and an item that starts over.
+	 * change that lands again under this worker's config, an item that starts over, and on the Mac each item its holder
+	 * claimed before this worker started.
 	 */
 	readonly #resuming = new Set<string>();
+	/** Whether this worker has read the items its holder claimed before it started. */
+	#tookBack = false;
 	/** The items a CI job's passes ended on: each job takes an item once, and the next wake takes it again. */
 	readonly #handled = new Set<string>();
 	/** Items whose thread a tick failed to read; the next tick reads them again whatever the watch says. */
@@ -486,6 +489,23 @@ export class Worker {
 			this.#unread.add(id);
 			faults.raise({ code: UNREAD_CODE, item: id, cause: `The thread of ${id} could not be read: ${error instanceof Error ? error.message : String(error)}`.slice(0, ERROR_EXCERPT), fix: "hum reads it again each tick and goes on with the other items." });
 		}
+	}
+
+	/**
+	 * Once, on the Mac: the items this worker's holder claimed before it started, which it goes on with at once, as a
+	 * hum restarted on the same state folder. Another holder waits for those claims to expire. A failed read, whose
+	 * guard raised the card, is made again next tick.
+	 */
+	async #takeBack(): Promise<void> {
+		if (this.#tookBack || this.#o.where !== "mac") return;
+
+		const claimed = await this.#o.adapters.workSource.listClaimed(this.#o.holder).catch(() => undefined);
+
+		if (claimed === undefined) return;
+
+		for (const { id } of claimed) this.#resuming.add(id);
+
+		this.#tookBack = true;
 	}
 
 	/** Every claim in flight is renewed; a run whose claim is gone stops. */
@@ -881,6 +901,8 @@ export class Worker {
 		}
 
 		const sources = await this.#readSources();
+
+		await this.#takeBack();
 
 		if (this.#o.ciJob?.kind !== "work") {
 			await this.#askParked();

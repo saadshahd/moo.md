@@ -141,6 +141,7 @@ export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoff
 
 				return list;
 			},
+			listClaimed: (holder) => retried(() => workSource.listClaimed(holder), ItemRef.array()),
 			read: (id) => retried(() => workSource.read(id), Item),
 			claim: (id, holder, ttlMs) => retried(() => workSource.claim(id, holder, ttlMs), ClaimResult),
 			renew: (id, holder, ttlMs) => retried(() => workSource.renew(id, holder, ttlMs), ClaimResult),

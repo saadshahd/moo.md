@@ -1,6 +1,9 @@
+import { createHash } from "node:crypto";
+import { mkdirSync, realpathSync } from "node:fs";
+import { hostname } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
-import { ADAPTER_API_VERSION, type Integrations } from "../adapter-api.ts";
+import { ADAPTER_API_VERSION, Holder, type Integrations } from "../adapter-api.ts";
 import type { WorkIntegrations } from "../publish/handover.ts";
 import { type Resolved, resolveAdapters } from "../adapters/registry.ts";
 import { startBackgroundRunner } from "../adapters/claude-bg.ts";
@@ -23,7 +26,9 @@ import { type Measurement, measureOn } from "../measure/remeasure.ts";
 import { DEFAULT_BASE } from "./thin-path.ts";
 import { Worker, type WorkerOptions } from "./worker.ts";
 
-export type OpenWorkerOptions = Omit<WorkerOptions, "repo" | "state" | "config" | "adapters" | "runner" | "remote" | "pulls" | "commits" | "loop" | "checks" | "runnerVariables"> & {
+export type OpenWorkerOptions = Omit<WorkerOptions, "repo" | "state" | "config" | "adapters" | "runner" | "remote" | "pulls" | "commits" | "loop" | "checks" | "runnerVariables" | "holder"> & {
+	/** The name this worker claims items by; default its installation's. */
+	readonly holder?: Holder;
 	/** Where saved state lives; default `<git common dir>/hum`. */
 	readonly stateDir?: string;
 	/** The installed plugins' skills, as a role names them; a role that names another plugin skill is refused. Absent where the worker makes judgment calls alone. */
@@ -39,6 +44,18 @@ export type OpenWorkerOptions = Omit<WorkerOptions, "repo" | "state" | "config" 
 	readonly env: Env;
 	/** The work source and questions in place of the ones `hum.json` names, with no GitHub reads: a CI work job's inbox. */
 	readonly integrations?: WorkIntegrations;
+};
+
+const HOLDER_HASH_LENGTH = 8;
+
+/**
+ * The name a hum installation claims items by: where it runs, its host, and a hash of its state folder's real path. A
+ * hum restarted on that folder claims by the same name; every worktree of a clone shares the folder, so the name too.
+ */
+export const installationHolder = (where: "mac" | "ci", stateDir: string): Holder => {
+	mkdirSync(stateDir, { recursive: true });
+
+	return Holder.parse(`${where}@${hostname()}:${createHash("sha256").update(realpathSync(stateDir)).digest("hex").slice(0, HOLDER_HASH_LENGTH)}`);
 };
 
 const Latest = z.looseObject({ version: z.string().min(1) });
@@ -116,7 +133,7 @@ export const openWorker = async (repo: string, options: OpenWorkerOptions): Prom
 
 /** Everything a worker on `repo` works with: its state, its config, its integrations, its runner and its remote. */
 export const workerOptions = async (repo: string, options: OpenWorkerOptions): Promise<WorkerOptions> => {
-	const { stateDir, installedSkills, judgmentsOnly, binary, env, ...rest } = options;
+	const { stateDir, installedSkills, judgmentsOnly, binary, env, holder, ...rest } = options;
 	const { now } = rest;
 	const state = openState(stateDir ?? (await defaultStateDir(repo)), { now });
 	const loaded = loadConfig(readConfigDir(join(repo, ".hum")), { env: { installedSkills } });
@@ -174,5 +191,5 @@ export const workerOptions = async (repo: string, options: OpenWorkerOptions): P
 	/** A measurement writes the owner's `.hum/hum.json`, which a CI checkout throws away. */
 	const remeasure = rest.where === "ci" ? undefined : (measurement: Measurement, signal: AbortSignal) => measureOn(repo, measurement, { inherit: false, signal });
 
-	return { ...rest, remeasure, checks: config.hum.checks, checkout: rest.checkout ?? slots?.checkout, slots, repo, state, config, adapters: { workSource, questions, answers, close: closeAll(resolved.close, place) }, runner, remote, pulls, commits, loop, runnerVariables: new Set(Object.entries(withoutGitHubTokens(env)).flatMap(([name, value]) => (value === undefined ? [] : [name]))) };
+	return { ...rest, holder: holder ?? installationHolder(rest.where ?? "mac", state.dir), remeasure, checks: config.hum.checks, checkout: rest.checkout ?? slots?.checkout, slots, repo, state, config, adapters: { workSource, questions, answers, close: closeAll(resolved.close, place) }, runner, remote, pulls, commits, loop, runnerVariables: new Set(Object.entries(withoutGitHubTokens(env)).flatMap(([name, value]) => (value === undefined ? [] : [name]))) };
 };

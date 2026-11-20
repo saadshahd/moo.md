@@ -26,6 +26,9 @@ export type ClaimDecision =
 /** A claim stands until it expires. */
 export const isLive = (claim: Claim | undefined, now: number): boolean => claim !== undefined && claim.expiresAt > now;
 
+/** `holder` holds a claim that still stands. */
+export const isHeldBy = (claim: Claim | undefined, holder: string, now: number): boolean => isLive(claim, now) && claim?.holder === holder;
+
 const isHeldByAnother = (standing: Claim, holder: string, now: number): boolean => isLive(standing, now) && standing.holder !== holder;
 
 /**

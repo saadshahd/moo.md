@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { docsJudge } from "./fixtures/judge.ts";
 import { expect, test } from "bun:test";
-import { existsSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ADAPTER_API_VERSION, type Adapter, Holder, type Integrations, type Item, ItemId, PermanentError } from "../src/adapter-api.ts";
 import { guarded } from "../src/adapters/guard.ts";
 import { onceCalls } from "../src/adapters/once.ts";
 import { openState } from "../src/state/open.ts";
-import { openWorker } from "../src/worker/open.ts";
+import { installationHolder, openWorker } from "../src/worker/open.ts";
 import { configWith, installedSkills, rawConfig, writeConfigDir } from "./fixtures/config.ts";
 import { sh } from "./fixtures/work-repo.ts";
 import { NOW, TTL, workerWorld } from "./fixtures/worker-world.ts";
@@ -87,6 +87,7 @@ test("the last-read list survives a restart: a fresh guard still sees an empty l
 		apiVersion: ADAPTER_API_VERSION,
 		workSource: {
 			listReady: async () => ids.map((id) => ({ id: ItemId.parse(id), title: id })),
+			listClaimed: async () => [],
 			read: async (id) => item(id),
 			claim: async () => {
 				throw new Error("unused");
@@ -296,4 +297,14 @@ test("openWorker with run slots enabled builds the pool: the run starts in a slo
 
 	expect(folders.filter((folder) => folder.startsWith(realpathSync(pool)))).not.toEqual([]);
 	expect(openState(join(w.repo.owner, ".git", "hum"), { now: () => NOW }).slots.list().filter(({ status }) => status !== "free")).toEqual([]);
+});
+
+test("a hum restarted on its state folder claims by the same name, whichever path reaches the folder, and a hum on another folder by another", () => {
+	const folder = tempDir("holder");
+	const link = join(tempDir("holder-link"), "state");
+
+	symlinkSync(folder, link);
+
+	expect(installationHolder("mac", link)).toBe(installationHolder("mac", folder));
+	expect(installationHolder("mac", tempDir("holder-other"))).not.toBe(installationHolder("mac", folder));
 });

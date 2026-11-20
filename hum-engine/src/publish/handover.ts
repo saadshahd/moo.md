@@ -111,6 +111,7 @@ export const inboxIntegrations = (inbox: Inbox, now: () => number): WorkIntegrat
 	return {
 		workSource: {
 			listReady: async () => inbox.items.map(({ id, title }) => ({ id, title })),
+			listClaimed: async () => [],
 			read: async (id) => items.get(id) ?? refused(`inbox holds no item ${id}`),
 			claim: claimed,
 			renew: claimed,

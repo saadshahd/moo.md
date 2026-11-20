@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { lock } from "proper-lockfile";
 import { z } from "zod";
 import type { Watch } from "../adapter-api.ts";
+import { STALE_FLOOR_MS } from "../state/alone.ts";
 import { atomicWrite, hasCode, orMissing, readJson } from "../state/fs.ts";
 
 const Outcome = z.discriminatedUnion("kind", [
@@ -55,9 +56,6 @@ const replay = (saved: SavedWatch): Watch => {
 
 	return { token: saved.token ?? "", changed: saved.outcome.changed };
 };
-
-/** proper-lockfile refuses a staleness under two seconds. */
-const STALE_FLOOR_MS = 2000;
 
 /**
  * One read of what changed serves every caller in the repo for `cacheMs`. Only the caller holding the lock reads;

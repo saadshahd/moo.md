@@ -29,7 +29,7 @@ export default () => {
 
 	return {
 		apiVersion: ADAPTER_API_VERSION,
-		workSource: { listReady: async () => [], read: none, claim: none, renew: none, comment: none, fileFollowUp: none, finish: none },
+		workSource: { listReady: async () => [], listClaimed: async () => [], read: none, claim: none, renew: none, comment: none, fileFollowUp: none, finish: none },
 		questions: { ask: none, decide: none },
 		answers: { answer: none, watch: async () => ({ token: "", changed: false }) },
 		close: async () => clearInterval(held),

@@ -1,7 +1,7 @@
 import * as core from "@actions/core";
 import { randomUUID } from "node:crypto";
 import { mkdtempSync } from "node:fs";
-import { hostname, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Command } from "commander";
 import { z } from "zod";
@@ -17,6 +17,7 @@ import { programDifferences, programEntry, readProgram } from "../service/progra
 import { reportStatus } from "../service/program-status.ts";
 import { installPlugins } from "../service/plugins.ts";
 import { doesStopWake, reportCards, wakeUntilQuiet } from "../service/wake.ts";
+import { alone } from "../state/alone.ts";
 import { defaultStateDir, openState, type State, STATUS_FILE } from "../state/open.ts";
 import { ENGINE_VERSION } from "../state/format.ts";
 import { SECOND_MS } from "../time.ts";
@@ -54,7 +55,7 @@ type WorkFlags = { holder?: string; base?: string };
 /** What a worker needs to know that no file in the repo says: who it claims as, and where items merge. */
 const withWorkOptions = (cmd: Command): Command =>
 	cmd
-		.option("--holder <name>", "the name this worker claims items by; default <where>@<host>")
+		.option("--holder <name>", "the name this worker claims items by; default <where>@<host>:<a hash of its state folder>")
 		.option("--base <branch>", "the branch items merge into; default main");
 
 const PluginList = z.array(z.looseObject({ id: z.string(), installPath: z.string(), enabled: z.boolean().default(true) }));
@@ -107,7 +108,7 @@ const optionsFor = async ({ cwd: repo, env }: Io, flags: WorkFlags, where: "mac"
 		env,
 		newSessionId: randomUUID,
 		installedSkills: extra.judgmentsOnly ? undefined : await installedSkills(),
-		holder: parseArgument(Holder, flags.holder ?? `${where}@${hostname()}`),
+		holder: flags.holder === undefined ? undefined : parseArgument(Holder, flags.holder),
 		base: flags.base,
 		where,
 		latestVersion: where === "mac" ? npmLatest : undefined,
@@ -179,14 +180,23 @@ const showProgramCard = ({ faults, statusPath }: Pick<State, "faults" | "statusP
  * with it, so gather brings back the state the last wake saved first and saves it for publish, which saves it again.
  */
 export const addServiceCommands = (root: Command, io: Io, done: (code: number) => void): void => {
+	/** Stops this process when another took its hold on the state folder over. */
+	const stopOnLoss = (name: string, abort: AbortController) => (error: Error) => {
+		io.stderr(`hum ${name}: another process took the state folder over: ${error.message}\n`);
+		abort.abort();
+	};
+
 	withWorkOptions(root.command("work").description("Run the worker on this machine until it is stopped or an update arrives; exits 75 for an update."))
 		.action(async (flags: WorkFlags) => {
 			const abort = new AbortController();
 
 			onStop(() => abort.abort());
 
-			const options = await optionsFor(io, flags, "mac");
-			const ended = await closingAfter(options, () => new Worker(options).serve(abort.signal));
+			const ended = await alone(await defaultStateDir(io.cwd), "work", stopOnLoss("work", abort), async () => {
+				const options = await optionsFor(io, flags, "mac");
+
+				return closingAfter(options, () => new Worker(options).serve(abort.signal));
+			});
 
 			io.stderr(`hum work: stopped, ${ended.reason}\n`);
 			done(ended.reason === "stopped" ? EXIT_OK : EXIT_UPDATED);
@@ -201,34 +211,39 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 		.action(async (workArgs: string[]) => {
 			const abort = new AbortController();
 			const settings = serviceSettings(io.cwd);
-			const state = openState(await defaultStateDir(io.cwd), { now: Date.now });
-			const host = await serveHost(io, settings.runSlots.pool);
-			const card = showProgramCard(state, host.differences, Date.now());
-			const stopReport = host.report(state.statusPath);
+			const dir = await defaultStateDir(io.cwd);
 
 			onStop(() => abort.abort());
 
-			if (card) io.stderr(`hum serve: ${card.cause} ${card.fix}\n`);
+			await alone(dir, "serve", stopOnLoss("serve", abort), async () => {
+				const state = openState(dir, { now: Date.now });
+				const host = await serveHost(io, settings.runSlots.pool);
+				const card = showProgramCard(state, host.differences, Date.now());
+				const stopReport = host.report(state.statusPath);
 
-			const ended = card
-				? "refused"
-				: await supervise({
-						state,
-						spawn: () => spawnWorker(io.cwd, workArgs),
-						now: Date.now,
-						intervalMs: settings.tickIntervalSeconds * SECOND_MS,
-						workerDownTicks: settings.workerDownTicks,
-						maxCrashes: settings.maxCrashes,
-						crashWindowMs: settings.crashWindowSeconds * SECOND_MS,
-						backoffMs: settings.restartBackoff.firstSeconds * SECOND_MS,
-						maxBackoffMs: settings.restartBackoff.maxSeconds * SECOND_MS,
-						stop: abort.signal,
-					});
+				if (card) io.stderr(`hum serve: ${card.cause} ${card.fix}\n`);
 
-			io.stderr(`hum serve: ${ended}\n`);
-			await host.leave(abort.signal);
-			stopReport();
-			host.close();
+				const ended = card
+					? "refused"
+					: await supervise({
+							state,
+							spawn: () => spawnWorker(io.cwd, workArgs),
+							now: Date.now,
+							intervalMs: settings.tickIntervalSeconds * SECOND_MS,
+							workerDownTicks: settings.workerDownTicks,
+							maxCrashes: settings.maxCrashes,
+							crashWindowMs: settings.crashWindowSeconds * SECOND_MS,
+							backoffMs: settings.restartBackoff.firstSeconds * SECOND_MS,
+							maxBackoffMs: settings.restartBackoff.maxSeconds * SECOND_MS,
+							stop: abort.signal,
+						});
+
+				io.stderr(`hum serve: ${ended}\n`);
+				await host.leave(abort.signal);
+				stopReport();
+				host.close();
+			});
+
 			done(EXIT_STAY_DOWN);
 		});
 

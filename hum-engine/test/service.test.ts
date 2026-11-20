@@ -8,6 +8,7 @@ import { doesStopWake, wakeUntilQuiet } from "../src/service/wake.ts";
 import { programDifferences } from "../src/service/program.ts";
 import { programStatus, statusReport } from "../src/service/program-status.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
+import { alone } from "../src/state/alone.ts";
 import { openState } from "../src/state/open.ts";
 import { emptyStatus, readStatus, writeHeartbeat } from "../src/status/file.ts";
 import { configWith } from "./fixtures/config.ts";
@@ -243,3 +244,17 @@ test("hum's status reads as one OSC 7501 record: its newest fault first, then th
 	expect(reported(statusReport(programStatus({ ok: true, status: { ...status, inFlight: [item("12")], cards: [fault("old", 1), fault("new\nline", 2)] } })))).toEqual({ state: "error", label: "new line and 1 more" });
 	expect(reported(statusReport(programStatus({ ok: true, status: { ...status, cards: [fault("x".repeat(300), 1)] } }))).label).toBe(`${"x".repeat(199)}…`);
 });
+
+test("a second `hum work` on one state folder is refused, naming it, while `hum serve` there is not", async () => {
+	const dir = tempDir("alone");
+	const kept = Promise.withResolvers<void>();
+	const lost = () => {};
+	const held = alone(dir, "work", lost, () => kept.promise);
+
+	await expect(alone(dir, "work", lost, async () => "second")).rejects.toThrow(`another \`hum work\` runs on ${dir}`);
+	expect(await alone(dir, "serve", lost, async () => "serve")).toBe("serve");
+
+	kept.resolve();
+	await held;
+	expect(await alone(dir, "work", lost, async () => "after")).toBe("after");
+}, 20_000);

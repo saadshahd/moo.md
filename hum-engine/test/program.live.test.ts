@@ -98,7 +98,7 @@ beforeAll(async () => {
 				runners: 1,
 				defaultKind: "docs",
 				tickIntervalSeconds: 2,
-				claimExpirySeconds: 8,
+				claimExpirySeconds: 600,
 			},
 			waitHours: {},
 		},
@@ -164,7 +164,7 @@ test.skipIf(!live)(
 );
 
 test.skipIf(!live)(
-	"after hum serve comes back, its item resumes on the same row once the old claim lapses: hum takes the row's answer and starts no second row",
+	"after hum serve comes back, it takes its item back at once, long before the claim's 600 s expiry: hum takes the row's answer and starts no second row",
 	async () => {
 		writeFileSync(join(rig.dir, "go-build"), "");
 

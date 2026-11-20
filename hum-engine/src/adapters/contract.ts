@@ -48,6 +48,7 @@ const workSourceChecks = (target: ContractTarget, source: WorkSource): Check[] =
 	const readItem = async (id: ItemId) => Item.parse(await source.read(id));
 	const ready = async () => ItemRef.array().parse(await source.listReady());
 	const isListed = async (id: ItemId) => (await ready()).some((ref) => ref.id === id);
+	const isClaimedBy = async (holder: string, id: ItemId) => ItemRef.array().parse(await source.listClaimed(Holder.parse(holder))).some((ref) => ref.id === id);
 
 	const claimOf = async (who: Adapter, id: ItemId, holder: string, mode: ClaimMode = "claim") =>
 		ClaimResult.parse(await answering<WorkSource>(need(who.workSource, "no work source"))[mode](id, Holder.parse(holder), TTL));
@@ -118,6 +119,19 @@ const workSourceChecks = (target: ContractTarget, source: WorkSource): Check[] =
 				assert.equal((await claimOf(target.adapter, id, "worker-a", "renew")).won, true);
 				assert.equal((await claimOf(target.adapter, id, "worker-b", "renew")).won, false);
 				assert.equal((await claimOf(target.adapter, id, "worker-b")).won, false);
+			},
+		},
+		{
+			name: "work source: a live claim is listed for its holder alone, until the item is finished",
+			run: async () => {
+				const id = await target.seed("held");
+
+				assert.equal((await claimOf(target.adapter, id, "worker-a")).won, true);
+				assert.ok(await isClaimedBy("worker-a", id), "the holder sees its own claim");
+				assert.ok(!(await isClaimedBy("worker-b", id)), "another holder does not");
+
+				await source.finish(id);
+				assert.ok(!(await isClaimedBy("worker-a", id)), "a finished item is not listed");
 			},
 		},
 		{
