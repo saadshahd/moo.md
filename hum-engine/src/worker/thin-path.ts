@@ -588,6 +588,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 					schema,
 					tokenCap: kind.tokenCap.tokens - tally.sinceAnswer(),
 					name: begun.record.name,
+					item: { id, title: item.title },
 					// A saved id already has a transcript under it; a fresh run mints its own.
 					sessionId: begun.adopted ? undefined : begun.record.sessionId,
 					signal,

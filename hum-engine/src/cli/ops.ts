@@ -7,8 +7,9 @@ import { resolveAdapters, type Slot } from "../adapters/registry.ts";
 import { readSettings } from "../config/settings.ts";
 import { CommandTimedOut, commandTimeoutMs, type Env, exec } from "../exec.ts";
 import { HumConfig } from "../config/schema.ts";
-import { dropInto } from "../state/fs.ts";
+import { dropInto, orMissing } from "../state/fs.ts";
 import { defaultStateDir, openState } from "../state/open.ts";
+import { checkAnswer, readSchema, runFolderAt, saveAnswer } from "../adapters/run-answer.ts";
 import pkg from "../../package.json" with { type: "json" };
 import { type OpName, commands, type Flag, opSpecs } from "./commands.ts";
 import { addServiceCommands } from "./service.ts";
@@ -23,6 +24,7 @@ export type Io = {
 	readonly env: Env;
 	readonly stdout: (text: string) => void;
 	readonly stderr: (text: string) => void;
+	readonly stdin: () => Promise<string>;
 };
 
 const EXIT_FAILED = 1;
@@ -114,7 +116,7 @@ const handlers = {
 	decide: ({ slot, item, text }) => performed(slot("questions", (a) => a.questions).decide(idOf(item), text)),
 	publish: ({ slot, item, second }) => performed(slot("release", (a) => a.release).publish(idOf(item), second)),
 	release: ({ slot, item, second }) => performed(slot("release", (a) => a.release).release(idOf(item), second)),
-} as const satisfies Record<Exclude<OpName, "push">, Handler>;
+} as const satisfies Record<Exclude<OpName, "push" | "run-answer">, Handler>;
 
 const callOf = async (positionals: readonly string[], flags: Flags, io: Io): Promise<Call> => {
 	const stateDir = await defaultStateDir(io.cwd);
@@ -163,9 +165,49 @@ const push = async (positionals: readonly string[], io: Io): Promise<number> => 
 	}
 };
 
+/** The run this shell belongs to, from what hum put in the run's settings; a shell of no run lacks them. */
+const RunShell = z.object({ HUM_RUN: z.string().min(1), HUM_RUN_KEY: z.string().min(1), HUM_RUN_DIR: z.string().min(1) });
+
+/** Checks the answer on stdin against the run's schema and saves it under the run's key; a refusal names what to fix. */
+const runAnswer = async (io: Io): Promise<number> => {
+	const shell = RunShell.safeParse(io.env);
+
+	if (!shell.success) {
+		io.stderr("hum run-answer: this shell belongs to no run hum started: HUM_RUN, HUM_RUN_KEY and HUM_RUN_DIR come only in a run's settings\n");
+
+		return EXIT_FAILED;
+	}
+
+	const { HUM_RUN: name, HUM_RUN_KEY: key, HUM_RUN_DIR: dir } = shell.data;
+	const folder = runFolderAt(dir);
+	const text = await io.stdin();
+	const schema = orMissing(() => readSchema(folder), undefined);
+
+	if (schema === undefined) {
+		io.stderr(`hum run-answer: hum waits for no answer from ${name}: the run has ended\n`);
+
+		return EXIT_FAILED;
+	}
+
+	const checked = checkAnswer(schema, text);
+
+	if (!checked.ok) {
+		io.stderr(`hum run-answer: refused: ${checked.why}\nFix the answer and pipe it again.\n`);
+
+		return EXIT_FAILED;
+	}
+
+	saveAnswer(folder, key, name, text);
+	io.stdout("answer saved\n");
+
+	return 0;
+};
+
 /** Runs one parsed `hum <op>` and returns its exit code: 0 done, 1 failed, 2 misused. */
 const perform = async (op: OpName, positionals: readonly string[], flags: Flags, io: Io): Promise<number> => {
 	if (op === "push") return push(positionals, io);
+
+	if (op === "run-answer") return runAnswer(io);
 
 	try {
 		const call = await callOf(positionals, flags, io);

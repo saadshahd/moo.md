@@ -320,7 +320,8 @@ const Shipped = z.object({
 	ownerBranchPrefix: branchPrefix.describe("The branch prefix of a pull request that lands a commit the owner wrote, such as an answer."),
 	backgroundRuns: z.boolean().describe("Whether a run on the Mac is a Claude Code background agent, listed in agent view, instead of a claude -p process."),
 	backgroundLaunchSeconds: z.number().positive().describe("How long a launch waits for the run it just started to appear in the agent list."),
-	backgroundPollSeconds: z.number().positive().describe("The time between reads of a background run's transcript and job state."),
+	backgroundPollSeconds: z.number().positive().describe("The time between reads of a background run's or a Rail row's transcript and state."),
+	rowNoteWaitSeconds: seconds.describe("How long a Rail row that ended a turn with no answer may stay idle after hum's one note before hum stops it and fails the run."),
 	deniedRunCommands: z.array(name).describe("Shell commands a background run may not run: each is denied as written, with any arguments."),
 	runAutoMode: z
 		.strictObject({ environment: z.array(z.string().min(1)), allow: z.array(z.string().min(1)), hardDeny: z.array(z.string().min(1)) })
@@ -588,6 +589,7 @@ export const OWNER_CHANGEABLE = {
 	"background runs": "backgroundRuns",
 	"background poll": "backgroundPollSeconds",
 	"background launch wait": "backgroundLaunchSeconds",
+	"row note wait": "rowNoteWaitSeconds",
 	"denied run commands": "deniedRunCommands",
 	"run auto mode": "runAutoMode",
 	"run slots": "runSlots",

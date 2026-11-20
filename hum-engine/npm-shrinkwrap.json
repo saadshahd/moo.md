@@ -24,6 +24,7 @@
         "expiry-map": "2.0.0",
         "hosted-git-info": "10.1.1",
         "is-git-ref-name-valid": "1.0.0",
+        "json-rpc-2.0": "1.8.1",
         "mdast-util-from-markdown": "2.1.0",
         "mdast-util-frontmatter": "2.0.1",
         "micromark-extension-frontmatter": "2.0.0",
@@ -1767,6 +1768,12 @@
       "funding": {
         "url": "https://github.com/sponsors/panva"
       }
+    },
+    "node_modules/json-rpc-2.0": {
+      "version": "1.8.1",
+      "resolved": "https://registry.npmjs.org/json-rpc-2.0/-/json-rpc-2.0-1.8.1.tgz",
+      "integrity": "sha512-BmN42JKn6FI36pcMMzHCXQhpKNEfbeqgSIcUYHKnifq0/4Ey6PDinovwUOgajT7NsgUtpWdDXaCWlpI4LHXN3g==",
+      "license": "MIT"
     },
     "node_modules/json-schema-traverse": {
       "version": "1.0.0",

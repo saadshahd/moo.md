@@ -6,6 +6,7 @@ import pMemoize, { pMemoizeClear } from "p-memoize";
 import pRetry from "p-retry";
 import semver from "semver";
 import { z } from "zod";
+import type { ItemRef } from "../adapter-api.ts";
 import type { EFFORTS } from "../config/schema.ts";
 import { CommandTimedOut, type Env, exec, SHIPPED_COMMAND_TIMEOUT_MS, spawn, withoutGitHubTokens } from "../exec.ts";
 import { raiseRejectedToken, UNAUTHORIZED } from "../service/token.ts";
@@ -303,8 +304,10 @@ export type RunRequest = {
 	readonly effort: Effort;
 	readonly schema: object;
 	readonly call?: Call;
-	/** Saved before the run launches. A background run is found by it after a crash, and agent view lists it under it. */
+	/** Saved before the run launches. A background run or a Rail row is found by it after a crash, and agent view lists it under it. */
 	readonly name?: string;
+	/** The item the run works on: a Rail row sits in its item's Workstream. */
+	readonly item?: ItemRef;
 	/** Tokens the item may still spend. */
 	readonly tokenCap?: number;
 	readonly sessionId?: string;

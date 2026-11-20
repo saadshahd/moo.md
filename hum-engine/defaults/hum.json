@@ -315,6 +315,7 @@
 	"backgroundRuns": true,
 	"backgroundPollSeconds": 1,
 	"backgroundLaunchSeconds": 30,
+	"rowNoteWaitSeconds": 600,
 	"deniedRunCommands": [
 		"gh issue",
 		"gh label",

@@ -1348,7 +1348,14 @@
 			"default": 1,
 			"type": "number",
 			"exclusiveMinimum": 0,
-			"description": "The time between reads of a background run's transcript and job state."
+			"description": "The time between reads of a background run's or a Rail row's transcript and state."
+		},
+		"rowNoteWaitSeconds": {
+			"default": 600,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "How long a Rail row that ended a turn with no answer may stay idle after hum's one note before hum stops it and fails the run."
 		},
 		"deniedRunCommands": {
 			"default": [

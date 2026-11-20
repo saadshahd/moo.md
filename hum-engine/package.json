@@ -60,6 +60,7 @@
     "expiry-map": "2.0.0",
     "hosted-git-info": "10.1.1",
     "is-git-ref-name-valid": "1.0.0",
+    "json-rpc-2.0": "1.8.1",
     "mdast-util-from-markdown": "2.1.0",
     "mdast-util-frontmatter": "2.0.1",
     "micromark-extension-frontmatter": "2.0.0",

@@ -1,24 +1,19 @@
-import { mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import { z } from "zod";
 import type { HumConfig } from "../config/schema.ts";
-import { commandTimeoutMs, exec, shellQuote, withoutGitHubTokens } from "../exec.ts";
-import { listRecords, orMissing } from "../state/fs.ts";
+import { commandTimeoutMs, exec, withoutGitHubTokens } from "../exec.ts";
+import { orMissing } from "../state/fs.ts";
 import type { State } from "../state/open.ts";
 import { CARD_EXCERPT, type Card } from "../status/format.ts";
 import { SECOND_MS } from "../time.ts";
-import { ADVISOR_AND_FAST_MODE_OFF, type Finished, type RunOutcome, type RunRequest, type Runner, type RunnerOptions, START_ANSWER, START_PROMPT, START_SCHEMA, startRunner, hasSucceeded } from "./claude-p.ts";
+import { type RunOutcome, type RunRequest, type Runner, type RunnerOptions, START_ANSWER, START_PROMPT, START_SCHEMA, startRunner, hasSucceeded } from "./claude-p.ts";
 import { type LimitEnded, limitOf, savedLimitUntil, settleLimit } from "./limit.ts";
 import { parseLooseJson } from "./marked.ts";
-import { billedTokens, cacheReadTokens, modelsOf, outputTokens, type RunTranscript, readTranscript } from "./transcript.ts";
-
-/** The plugin a background run turns off, so no run draws the band or polls. */
-export const HUM_PLUGIN = "hum@moo.md";
-
-/** The hook events that tell the engine where a run's transcript is: at its first prompt and at each stop. */
-const HOOK_EVENTS = ["UserPromptSubmit", "Stop"] as const;
+import { failedWith, finishedOf, hookReports, runSettings, STOP_EVENT, succeededWith, tokensOf } from "./hooked-run.ts";
+import { type RunTranscript, readTranscript } from "./transcript.ts";
 
 /** `claude --bg` prints the id in colour, so the line is read after its terminal codes are dropped. */
 const SHORT_ID = /backgrounded\W+([0-9a-f]{8})\b/u;
@@ -26,26 +21,6 @@ const SHORT_ID = /backgrounded\W+([0-9a-f]{8})\b/u;
 const AGENT_VIEW_KIND = "background";
 
 const AGENTS_UNREAD = "agents-unread";
-
-/**
- * A hook command that saves the hook's input, which names the session and its transcript, as a file of its own. It
- * writes a temp file the folder's reader skips and renames it in, so a reader never meets half a report.
- */
-const dropInto = (folder: string): string => {
-	const at = shellQuote(folder);
-
-	return `cat > ${at}/$$.part && mv ${at}/$$.part ${at}/$$.json`;
-};
-
-/** The settings every background run starts with: hum's plugin, the advisor and fast mode off, the deny rules and auto mode's rules, and a hook that reports the run. */
-export const backgroundSettings = ({ deniedRunCommands, runAutoMode }: Pick<HumConfig, "deniedRunCommands" | "runAutoMode">, stopsFolder: string, env: Readonly<Record<string, string>> = {}) => ({
-	enabledPlugins: { [HUM_PLUGIN]: false },
-	// A project's own settings may name an editor that waits for a window; a run has none, so its git would wait for good.
-	env: { GIT_EDITOR: "true", ...env, ...ADVISOR_AND_FAST_MODE_OFF },
-	permissions: { deny: deniedRunCommands.map((command) => `Bash(${command} *)`) },
-	autoMode: { classifyAllShell: true, environment: runAutoMode.environment, allow: runAutoMode.allow, hard_deny: runAutoMode.hardDeny },
-	hooks: Object.fromEntries(HOOK_EVENTS.map((event) => [event, [{ hooks: [{ type: "command", command: dropInto(stopsFolder) }] }]])),
-});
 
 export type LaunchSpec = {
 	readonly name: string;
@@ -82,10 +57,6 @@ const JOBS_FOLDER = "jobs";
 const JOB_STATE_FILE = "state.json";
 
 const JobFile = z.looseObject({ tokens: z.number().optional() });
-
-const Reported = z.looseObject({ hook_event_name: z.string(), session_id: z.string(), transcript_path: z.string().optional() });
-
-const STOP_EVENT = "Stop";
 
 /** What the engine reads of a run at one moment. */
 export type Reading = {
@@ -136,27 +107,6 @@ export const progressOf = ({ transcript, stops, job, jobOutputTokens }: Reading,
 	return { kind: "waiting" };
 };
 
-/** What the run billed: its transcript's tokens, and the output tokens the job counts beyond them. */
-const tokensOf = (transcript: RunTranscript, jobOutputTokens: number): number => billedTokens(transcript) + Math.max(0, jobOutputTokens - outputTokens(transcript));
-
-const finishedOf = (sessionId: string, { transcript, jobOutputTokens }: Pick<Reading, "transcript" | "jobOutputTokens">, { subtype, isError, text, structured }: Pick<Finished, "subtype" | "isError" | "text" | "structured">): Finished => ({
-	kind: "finished",
-	subtype,
-	isError,
-	sessionId,
-	text,
-	structured,
-	tokens: tokensOf(transcript, jobOutputTokens),
-	cacheReadTokens: cacheReadTokens(transcript),
-	plugins: [],
-	keySource: undefined,
-	models: modelsOf(transcript),
-});
-
-const succeededWith = (structured: Finished["structured"]): Pick<Finished, "subtype" | "isError" | "text" | "structured"> => ({ subtype: "success", isError: false, text: "", structured });
-
-const failedWith = (why: string): Pick<Finished, "subtype" | "isError" | "text" | "structured"> => ({ subtype: "error_during_execution", isError: true, text: why, structured: undefined });
-
 /** What `claude --bg` said: the id of the run it started, or why it did not start one. */
 type Launched = { readonly kind: "started"; readonly id: string } | { readonly kind: "refused"; readonly why: string };
 
@@ -200,12 +150,7 @@ export const backgroundRunner = ({ binary = "claude", env, state, config, fallba
 		return found.flatMap(({ kind, id, name, sessionId, state }) => (kind === AGENT_VIEW_KIND && id !== undefined ? [{ id, name, sessionId, state }] : []));
 	};
 
-	const reportsOf = (sessionId: string): { file: string; at: number; event: string; transcriptPath: string | undefined }[] =>
-		listRecords(state.stops).flatMap((file) => {
-			const reported = orMissing(() => Reported.safeParse(JSON.parse(readFileSync(file, "utf8"))), undefined);
-
-			return reported?.success && reported.data.session_id === sessionId ? [{ file, at: statSync(file).mtimeMs, event: reported.data.hook_event_name, transcriptPath: reported.data.transcript_path }] : [];
-		});
+	const reportsOf = (sessionId: string) => hookReports(state.stops).filter((report) => report.sessionId === sessionId);
 
 	/** Drops the session's hook reports, so the stops folder holds only runs still going. */
 	const forget = (sessionId: string): void => {
@@ -234,7 +179,7 @@ export const backgroundRunner = ({ binary = "claude", env, state, config, fallba
 		// The run's hook writes into this folder and does not make it.
 		mkdirSync(state.stops, { recursive: true });
 
-		const settings = backgroundSettings(config, state.stops, request.env);
+		const settings = runSettings(config, state.stops, request.env);
 		const { stdout, stderr } = await claude(launchArgs({ ...request, settings }), { stdin: request.prompt, cwd: request.cwd });
 		const said = stripVTControlCharacters(`${stdout}\n${stderr}`).trim();
 		const id = SHORT_ID.exec(said)?.[1];
@@ -277,9 +222,9 @@ export const backgroundRunner = ({ binary = "claude", env, state, config, fallba
 			case "limit":
 				return settleLimit(state, progress.ended);
 			case "done":
-				return finishedOf(sessionId, reading, succeededWith(progress.structured));
+				return finishedOf(sessionId, reading.transcript, succeededWith(progress.structured), reading.jobOutputTokens);
 			case "failed":
-				return finishedOf(sessionId, reading, failedWith(progress.why));
+				return finishedOf(sessionId, reading.transcript, failedWith(progress.why), reading.jobOutputTokens);
 		}
 	};
 

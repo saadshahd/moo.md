@@ -2,7 +2,8 @@ import { expect, test } from "bun:test";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { backgroundSettings, launchArgs } from "../src/adapters/claude-bg.ts";
+import { launchArgs } from "../src/adapters/claude-bg.ts";
+import { runSettings } from "../src/adapters/hooked-run.ts";
 import { judgmentRunner, type Runner, type RunnerOptions, type RunRequest, runArgs, startRunner, hasSucceeded } from "../src/adapters/claude-p.ts";
 import { parseLimit } from "../src/adapters/limit.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
@@ -51,7 +52,7 @@ test("a model call keeps no session, loads only the user's settings, where their
 });
 
 test("a run, a model call and a background run each turn Claude Code's advisor and fast mode off in their settings", () => {
-	const background = launchArgs({ ...RUN, name: "hum #68 build #0", settings: backgroundSettings(SHIPPED_DEFAULTS, "/tmp/stops") });
+	const background = launchArgs({ ...RUN, name: "hum #68 build #0", settings: runSettings(SHIPPED_DEFAULTS, "/tmp/stops") });
 	const settingsOf = (args: readonly string[]) => JSON.parse(args[args.indexOf("--settings") + 1] ?? "{}");
 
 	for (const args of [runArgs(RUN), runArgs({ ...RUN, call: "judgment" }), background]) expect(settingsOf(args)).toMatchObject({ env: { CLAUDE_CODE_DISABLE_ADVISOR_TOOL: "1", CLAUDE_CODE_DISABLE_FAST_MODE: "1" } });
