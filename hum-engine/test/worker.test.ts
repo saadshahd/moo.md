@@ -13,6 +13,7 @@ import { scriptedJudge, SOUND } from "./fixtures/judge.ts";
 import { type AdapterContext, Holder, ItemId } from "../src/adapter-api.ts";
 import { markdownAdapter } from "../src/adapters/markdown.ts";
 import { RUN_AGAIN } from "../src/decide/answer.ts";
+import { OWNER_APPROVAL } from "../src/decide/merge.ts";
 import { isTrusted } from "../src/decide/prose.ts";
 import type { Measured, Measurement } from "../src/measure/remeasure.ts";
 import { configWith, trustedScores } from "./fixtures/config.ts";
@@ -508,16 +509,17 @@ test("a stuck item never reruns until the owner answers; the answer takes it bac
 	expect(w.state.spent.get("a")).toMatchObject({ total: 802, base: 401 });
 });
 
+/** A markdown source whose owner answers only a question hum asked, as on roundup. */
+const answersOnlyToQuestions = (context: AdapterContext, repo: string) => {
+	const markdown = markdownAdapter({ ...markdownSettings, repo }, context);
+
+	return { ...markdown, answers: markdown.answers && { ...markdown.answers, onlyToQuestions: true as const } };
+};
+
 test("where the owner answers only a question, a stuck item asks once to run again, and the answer to it runs the item again", async () => {
 	const flag = join(tempDir("flag"), "flag");
 
-	const source = (context: AdapterContext, repo: string) => {
-		const markdown = markdownAdapter({ ...markdownSettings, repo }, context);
-
-		return { ...markdown, answers: markdown.answers && { ...markdown.answers, onlyToQuestions: true as const } };
-	};
-
-	const w = await workerWorld({ items: { a: { writeForItem: true } } }, { checks: [`test -f ${flag}`], settings: { maxFixRuns: 1 }, source });
+	const w = await workerWorld({ items: { a: { writeForItem: true } } }, { checks: [`test -f ${flag}`], settings: { maxFixRuns: 1 }, source: answersOnlyToQuestions });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -557,6 +559,29 @@ test("where the owner answers only a question, a stuck item asks once to run aga
 	await runAgain("once more");
 
 	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
+});
+
+test("where the owner answers only a question, an item waiting on review asks to approve or run again, and approve lands it with no second run", async () => {
+	const w = await workerWorld({ items: { a: { writeForItem: true } } }, { settings: { paths: [{ glob: "docs/**", level: "high" }] }, source: answersOnlyToQuestions });
+
+	w.item("a", "docs/a.md");
+	await w.worker.tick();
+	await w.worker.idle();
+
+	expect(w.results).toMatchObject([{ outcome: "review", item: "a" }]);
+
+	w.clock.at += 1000;
+	await w.worker.tick();
+
+	expect(w.state.questions.list().map(({ item, options, askedAt }) => ({ item, options, asked: askedAt !== undefined }))).toEqual([{ item: "a", options: [OWNER_APPROVAL, RUN_AGAIN], asked: true }]);
+
+	w.clock.at += TTL + 1;
+	await w.adapter.answers!.answer(ItemId.parse("a"), { text: "approve", option: OWNER_APPROVAL });
+	await w.worker.tick();
+	await w.worker.idle();
+
+	expect(merged(w)).toEqual(["a"]);
+	expect(w.shim.calls().filter((call) => call.itemId)).toHaveLength(1);
 });
 
 test("an item the owner runs again after it ended stuck at the fix cap gets its fix runs afresh", async () => {
