@@ -27,6 +27,9 @@ const Node = z.looseObject({ id: z.string(), name: z.string(), kind: z.string(),
 
 const Made = z.looseObject({ id: z.union([z.int(), z.string()]) });
 
+/** The scratch repo turns on, at project scope as an owner's project does, the moo.md plugins hum's roles name. */
+const PROJECT_SETTINGS = { enabledPlugins: { "hope@moo.md": true, "sound@moo.md": true } };
+
 let rig: Rig;
 let repo: string;
 let entry: Required<ProgramEntry>;
@@ -86,6 +89,8 @@ beforeAll(async () => {
 	mkdirSync(join(repo, "node_modules", ".bin"), { recursive: true });
 	symlinkSync(CLI, join(repo, "node_modules", ".bin", "hum"));
 	appendFileSync(join(repo, ".git", "info", "exclude"), "node_modules/\n");
+	mkdirSync(join(repo, ".claude"), { recursive: true });
+	writeFileSync(join(repo, ".claude", "settings.json"), JSON.stringify(PROJECT_SETTINGS));
 
 	const setup = writeSetup(
 		repo,
