@@ -34,6 +34,7 @@ const Result = z.looseObject({
 	asked: z.array(z.array(z.string()).optional()).optional(),
 	runs: z.array(z.int()).optional(),
 	rows: z.array(Node.extend({ visibility: z.string().optional() }).loose()).optional(),
+	parent: z.looseObject({ outcome: z.string().optional() }).optional(),
 	talk: z.looseObject({}).optional(),
 });
 
@@ -150,9 +151,13 @@ test.skipIf(!live)("the roundup adapter keeps the adapter contract as the Projec
 	expect(results.filter(({ failure }) => failure !== undefined)).toEqual([]);
 }, RIG_MS);
 
+/** Each row's step and visibility, in the order hum started them. */
+const stepsOf = (rows: readonly { readonly id: string; readonly name: string; readonly visibility?: string }[]) =>
+	rows.toSorted((one, other) => Number(one.id) - Number(other.id)).map(({ name, visibility }) => [name.replace(/^hum \S+ /u, "").replace(/ #\d+$/u, ""), visibility]);
+
 test.skipIf(!live)("a feature item shows its ideate row, then its shape row and a row for each open choice, all shown; each takes only the answer saved once it asked the owner and gets no note, and planning starts once every choice carries a pick", async () => {
 	const { rows = [], talk } = await run("talk");
-	const steps = rows.toSorted((one, other) => Number(one.id) - Number(other.id)).map(({ name, visibility }) => [name.replace(/^hum \S+ /u, "").replace(/ #\d+$/u, ""), visibility]);
+	const steps = stepsOf(rows);
 
 	expect(steps.slice(0, 2)).toEqual([
 		["ideate", "shown"],
@@ -170,4 +175,12 @@ test.skipIf(!live)("a feature item shows its ideate row, then its shape row and 
 	const talked = new Set(rows.slice(0, 5).map(({ id }) => id));
 
 	expect((await rig.events()).filter(({ name, data }) => name === "message.sent" && talked.has(String(data?.to)) && JSON.stringify(data).includes(HUM_EXT))).toEqual([]);
+}, RIG_MS);
+
+test.skipIf(!live)("a part split from a talked feature item keeps the owner's work order and picks, so its pass starts only its plan row", async () => {
+	const { parent, rows = [], talk } = await run("split");
+
+	expect(parent?.outcome).toBe("merged");
+	expect(stepsOf(rows)).toEqual([["plan-after-talk", "internal"]]);
+	expect(talk).toMatchObject({ order: { title: "Write the note" }, choices: [{ pick: "the first" }, { pick: "the first" }, { pick: "the first" }, { pick: "plain" }] });
 }, RIG_MS);

@@ -844,6 +844,25 @@ test("where runs talk with the owner, a feature opens with ideate and shape, who
 	expect(plan?.prompt).toContain("- Its tone: plain");
 });
 
+test("a part split from an item the owner talked through keeps the work order and the picks they settled", async () => {
+	const parts = [
+		{ title: "Write part one", touches: ["docs/one.md"], waitsOn: [], check: "test -f docs/one.md" },
+		{ title: "Write part two", touches: ["docs/two.md"], waitsOn: [1], check: "test -f docs/two.md" },
+	];
+
+	const w = await world({ script: [{}], decisions: [{ event: "needs-split", sure: true, reason: "Two jobs.", parts }] }, { checks: ["true"] });
+	const id = w.repo.seed("Write two parts");
+	const talk = talkingRunner(w.thinPath().runner, SETTLED);
+
+	expect(await runThinPath(w.thinPath({ judge: featureJudge, runner: talk.runner }))).toEqual({ outcome: "merged", item: id });
+
+	const settled = w.state.talks.get(id);
+	const filed = await w.adapter.workSource!.listReady();
+
+	expect(settled?.choices?.every(({ pick }) => pick !== undefined)).toBe(true);
+	expect(filed.map(({ id: part }) => w.state.talks.get(part))).toEqual(filed.map(({ id: part }) => ({ ...settled, item: part })));
+});
+
 test("where runs cannot talk with the owner, a feature plans at once, and its plan run reaches for hope:intent and hope:shape itself", async () => {
 	const w = await world({ script: [{}, NOTE], decisions: [READY_PLAN] });
 	const id = w.repo.seed("Write the note");

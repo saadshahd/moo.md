@@ -259,6 +259,11 @@ export const publishPass = async (p: Publisher, trust: GatherTrust, pass: PassOu
 
 			if (part) p.state.parts.put(filed.id, { item: filed.id, from: pass.item, waitsOn, check: part.check });
 
+			/* A part takes what the owner settled in its item's talk rows, so its pass asks them nothing again. */
+			const talked = part && p.state.talks.get(pass.item);
+
+			if (talked) p.state.talks.put(filed.id, { ...talked, item: filed.id });
+
 			return undefined;
 		},
 		"keep-evidence": async () => {

@@ -97,65 +97,93 @@ const park = async (): Promise<object> => {
 	return { outcomes: w.results.map(({ outcome }) => outcome), asked: w.state.questions.list().map(({ options }) => options), runs: [...runs, w.shim.calls().length] };
 };
 
-/** The talk scenario's own Workstream of items. */
-const TALK_WORKSTREAM = "hum talk";
-
-/** The run slot the talk scenario's pass works in. */
-const TALK_SLOT = "s1";
-
 /**
- * One thin-path pass of a feature item over the roundup adapter with Rail rows, as hum serve runs it: its talk rows act
- * out the owner, and the pass stops once its plan row starts. The result holds the item's rows and what it kept of the talk.
+ * A Workstream of feature items, and thin-path passes over the roundup adapter with Rail rows, as hum serve runs
+ * them, in a run slot of the scenario's own; their talk rows act out the owner.
  */
-const talk = async (): Promise<object> => {
+const talkWorld = async (workstream: string, slot: string) => {
 	const seeder = roundupRpc(socket);
-	const home = z.looseObject({ id: z.string() }).parse(await seeder.call("rail.createWorkstream", { name: TALK_WORKSTREAM })).id;
-	const { id } = z.looseObject({ id: z.int() }).parse(await seeder.call("todo.create", { title: "talk item", body: "Kind: feature\n\nWrite the note." }));
-
-	await seeder.call("todo.move", { id, home });
-
-	const state = openState(join(rig, "state-talk"), { now });
+	const home = z.looseObject({ id: z.string() }).parse(await seeder.call("rail.createWorkstream", { name: workstream })).id;
+	const dir = `state-${workstream.replaceAll(" ", "-")}`;
+	const state = openState(join(rig, dir), { now });
 	const program = await roundupProgram(process.env, state.faults);
 
-	if (!program) return { error: `roundup did not take this process as its program: ${JSON.stringify(state.faults.list())}` };
+	if (!program) throw new Error(`roundup did not take this process as its program: ${JSON.stringify(state.faults.list())}`);
 
-	const source = roundupOn("state-talk", { report: () => {}, now, env: process.env }, TALK_WORKSTREAM);
-	const item = ItemId.parse(String(id));
-	const folder = join(rig, "repo", SLOTS_DIR, TALK_SLOT);
-	const stop = new AbortController();
+	const source = roundupOn(dir, { report: () => {}, now, env: process.env }, workstream);
+	const folder = join(rig, "repo", SLOTS_DIR, slot);
 
-	const passed = runThinPath({
-		workSource: source.workSource,
-		questions: source.questions,
-		state,
-		runner: railRunner({ call: program.call, state, config: { ...SHIPPED_DEFAULTS, backgroundPollSeconds: 0.2 }, fallback: refusing, now }),
-		config: configWith(),
-		judge: scriptedJudge({ kind: { kind: "feature" }, alignment: SOUND }),
-		remote: join(rig, "origin.git"),
-		checks: ["true"],
-		holder: Holder.parse("rig"),
-		checkout: async () => ({ folder, env: {}, readyFailure: async () => undefined, giveBack: async () => {} }),
-		itemId: item,
-		now,
-		runnerVariables: new Set(),
-		newSessionId: randomUUID,
-		signal: stop.signal,
-	}).catch((error: Error) => ({ error: error.message }));
+	const seed = async (title: string, body: string): Promise<ItemId> => {
+		const { id } = z.looseObject({ id: z.int() }).parse(await seeder.call("todo.create", { title, body }));
 
-	const rows = async () => {
+		await seeder.call("todo.move", { id, home });
+
+		return ItemId.parse(String(id));
+	};
+
+	const passOf = (item: ItemId, signal: AbortSignal) =>
+		runThinPath({
+			workSource: source.workSource,
+			questions: source.questions,
+			state,
+			runner: railRunner({ call: program.call, state, config: { ...SHIPPED_DEFAULTS, backgroundPollSeconds: 0.2 }, fallback: refusing, now }),
+			config: configWith(),
+			judge: scriptedJudge({ kind: { kind: "feature" }, alignment: SOUND }),
+			remote: join(rig, "origin.git"),
+			checks: ["true"],
+			holder: Holder.parse("rig"),
+			checkout: async () => ({ folder, env: {}, readyFailure: async () => undefined, giveBack: async () => {} }),
+			itemId: item,
+			now,
+			runnerVariables: new Set(),
+			newSessionId: randomUUID,
+			signal,
+		}).catch((error: Error) => ({ error: error.message }));
+
+	const rowsOf = async (item: ItemId) => {
 		const nodes = await railTree(seeder.call);
-		const own = nodes.find(({ kind, name }) => kind === "workstream" && name.startsWith(`#${id} `));
+		const own = nodes.find(({ kind, name }) => kind === "workstream" && name.startsWith(`#${item} `));
 
 		return nodes.filter(({ parent }) => parent !== undefined && parent === own?.id);
 	};
 
-	for (const deadline = Date.now() + ANSWER_WAIT_MS; !(await rows()).some(({ name }) => name.includes(" plan-after-talk ")) && Date.now() < deadline; ) await Bun.sleep(200);
+	/** The item's rows once its plan row started: the pass stops there, as the plan row waits. */
+	const rowsToPlan = async (item: ItemId) => {
+		const stop = new AbortController();
+		const passed = passOf(item, stop.signal);
 
-	const seen = await rows();
+		for (const deadline = Date.now() + ANSWER_WAIT_MS; !(await rowsOf(item)).some(({ name }) => name.includes(" plan-after-talk ")) && Date.now() < deadline; ) await Bun.sleep(200);
 
-	stop.abort();
+		const rows = await rowsOf(item);
 
-	return { rows: seen, talk: state.talks.get(item), outcome: await passed, faults: state.faults.list() };
+		stop.abort();
+
+		return { rows, talk: state.talks.get(item), outcome: await passed, faults: state.faults.list() };
+	};
+
+	return { seed, passOf, rowsToPlan, source };
+};
+
+/** A feature item's talk rows, then its plan row. */
+const talk = async (): Promise<object> => {
+	const world = await talkWorld("hum talk", "s1");
+
+	return world.rowsToPlan(await world.seed("talk item", "Kind: feature\n\nWrite the note."));
+};
+
+/** A feature item whose plan row splits it after the talk, then its first part's rows once its plan row started. */
+const split = async (): Promise<object> => {
+	const world = await talkWorld("hum split", "s2");
+	const item = await world.seed("split item", "Kind: feature\n\nWrite the note in two parts.");
+
+	writeFileSync(join(rig, `go-split-${item}`), "");
+
+	const parent = await world.passOf(item, new AbortController().signal);
+	const part = (await world.source.workSource.listReady()).find(({ title }) => title.endsWith("Write part one"));
+
+	if (!part) return { error: `the split filed no ready part: ${JSON.stringify(parent)}` };
+
+	return { parent, ...(await world.rowsToPlan(part.id)) };
 };
 
 /** Every check of the adapter contract, with items seeded in the hum Workstream. */
@@ -180,7 +208,7 @@ const contract = async (): Promise<object> => {
 	return { results };
 };
 
-const SCENARIOS = new Map(Object.entries({ question, park, contract, talk }));
+const SCENARIOS = new Map(Object.entries({ question, park, contract, talk, split }));
 
 const result = JSON.stringify(await (SCENARIOS.get(scenario) ?? (async () => ({ error: `no scenario ${scenario}` })))().catch((error: Error) => ({ error: error.stack ?? error.message })));
 

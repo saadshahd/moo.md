@@ -96,6 +96,17 @@ const TALKED = {
 	pick: { pick: "the first", found: "the rig measured it" },
 };
 
+/** A plan row whose item the rig split: it answers with two parts. */
+const SPLIT = {
+	event: "needs-split",
+	sure: true,
+	reason: "Two jobs.",
+	parts: [
+		{ title: "Write part one", touches: ["docs/one.md"], waitsOn: [], check: "true" },
+		{ title: "Write part two", touches: ["docs/two.md"], waitsOn: [1], check: "true" },
+	],
+};
+
 /** What such a row saves before it asks the owner, which hum must not take. */
 const EARLY = {
 	ideate: { order: { title: "early", ask: "early", done: "early", limits: [] } },
@@ -126,7 +137,9 @@ const SCENARIOS = new Map<string, () => Promise<void>>(Object.entries({
 	spike: talkRow("pick"),
 	draft: talkRow("pick"),
 	plan: async () => undefined,
-	"plan-after-talk": async () => undefined,
+	"plan-after-talk": async () => {
+		if (existsSync(join(rig, `go-split-${env.HUM_RUN?.split(" ")[1] ?? ""}`))) await turn(() => answer(JSON.stringify(SPLIT)));
+	},
 	finish: () => turn(() => answer(DONE)),
 	fix: () =>
 		turn(() => {
