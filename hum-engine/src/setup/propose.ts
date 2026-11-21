@@ -33,7 +33,7 @@ export type Proposal = {
 	readonly usualSizes: readonly { readonly folder: string; readonly usual: number | undefined }[];
 	readonly windows: Pick<HumConfig["changeLabels"], "fixWindow"> & Pick<HumConfig, "measureWindow">;
 	readonly kindLabels: Readonly<Record<string, string>>;
-	readonly runSlots: Pick<HumConfig["runSlots"], "services" | "recipe">;
+	readonly runSlots: Pick<HumConfig["runSlots"], "services" | "pool" | "recipe">;
 	readonly runPlaces: readonly RunPlace[];
 	readonly wakeJob: Pick<HumConfig, "ciRunner" | "ciContainer" | "ciEnv" | "ciClaudeAuth" | "pullRequestToken">;
 	/** The adapter of each slot that does not use the markdown source; empty where the repo keeps no work in issues. */
@@ -210,7 +210,7 @@ export const proposeSetup = (scan: RepoScan, shipped: DefaultsConfig, { labels =
 		usualSizes: scan.folders.map(({ folder, sizes }) => ({ folder, usual: usualSize(sizes, shipped.sizeRange) })),
 		windows: { fixWindow: shipped.changeLabels.fixWindow, measureWindow: shipped.measureWindow },
 		kindLabels: kindLabelsOf(scan, labels, shipped.kinds),
-		runSlots: { services: shipped.runSlots.services, recipe: recipeOf(scan, checks) },
+		runSlots: { services: shipped.runSlots.services, pool: shipped.runSlots.pool, recipe: recipeOf(scan, checks) },
 		runPlaces: shipped.runPlaces,
 		wakeJob: wakeJobOf(scan.ci, shipped, isPublic),
 		integrations: integrationsOf(scan, openIssues),

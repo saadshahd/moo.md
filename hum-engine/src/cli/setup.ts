@@ -88,7 +88,7 @@ export const addSetupCommands = (root: Command, io: Io, done: (code: number) => 
 
 	setup
 		.command("scan")
-		.description("Read the repo and print what setup proposes: checks, paths, data and secrets globs, kind labels, the slot recipe, and a timeout question per wait.")
+		.description("Read the repo and print what setup proposes: checks, paths, data and secrets globs, kind labels, the slot pool and recipe, and a timeout question per wait.")
 		.option("--base <branch>", "the branch items merge into", DEFAULT_BASE)
 		.action(async ({ base }: { base: string }) => {
 			const shipped = shippedConfig();

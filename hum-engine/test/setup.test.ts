@@ -68,7 +68,7 @@ const shipped = shippedConfig();
 /** What git config holds for the owner. */
 const OWNER_GIT: GitIdentityRead = { found: true, identity: OWNER };
 
-test("a scan reads the checks CI runs on a pull request after the install a fresh clone needs, the compose services and the issue-template labels", async () => {
+test("a scan reads the checks CI runs on a pull request after the install a fresh clone needs, the compose services and the issue-template labels, and proposes the slot pool", async () => {
 	const scan = await scanRepo(repoWith(PROJECT), "main");
 	const proposal = proposeSetup(scan, shipped.hum, { labels: ["bug", "docs"] });
 
@@ -76,6 +76,7 @@ test("a scan reads the checks CI runs on a pull request after the install a fres
 	expect(scan.composeServices).toEqual([{ name: "db", image: "mongo:7" }]);
 	expect(proposal.checks).toEqual(["bun install --frozen-lockfile", "bun run typecheck", "bun test"]);
 	expect(proposal.runSlots.recipe.prepare).toContain("bun install --frozen-lockfile");
+	expect(proposal.runSlots.pool).toBe(".hum-slots");
 });
 
 const AGENTS = `name: agents

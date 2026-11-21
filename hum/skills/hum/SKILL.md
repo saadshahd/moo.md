@@ -1,6 +1,6 @@
 ---
 name: hum
-description: Set hum up in this repo, or change how it is set up. Reads the repo, proposes every setting, asks only what you alone hold, writes .hum/hum.json and proves it on a scratch copy.
+description: Set hum up in this repo, or change how it is set up. Reads the repo, proposes every setting, asks only what you alone hold, writes .hum/hum.json, adds a check tool's ignore line for the slot folder where you say yes, and proves it on a scratch copy.
 disable-model-invocation: true
 ---
 
@@ -33,9 +33,12 @@ Ask in this order. One question per turn, each with its proposal. Where a questi
 | Which label means which kind | issue-template labels and repo labels | `kindLabels` |
 | Which kind an item takes when no label and no `Kind:` line name one | the work source: where its items never carry labels, as roundup Todos, the kind most of them are; else `null`, so the cheap model call picks and asks when unsure | `defaultKind` |
 | Services and setup each run slot needs | compose file, env script, install command | `runSlots` |
+| One question per check tool that reads the pool folder, where run slots are on and the pool lies inside the checkout: the tool's ignore line for the pool | slots are on where `runSlots.enabled` is true or `integrations` names roundup; the pool is `runSlots.pool` as settled: the proposal's, unless `.hum/hum.json` or the owner names another; each command in `checks`, as the paragraph below reads it | the tool's ignore entry for the pool, written in that tool's own config, outside the answers file, only on the owner's yes |
 | Whether items with no `touches:` line run beside others, and how many times a change another run beat to the same files is built again | the work source: where items never name their files, as roundup Todos, run them side by side with one rebuild; else keep them alone | `undeclaredRunsAlone`, `conflictRebuilds` |
 | Which files every review reads beside the diff | the repo's rules files, such as `AGENTS.md`; an item adds its own on a `reads: a, b` line | `reviewReads` |
 | When `ciClaudeAuth` is `oauth-token`: the date the CI token expires, after `claude setup-token` | only the owner holds it | a reminder the owner keeps |
+
+A check run from the checkout can walk every slot in the pool: `.git/info/exclude` hides the pool from git, and a tool skips it only where it honours that file or a rule in its config does. For each command in `checks`, follow it through package scripts and wrappers to its tool, then read each config the command loads, and the tool's defaults and docs, for whether the tool walks the pool. A tool given its files or folders by name does not. One whose defaults and configs show it takes every folder they do not skip by name does. One whose handling of `.git/info/exclude` they leave open goes to the probe: add `/<pool>/` to `.git/info/exclude`, run `git worktree add --detach <pool>/probe origin/<base>` (the base branch the scan ran with), break in it one file for each tool you probe, run each command from the checkout, and count a path under the pool in its output as the tool reading the pool. Then run `git worktree remove --force <pool>/probe`; leave the exclude line, which hum adds itself. For each config whose tool reads the pool, name the config file and propose the one entry that config uses to skip a path.
 
 Say what the labels cover: "`kindLabels` covers N of M open issues; the rest get `defaultKind`, or where it is `null` the fallback kind and one question."
 
