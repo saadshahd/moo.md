@@ -14,7 +14,7 @@ import { failedWith, finishedOf, hookReports, runSettings, STOP_EVENT, succeeded
 import { limitOf, savedLimitUntil, settleLimit } from "./limit.ts";
 import { itemWorkstream, NEEDS_YOU, RailNode, railName, railTree } from "./rail.ts";
 import { HUM_EXT, type RoundupCall, type RoundupClient, RoundupRefusal } from "./roundup-rpc.ts";
-import { askedSince, hasSavedAnswer, keepSchema, markAsked, type RunFolder, runFolder, runFolders, runKey, takeAnswer } from "./run-answer.ts";
+import { askedSince, dropAnswers, hasSavedAnswer, keepSchema, markAsked, type RunFolder, runFolder, runFolders, runKey, takeAnswer } from "./run-answer.ts";
 import { readTranscript, type RunTranscript } from "./transcript.ts";
 
 const RowRecord = z.strictObject({ id: z.string(), name: z.string() });
@@ -163,7 +163,7 @@ type Reading = { readonly node: RailNode | undefined; readonly transcript: RunTr
  * configured wait, stops it and fails the run. A run the owner talks to starts shown, in the run's working copy
  * without adopting it, so several such rows run there side by side. It waits on the owner through its turns, and its
  * answer counts only once roundup showed the row waiting on the owner; one that answers and goes idle without asking
- * gets one note to ask first, and answering so again stops it and fails the run. A cheap model call and a run with no
+ * gets one note to ask first, and hum drops what it saved so far. Answering so again stops it and fails the run. A cheap model call and a run with no
  * name go to `fallback`.
  */
 export const railRunner = ({ call, state, config, fallback, now }: RowsOptions): Runner => {
@@ -286,7 +286,11 @@ export const railRunner = ({ call, state, config, fallback, now }: RowsOptions):
 			const idle = reading.node.status?.kind === IDLE;
 			const due = talks ? idle && askedSince(folder) === undefined && hasSavedAnswer(folder) : reading.stops > 0;
 
-			if (mark === undefined && due) await note(row, talks ? NOTES.ask() : NOTES.answer(name), folder, reading.stops);
+			if (mark === undefined && due) {
+				if (talks) dropAnswers(folder);
+
+				await note(row, talks ? NOTES.ask() : NOTES.answer(name), folder, reading.stops);
+			}
 
 			if (mark !== undefined && due && reading.stops > mark.stops) {
 				await stop(row);

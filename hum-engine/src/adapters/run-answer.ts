@@ -95,6 +95,11 @@ const Saved = z.strictObject({ mac: z.string(), text: z.string() });
 /** Whether the run saved an answer that hum has not taken, whether or not it would count. */
 export const hasSavedAnswer = (folder: RunFolder): boolean => listFiles(folder.answers).length > 0;
 
+/** Drops every answer the run saved so far, so only one it saves from now on can count. */
+export const dropAnswers = (folder: RunFolder): void => {
+	for (const file of listFiles(folder.answers)) rmSync(file, { force: true });
+};
+
 /** When roundup first showed a row waiting on the owner. */
 const AskedMark = z.strictObject({ since: z.number() });
 
