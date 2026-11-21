@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { x } from "tinyexec";
 import { z } from "zod";
+import type { Runner } from "../../src/adapters/claude-p.ts";
 import { type RoundupClient, roundupRpc } from "../../src/adapters/roundup-rpc.ts";
 import { Json } from "../../src/config/json.ts";
 import { runTempDir } from "./temp.ts";
@@ -17,6 +18,14 @@ const DRIVER = join(import.meta.dir, "rows-driver.ts");
 export const ITEMS_DRIVER = join(import.meta.dir, "items-driver.ts");
 
 const CLI = join(import.meta.dir, "..", "..", "src", "cli", "main.ts");
+
+/** The rig starts no model session: a cheap call or a run with no name would reach claude -p, so it fails the scenario. */
+export const refusing: Runner = {
+	run: async () => {
+		throw new Error("the rig starts no claude -p run");
+	},
+	limitedUntil: () => 0,
+};
 
 /** The run slots the rig's repo holds, one per scenario, each a worktree on a branch of its own. */
 const SLOTS = 7;

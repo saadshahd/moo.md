@@ -18,9 +18,10 @@ const PRIVATE = 0o600;
 
 /**
  * What passes between hum and one run's row: the schema the answer must match, the answers the run saved, the reports
- * its hooks drop, the row hum started for it, and the mark that hum sent the row its one note.
+ * its hooks drop, the row hum started for it, the mark that hum sent the row its one note, and when roundup first
+ * showed the row waiting on the owner.
  */
-export type RunFolder = { readonly root: string; readonly schema: string; readonly answers: string; readonly hooks: string; readonly row: string; readonly noted: string };
+export type RunFolder = { readonly root: string; readonly schema: string; readonly answers: string; readonly hooks: string; readonly row: string; readonly noted: string; readonly asked: string };
 
 export const runFolderAt = (root: string): RunFolder => ({
 	root,
@@ -29,6 +30,7 @@ export const runFolderAt = (root: string): RunFolder => ({
 	hooks: join(root, "hooks"),
 	row: join(root, "row.json"),
 	noted: join(root, "noted"),
+	asked: join(root, "asked.json"),
 });
 
 /** The folder of every run under hum's state; the secret beside them is no run. */
@@ -89,6 +91,17 @@ const orThrown = <T>(read: () => T): T | undefined => {
 };
 
 const Saved = z.strictObject({ mac: z.string(), text: z.string() });
+
+/** When roundup first showed a row waiting on the owner. */
+const AskedMark = z.strictObject({ since: z.number() });
+
+/** When roundup first showed the run's row waiting on the owner, if it has. */
+export const askedSince = (folder: RunFolder): number | undefined => orMissing(() => AskedMark.parse(JSON.parse(readFileSync(folder.asked, "utf8"))).since, undefined);
+
+/** Keeps the first time roundup showed the run's row waiting on the owner; a later one changes nothing. */
+export const markAsked = (folder: RunFolder, since: number): void => {
+	if (askedSince(folder) === undefined) atomicWrite(folder.asked, JSON.stringify({ since }));
+};
 
 type Saved = z.infer<typeof Saved>;
 

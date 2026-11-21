@@ -5,6 +5,7 @@ import { z } from "zod";
 import { Holder, ItemId } from "../src/adapter-api.ts";
 import { itemWorkstreamName } from "../src/adapters/rail.ts";
 import { roundupAdapter } from "../src/adapters/roundup.ts";
+import { HUM_EXT } from "../src/adapters/roundup-rpc.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { RUN_AGAIN } from "../src/decide/answer.ts";
 import { INBOX_DIR } from "../src/state/open.ts";
@@ -32,6 +33,8 @@ const Result = z.looseObject({
 	outcomes: z.array(z.string()).optional(),
 	asked: z.array(z.array(z.string()).optional()).optional(),
 	runs: z.array(z.int()).optional(),
+	rows: z.array(Node.extend({ visibility: z.string().optional() }).loose()).optional(),
+	talk: z.looseObject({}).optional(),
 });
 
 const HOLDER = Holder.parse("rig");
@@ -145,4 +148,26 @@ test.skipIf(!live)("the roundup adapter keeps the adapter contract as the Projec
 
 	expect(results.length).toBeGreaterThan(0);
 	expect(results.filter(({ failure }) => failure !== undefined)).toEqual([]);
+}, RIG_MS);
+
+test.skipIf(!live)("a feature item shows its ideate row, then its shape row and a row for each open choice, all shown; each takes only the answer saved once it asked the owner and gets no note, and planning starts once every choice carries a pick", async () => {
+	const { rows = [], talk } = await run("talk");
+	const steps = rows.toSorted((one, other) => Number(one.id) - Number(other.id)).map(({ name, visibility }) => [name.replace(/^hum \S+ /u, "").replace(/ #\d+$/u, ""), visibility]);
+
+	expect(steps.slice(0, 2)).toEqual([
+		["ideate", "shown"],
+		["shape", "shown"],
+	]);
+	expect(steps.slice(2, 5).toSorted()).toEqual([
+		["draft 3", "shown"],
+		["find 1", "shown"],
+		["spike 2", "shown"],
+	]);
+	expect(steps.slice(5)).toEqual([["plan", "internal"]]);
+	expect(talk).toMatchObject({ order: { title: "Write the note" }, choices: [{ pick: "the first" }, { pick: "the first" }, { pick: "the first" }, { pick: "plain" }] });
+	expect(JSON.stringify(talk)).not.toContain("early");
+
+	const talked = new Set(rows.slice(0, 5).map(({ id }) => id));
+
+	expect((await rig.events()).filter(({ name, data }) => name === "message.sent" && talked.has(String(data?.to)) && JSON.stringify(data).includes(HUM_EXT))).toEqual([]);
 }, RIG_MS);

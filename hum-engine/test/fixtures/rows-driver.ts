@@ -1,11 +1,11 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ItemId } from "../../src/adapter-api.ts";
-import type { Runner } from "../../src/adapters/claude-p.ts";
 import { railRunner, roundupProgram } from "../../src/adapters/rail-rows.ts";
 import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 import { openState } from "../../src/state/open.ts";
 import { RUN_SCHEMA } from "../../src/worker/thin-path.ts";
+import { refusing } from "./rows-rig.ts";
 
 /**
  * The rig's program: a Rail rows runner that runs one scenario's run, named for the scenario, and writes its outcome
@@ -22,14 +22,6 @@ const state = openState(join(rig, "state"), { now: Date.now });
 const abort = new AbortController();
 
 for (const signal of ["SIGTERM", "SIGHUP", "SIGINT"] as const) process.once(signal, () => abort.abort());
-
-/** The rig starts no model session: a cheap call or a run with no name would reach claude -p, so it fails the scenario. */
-const refusing: Runner = {
-	run: async () => {
-		throw new Error("the rig starts no claude -p run");
-	},
-	limitedUntil: () => 0,
-};
 
 const result = async (): Promise<object> => {
 	const roundup = await roundupProgram(process.env, state.faults);

@@ -10,10 +10,10 @@ import { INBOX_DIR } from "../state/open.ts";
 import { parseArgument } from "./argument.ts";
 import { claimer, isHeldBy, isLive } from "./claim.ts";
 import { commentText, cutLine, followUpBody, isFollowUpOf, type Marker, markedLine, parseComment, questionText } from "./marked.ts";
-import { itemWorkstream, type RailNode, railTree, rootWorkstream } from "./rail.ts";
+import { itemWorkstream, NEEDS_YOU, type RailNode, railTree, rootWorkstream } from "./rail.ts";
 import { type RowConfig, startRow } from "./rail-rows.ts";
 import { HUM_EXT, type RoundupEvent, RoundupRefusal, roundupRpc } from "./roundup-rpc.ts";
-import { keepSchema, type RunFolder, runFolderAt, runKey, takeAnswer } from "./run-answer.ts";
+import { askedSince, keepSchema, markAsked, type RunFolder, runFolderAt, runKey, takeAnswer } from "./run-answer.ts";
 
 /** The name `hum.json` gives the roundup adapter. */
 export const ROUNDUP = "roundup";
@@ -26,9 +26,6 @@ const COMMENT_LIMIT = 280;
 
 /** The digest in a Pad's name, so the same text posts to the same Pad name. */
 const PAD_DIGEST_LENGTH = 8;
-
-/** The status of a row that waits on the owner. */
-const NEEDS_YOU = "needs-you";
 
 /** A question row only asks and hands the answer over. */
 const QUESTION_EFFORT = "low";
@@ -58,9 +55,6 @@ const Taken = z.strictObject({ text: z.string(), option: z.string().optional(), 
 
 /** A question hum asked as a row, named `name`. */
 const Asked = z.strictObject({ item: z.string(), name: z.string(), text: z.string(), at: z.number() });
-
-/** When roundup first showed a question row as waiting on the owner. */
-const AskedMark = z.strictObject({ since: z.number() });
 
 const RowRecord = z.looseObject({ id: z.string() });
 
@@ -143,12 +137,6 @@ export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterCon
 
 	type Asking = ReturnType<typeof questionFolders>[number];
 
-	const markAsked = ({ root }: Pick<Asking, "root">, since: number): void => {
-		const mark = join(root, "asked.json");
-
-		if (readJson(AskedMark, mark) === undefined) atomicWrite(mark, JSON.stringify({ since }));
-	};
-
 	/** Whether an Event changes what hum reads: a Todo someone else changed, or the status of a question row, whose waiting on the owner it marks. */
 	const isChange = ({ name, actor, data }: RoundupEvent): boolean => {
 		if (name.startsWith("todo.")) return actor?.id !== HUM_EXT;
@@ -156,7 +144,7 @@ export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterCon
 		const status = name === "agent.status" ? StatusEvent.safeParse(data).data : undefined;
 		const asking = status && questionFolders().find(({ row }) => row === status.id);
 
-		if (asking && status.status.kind === NEEDS_YOU) markAsked(asking, status.status.since);
+		if (asking && status.status.kind === NEEDS_YOU) markAsked(asking.folder, status.status.since);
 
 		return asking !== undefined;
 	};
@@ -286,10 +274,10 @@ export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterCon
 		for (const asking of questionsOf(id).filter((open) => takenOf(open) === undefined)) {
 			const status = nodes.find((node) => node.id === asking.row)?.status;
 
-			if (status?.kind === NEEDS_YOU && status.since !== undefined) markAsked(asking, status.since);
+			if (status?.kind === NEEDS_YOU && status.since !== undefined) markAsked(asking.folder, status.since);
 
-			const mark = readJson(AskedMark, join(asking.root, "asked.json"));
-			const answer = mark && takeAnswer(asking.folder, runKey(options.stateDir, asking.asked.name), asking.asked.name, mark.since);
+			const since = askedSince(asking.folder);
+			const answer = since === undefined ? undefined : takeAnswer(asking.folder, runKey(options.stateDir, asking.asked.name), asking.asked.name, since);
 
 			if (answer === undefined) continue;
 

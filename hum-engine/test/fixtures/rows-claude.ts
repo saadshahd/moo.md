@@ -82,7 +82,50 @@ const DONE = JSON.stringify({ status: "done", pullRequest: { title: "rig change"
 /** A question row acts only for an item the rig named, by a file that holds the option the owner picks; any other waits. */
 const pickFile = join(rig, `go-ask-${env.HUM_RUN?.split(" ")[1] ?? ""}`);
 
+/** What a row the owner talks to hands over, by its step: the order the owner took, the choices shape named, and a pick. */
+const TALKED = {
+	ideate: { order: { title: "Write the note", ask: "Write docs/note.md.", done: "docs/note.md exists.", limits: ["Change no other file."] } },
+	choices: {
+		choices: [
+			{ title: "a tool", detail: "which tool writes it", role: "find" },
+			{ title: "speed", detail: "inline or lazy", role: "spike" },
+			{ title: "look", detail: "a card or a banner", role: "draft" },
+			{ title: "tone", detail: "plain or warm", pick: "plain" },
+		],
+	},
+	pick: { pick: "the first", found: "the rig measured it" },
+};
+
+/** What such a row saves before it asks the owner, which hum must not take. */
+const EARLY = {
+	ideate: { order: { title: "early", ask: "early", done: "early", limits: [] } },
+	choices: { choices: [{ title: "early", detail: "early", pick: "early" }] },
+	pick: { pick: "early", found: "early" },
+};
+
+/**
+ * A row the owner talks to: its first turn ends with no answer, as a turn that waits for the owner's words does. Its
+ * second saves its early answer before it asks, then asks with Claude Code's question and hands over what its step says.
+ */
+const talkRow = (step: keyof typeof TALKED) => async (): Promise<void> => {
+	await turn(() => undefined);
+	await Bun.sleep(1500);
+	await turn(async () => {
+		answer(JSON.stringify(EARLY[step]));
+		await Bun.sleep(1500);
+		hook("PermissionRequest", QUESTION);
+		await Bun.sleep(1000);
+		answer(JSON.stringify(TALKED[step]));
+	});
+};
+
 const SCENARIOS = new Map<string, () => Promise<void>>(Object.entries({
+	ideate: talkRow("ideate"),
+	"shape": talkRow("choices"),
+	find: talkRow("pick"),
+	spike: talkRow("pick"),
+	draft: talkRow("pick"),
+	plan: async () => undefined,
 	finish: () => turn(() => answer(DONE)),
 	fix: () =>
 		turn(() => {

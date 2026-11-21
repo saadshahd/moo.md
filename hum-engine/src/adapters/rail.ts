@@ -14,6 +14,9 @@ export const RailNode = z.looseObject({
 
 export type RailNode = z.infer<typeof RailNode>;
 
+/** The status of a row that waits on the owner. */
+export const NEEDS_YOU = "needs-you";
+
 /** The longest name roundup gives a Rail row. */
 const RAIL_NAME_LENGTH = 42;
 

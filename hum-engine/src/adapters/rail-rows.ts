@@ -12,9 +12,9 @@ import { type RunOutcome, type RunRequest, type Runner } from "./claude-p.ts";
 import { gitIn } from "./git.ts";
 import { failedWith, finishedOf, hookReports, runSettings, STOP_EVENT, succeededWith, tokensOf } from "./hooked-run.ts";
 import { limitOf, savedLimitUntil, settleLimit } from "./limit.ts";
-import { itemWorkstream, RailNode, railName, railTree } from "./rail.ts";
+import { itemWorkstream, NEEDS_YOU, RailNode, railName, railTree } from "./rail.ts";
 import { HUM_EXT, type RoundupCall, type RoundupClient, RoundupRefusal } from "./roundup-rpc.ts";
-import { keepSchema, type RunFolder, runFolder, runFolders, runKey, takeAnswer } from "./run-answer.ts";
+import { askedSince, keepSchema, markAsked, type RunFolder, runFolder, runFolders, runKey, takeAnswer } from "./run-answer.ts";
 import { readTranscript, type RunTranscript } from "./transcript.ts";
 
 const RowRecord = z.strictObject({ id: z.string(), name: z.string() });
@@ -75,7 +75,7 @@ export type RowConfig = Pick<HumConfig, "deniedRunCommands" | "runAutoMode" | "c
 export type RowStart = {
 	readonly name: string;
 	readonly folder: RunFolder;
-	readonly request: Pick<RunRequest, "prompt" | "schema" | "cwd" | "model" | "effort" | "env">;
+	readonly request: Pick<RunRequest, "prompt" | "schema" | "cwd" | "model" | "effort" | "env" | "talk">;
 	readonly workstream: string;
 	/** The row adopts its run's slot; a row that changes no file starts in the Project's own folder instead. */
 	readonly adopt: boolean;
@@ -123,7 +123,10 @@ const launchModel = async (call: RoundupCall, model: string): Promise<string | n
 	return named;
 };
 
-/** Starts a row and records it in its run's folder. Settings carry the run's key, so they reach no Pad, Message, argv or order. */
+/**
+ * Starts a row and records it in its run's folder. Settings carry the run's key, so they reach no Pad, Message, argv or
+ * order. A row the owner talks to is shown from its start; every other row starts folded.
+ */
 export const startRow = async (call: RoundupCall, { stateDir, config }: { readonly stateDir: string; readonly config: RowConfig }, start: RowStart): Promise<RailNode> => {
 	const { name, folder, request, workstream } = start;
 
@@ -132,7 +135,7 @@ export const startRow = async (call: RoundupCall, { stateDir, config }: { readon
 	const env = { ...request.env, HUM_RUN: name, HUM_RUN_KEY: runKey(stateDir, name), HUM_RUN_DIR: folder.root };
 	const place = await placeOf(config, start);
 
-	const node = RailNode.parse(await call(place.method, { ...place.params, parent: workstream, order: orderOf(name), model: await launchModel(call, request.model), effort: request.effort, settings: rowSettings(config, folder, env, request.model), visibility: "internal" }));
+	const node = RailNode.parse(await call(place.method, { ...place.params, parent: workstream, order: orderOf(name), model: await launchModel(call, request.model), effort: request.effort, settings: rowSettings(config, folder, env, request.model), visibility: request.talk === true ? "shown" : "internal" }));
 
 	atomicWrite(folder.row, JSON.stringify({ id: node.id, name }));
 	await call("rail.rename", { id: node.id, name: railName(name) });
@@ -157,7 +160,10 @@ type Reading = { readonly node: RailNode | undefined; readonly transcript: RunTr
  * the owner sees it, its diff and its questions. The run's prompt rides in a Pad, and its answer comes back through
  * `hum run-answer`, which counts only under the run's key. A row found alive under the run's name is taken over, never
  * started twice, and one hum stops on its way out is left running for the next hum to take over. A row that ends a turn with no answer gets one note; a second such turn, or no new turn within the
- * configured wait, stops it and fails the run. A cheap model call and a run with no name go to `fallback`.
+ * configured wait, stops it and fails the run. A run the owner talks to starts shown, in the run's working copy
+ * without adopting it, so several such rows run there side by side; it gets no note, since it waits on the owner
+ * through its turns, and its answer counts only once roundup showed the row waiting on the owner. A cheap model call
+ * and a run with no name go to `fallback`.
  */
 export const railRunner = ({ call, state, config, fallback, now }: RowsOptions): Runner => {
 	const pollMs = config.backgroundPollSeconds * SECOND_MS;
@@ -203,8 +209,20 @@ export const railRunner = ({ call, state, config, fallback, now }: RowsOptions):
 
 	const watch = async (request: RunRequest, name: string, row: string, folder: RunFolder): Promise<RunOutcome> => {
 		const key = runKey(state.dir, name);
+		const talks = request.talk === true;
 		let session: string | undefined;
 		let announced = false;
+
+		/** The answer the row saved; a row the owner talks to counts only one saved once roundup showed it waiting on the owner. */
+		const answerAt = (node: RailNode | undefined): Json | undefined => {
+			if (!talks) return takeAnswer(folder, key, name);
+
+			if (node?.status?.kind === NEEDS_YOU) markAsked(folder, node.status.since ?? now());
+
+			const since = askedSince(folder);
+
+			return since === undefined ? undefined : takeAnswer(folder, key, name, since);
+		};
 
 		const ended = (reading: Reading, why: string): RunOutcome => finishedOf(reading.sessionId, reading.transcript, failedWith(why, ROW_STOPPED));
 
@@ -212,8 +230,8 @@ export const railRunner = ({ call, state, config, fallback, now }: RowsOptions):
 			/* hum itself stops here, as when it shuts down: the row and its folder stay, so the next hum takes the row over. */
 			if (request.signal?.aborted) return { kind: "stopped" };
 
-			const answer = takeAnswer(folder, key, name);
 			const reading = await readRow(row, folder);
+			const answer = answerAt(reading.node);
 
 			if (session === undefined && reading.sessionId !== undefined) request.onSession?.((session = reading.sessionId));
 
@@ -229,7 +247,7 @@ export const railRunner = ({ call, state, config, fallback, now }: RowsOptions):
 			}
 
 			if (reading.node === undefined || reading.node.status?.kind === ENDED) {
-				const late = takeAnswer(folder, key, name);
+				const late = answerAt(reading.node);
 
 				return late === undefined ? ended(reading, `the row "${railName(name)}" ended before it answered`) : finishedOf(reading.sessionId, reading.transcript, succeededWith(late));
 			}
@@ -254,9 +272,9 @@ export const railRunner = ({ call, state, config, fallback, now }: RowsOptions):
 				return ended(reading, reading.transcript.apiError);
 			}
 
-			const mark = noted(folder);
+			const mark = talks ? undefined : noted(folder);
 
-			if (mark === undefined && reading.stops > 0) await note(row, name, folder, reading.stops);
+			if (!talks && mark === undefined && reading.stops > 0) await note(row, name, folder, reading.stops);
 
 			if (mark !== undefined && reading.stops > mark.stops) {
 				await stop(row);
@@ -301,7 +319,7 @@ export const railRunner = ({ call, state, config, fallback, now }: RowsOptions):
 
 		try {
 			const workstream = await itemWorkstream(call, item);
-			const row = (await liveRow(folder, name, workstream)) ?? (await startRow(call, { stateDir: state.dir, config }, { name, folder, request, workstream, adopt: true })).id;
+			const row = (await liveRow(folder, name, workstream)) ?? (await startRow(call, { stateDir: state.dir, config }, { name, folder, request, workstream, adopt: request.talk !== true })).id;
 
 			state.faults.clear({ code: ROW_REFUSED_CODE });
 
@@ -325,7 +343,7 @@ export const railRunner = ({ call, state, config, fallback, now }: RowsOptions):
 		return new Set(rows.filter(({ id }) => live.has(id)).map(({ name }) => name));
 	};
 
-	return { run, limitedUntil: fallback.limitedUntil, liveRuns };
+	return { run, limitedUntil: fallback.limitedUntil, liveRuns, talks: true };
 };
 
 /**
