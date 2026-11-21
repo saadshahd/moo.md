@@ -38,6 +38,7 @@ export type RoundupClient = {
 	readonly open: () => Promise<void>;
 	/** The last Event this client handed over, else the head it began following from; undefined before it follows. */
 	readonly position: () => number | undefined;
+	/** Ends the connection for good: a later call fails, and opens none. */
 	readonly close: () => void;
 };
 
@@ -58,12 +59,13 @@ const messageOf = (line: string): Json | undefined => {
 /**
  * JSON-RPC on the Daemon's socket, one message per line, claiming the Ext name `ext`, or no name at all when it is
  * null. The connection opens at the first call and again at the next call after it drops; a call in flight when it
- * drops fails. With `follow`, each connection subscribes to the Event log and hands every Event to it, each from the
- * last one handed over, so no Event is missed across a drop.
+ * drops fails, and every call fails once the client is closed. With `follow`, each connection subscribes to the Event
+ * log and hands every Event to it, each from the last one handed over, so no Event is missed across a drop.
  */
 export const roundupRpc = (socket: string, ext: string | null = HUM_EXT, follow?: Follow): RoundupClient => {
 	let open: Promise<Connection> | undefined;
 	let seen = follow?.from;
+	const closing = new AbortController();
 
 	const handOver = (event: RoundupEvent): void => {
 		seen = event.seq;
@@ -117,12 +119,15 @@ export const roundupRpc = (socket: string, ext: string | null = HUM_EXT, follow?
 			});
 		});
 
-	const opened = (): Promise<Connection> =>
-		(open ??= connect().catch((error: Error) => {
+	const opened = async (): Promise<Connection> => {
+		closing.signal.throwIfAborted();
+
+		return (open ??= connect().catch((error: Error) => {
 			open = undefined;
 
 			throw error;
 		}));
+	};
 
 	const call: RoundupCall = async (method, params) => {
 		const { peer } = await opened();
@@ -141,6 +146,7 @@ export const roundupRpc = (socket: string, ext: string | null = HUM_EXT, follow?
 		open: async () => void (await opened()),
 		position: () => seen,
 		close: () => {
+			closing.abort(new Error(`the client of roundup's socket ${socket} is closed`));
 			void open?.then(({ conn }) => conn.end(), () => {});
 			open = undefined;
 		},

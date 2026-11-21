@@ -25,7 +25,7 @@ test("wakes that arrive during a tick make one more tick, however many arrive", 
 	};
 
 	const stop = new AbortController();
-	const life = runLifecycle({ tick, stopRuns: async () => {}, tickIntervalMs: HOUR_MS, drainTimeoutMs: HOUR_MS }, stop.signal);
+	const life = runLifecycle({ tick, stopWork: async () => {}, tickIntervalMs: HOUR_MS, drainTimeoutMs: HOUR_MS }, stop.signal);
 
 	try {
 		for (let wake = 0; wake < 20; wake++) life.wake();
@@ -42,27 +42,41 @@ test("wakes that arrive during a tick make one more tick, however many arrive", 
 	expect(await life.ended).toEqual({ reason: "stopped" });
 });
 
-test("a draining worker keeps ticking, stops its runs once the drain timeout passes, and exits when a tick says so", async () => {
+test("a draining worker keeps ticking until the drain timeout passes, then stops its work and exits for the update", async () => {
 	const stopped: number[] = [];
-	const results = [DRAINING, DRAINING, DRAINING];
 	let ticks = 0;
 
-	const tick = async (): Promise<TickResult> => (stopped.length > 0 ? EXIT : (results[ticks++] ?? DRAINING));
+	const tick = async (): Promise<TickResult> => {
+		ticks++;
 
-	const life = runLifecycle({ tick, stopRuns: async () => void stopped.push(ticks), tickIntervalMs: 5, drainTimeoutMs: 40 });
+		return DRAINING;
+	};
+
+	const life = runLifecycle({ tick, stopWork: async () => void stopped.push(ticks), tickIntervalMs: 5, drainTimeoutMs: 40 });
 
 	expect(await life.ended).toEqual({ reason: "the engine changed" });
 	expect(stopped).toHaveLength(1);
 	expect(ticks).toBeGreaterThan(1);
 });
 
-test("stop stops the runs, then ends", async () => {
+test("a draining worker exits for the update once a tick finds nothing left to wait for, with no work to stop", async () => {
+	const stopped: string[] = [];
+	const results = [DRAINING, EXIT];
+	let ticks = 0;
+
+	const life = runLifecycle({ tick: async () => results[ticks++] ?? DRAINING, stopWork: async () => void stopped.push("work"), tickIntervalMs: 5, drainTimeoutMs: HOUR_MS });
+
+	expect(await life.ended).toEqual({ reason: "the engine changed" });
+	expect(stopped).toEqual([]);
+});
+
+test("stop stops the worker's work, then ends", async () => {
 	const stopped: string[] = [];
 	const stop = new AbortController();
-	const life = runLifecycle({ tick: async () => RAN, stopRuns: async () => void stopped.push("runs"), tickIntervalMs: HOUR_MS, drainTimeoutMs: HOUR_MS }, stop.signal);
+	const life = runLifecycle({ tick: async () => RAN, stopWork: async () => void stopped.push("work"), tickIntervalMs: HOUR_MS, drainTimeoutMs: HOUR_MS }, stop.signal);
 
 	stop.abort();
 
 	expect(await life.ended).toEqual({ reason: "stopped" });
-	expect(stopped).toEqual(["runs"]);
+	expect(stopped).toEqual(["work"]);
 });

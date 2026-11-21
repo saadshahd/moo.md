@@ -8,7 +8,7 @@ import { ROW_REFUSED_CODE } from "../src/adapters/rail-rows.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { type ProgramEntry, programEntry, programFields } from "../src/service/program.ts";
 import { writeSetup } from "../src/setup/write.ts";
-import { readStatus } from "../src/status/file.ts";
+import { readHeartbeat, readStatus } from "../src/status/file.ts";
 import type { Status } from "../src/status/format.ts";
 import { SECOND_MS } from "../src/time.ts";
 import { installedSkills } from "./fixtures/config.ts";
@@ -43,8 +43,8 @@ let entry: Required<ProgramEntry>;
 let printed: unknown;
 let item: string;
 
-const waitFor = async <T>(read: () => Promise<T | undefined>, what: string, ms = 90_000): Promise<T> => {
-	for (const deadline = Date.now() + ms; ; await Bun.sleep(200)) {
+const waitFor = async <T>(read: () => Promise<T | undefined>, what: string, ms = 90_000, everyMs = 200): Promise<T> => {
+	for (const deadline = Date.now() + ms; ; await Bun.sleep(everyMs)) {
 		const found = await read();
 
 		if (found !== undefined) return found;
@@ -82,6 +82,20 @@ const isAlive = (pid: string): boolean => {
 
 /** The status hum's worker last wrote. */
 const humStatus = () => readStatus(join(repo, ".git", "hum", "status.json"));
+
+/** The heartbeat hum's worker last wrote, as it ends a tick. */
+const humHeartbeat = () => readHeartbeat(join(repo, ".git", "hum", "heartbeat.json"));
+
+/** How many start checks hum's workers made: each `hum work` makes one as it starts, before its first tick. */
+const startChecks = (): number => readFileSync(join(rig.dir, "stub-p.log"), "utf8").split("\n").filter((line) => line === "ok").length;
+
+/** The Program's Terminal once roundup started the Program again in a Terminal other than `was`. */
+const programBack = (was: string, what: string) =>
+	waitFor(async () => {
+		const terminal = await programTerminal();
+
+		return terminal && terminal.id !== was ? terminal : undefined;
+	}, what);
 
 /** Whether the status shows the rig's item in flight in its build. */
 const isBuilding = ({ inFlight }: Status) => inFlight.some((flight) => flight.item === item && flight.state === "building");
@@ -167,11 +181,7 @@ test.skipIf(!live)(
 
 		process.kill(before.program_pid ?? 0, "SIGTERM");
 
-		await waitFor(async () => {
-			const terminal = await programTerminal();
-
-			return terminal && terminal.id !== before.id ? terminal : undefined;
-		}, "hum serve back");
+		await programBack(before.id, "hum serve back");
 
 		const backAt = Date.now();
 
@@ -209,6 +219,34 @@ test.skipIf(!live)(
 
 		expect(after.status?.label).toMatch(/^#\d+ rig docs item/u);
 		expect(workers.filter(isAlive)).toEqual([]);
+	},
+	RIG_MS,
+);
+
+test.skipIf(!live)(
+	"a hum serve stopped before its worker's first tick ended stops that worker and exits, and roundup starts it again",
+	async () => {
+		await rig.stopProgram();
+
+		const checks = startChecks();
+		const restartedAt = Date.now();
+
+		await startProgram(entry);
+		await waitFor(async () => (startChecks() > checks ? true : undefined), "its worker's start check", 90_000, 10);
+
+		const starting = await waitFor(programTerminal, "the Program's Terminal");
+		const [worker] = await childrenOf(starting.program_pid);
+		const beat = humHeartbeat();
+
+		process.kill(starting.program_pid ?? 0, "SIGTERM");
+
+		expect(worker).toBeDefined();
+		expect(beat?.time).toBeLessThan(restartedAt);
+
+		await programBack(starting.id, "hum serve back after a stop before its worker's first tick ended");
+
+		expect([worker ?? "no worker"].filter(isAlive)).toEqual([]);
+		expect((await buildRows()).filter(({ status }) => status?.kind !== "done")).toHaveLength(1);
 	},
 	RIG_MS,
 );

@@ -11,8 +11,8 @@ export type Exit = { readonly reason: string };
 
 export type LifecycleOptions = {
 	readonly tick: () => Promise<TickResult>;
-	/** Stops every run in flight and resolves once they have ended. */
-	readonly stopRuns: () => Promise<void>;
+	/** Stops the worker's work and resolves once all of it has ended; the worker exits next. */
+	readonly stopWork: () => Promise<void>;
 	readonly tickIntervalMs: number;
 	readonly drainTimeoutMs: number;
 };
@@ -26,7 +26,7 @@ const Context = z.object({ woken: z.boolean(), reason: z.string() });
 
 type Context = z.infer<typeof Context>;
 
-const STOPPED: Exit = { reason: "stopped" };
+const STOPPED = "stopped";
 
 /** The transition after a tick: to the phase its result names, else straight into the next tick when woken, else to rest. */
 const afterTick = (phase: Exclude<Phase, "exited">, context: Context, result: TickResult) => {
@@ -43,14 +43,15 @@ const afterTick = (phase: Exclude<Phase, "exited">, context: Context, result: Ti
 /**
  * The worker's life as a machine. It ticks, rests for the tick interval, and ticks again at once when woken; a
  * wake that arrives during a tick makes one more tick, however many arrive. A tick that sees an update moves it to
- * draining, where it still ticks, so claims are renewed and the heartbeat stays fresh, and the runs still going
- * are stopped once the drain timeout passes. It ends when a tick finds nothing left to wait for, or on `stop`.
+ * draining, where it still ticks, so claims are renewed and the heartbeat stays fresh. It ends when a tick finds nothing
+ * left to wait for. Past the drain timeout, or on `stop`, it stops its work and ends once that has: for the update,
+ * or as stopped.
  */
-const lifecycleMachine = ({ tick, stopRuns, tickIntervalMs, drainTimeoutMs }: LifecycleOptions) => {
+const lifecycleMachine = ({ tick, stopWork, tickIntervalMs, drainTimeoutMs }: LifecycleOptions) => {
 	const worker = setup({
 		schemas: { context: Context, events: { wake: z.object({}), stop: z.object({}) } },
 		delays: { tickInterval: tickIntervalMs, drainTimeout: drainTimeoutMs },
-		actors: { tick: createAsyncLogic({ run: tick }), stopRuns: createAsyncLogic({ run: stopRuns }) },
+		actors: { tick: createAsyncLogic({ run: tick }), stopWork: createAsyncLogic({ run: stopWork }) },
 	});
 
 	const cycle = (phase: Exclude<Phase, "exited">) =>
@@ -70,20 +71,19 @@ const lifecycleMachine = ({ tick, stopRuns, tickIntervalMs, drainTimeoutMs }: Li
 		id: "worker",
 		context: { woken: false, reason: "" },
 		initial: "serving",
-		on: { stop: { target: "#worker.stopping" } },
+		on: { stop: ({ context }: { context: Context }) => ({ target: "#worker.stopping", context: { ...context, reason: STOPPED } }) },
 		states: {
 			serving: { initial: "ticking", states: cycle("serving") },
-			draining: { initial: "ticking", states: cycle("draining"), after: { drainTimeout: (_, enq) => void enq(() => void stopRuns()) } },
-			stopping: { on: { stop: undefined }, invoke: { src: "stopRuns", onDone: { target: "stopped" } } },
+			draining: { initial: "ticking", states: cycle("draining"), after: { drainTimeout: { target: "#worker.stopping" } } },
+			stopping: { on: { stop: undefined }, invoke: { src: "stopWork", onDone: { target: "exited" } } },
 			exited: { type: "final", output: ({ context }): Exit => ({ reason: context.reason }) },
-			stopped: { type: "final", output: STOPPED },
 		},
 	});
 };
 
 export type Lifecycle = { readonly wake: () => void; readonly ended: Promise<Exit> };
 
-/** Starts the machine. `stop` ends it after the runs have stopped; `wake` asks for a tick now. */
+/** Starts the machine. `stop` ends it once the worker's work has stopped; `wake` asks for a tick now. */
 export const runLifecycle = (options: LifecycleOptions, stop?: AbortSignal): Lifecycle => {
 	const actor = createActor(lifecycleMachine(options)).start();
 	const halt = () => actor.send({ type: "stop" });

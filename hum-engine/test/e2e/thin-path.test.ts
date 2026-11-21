@@ -1,6 +1,6 @@
 import { docsJudge, scriptedJudge, SOUND } from "../fixtures/judge.ts";
 import type { RunOutcome, Runner, RunRequest } from "../../src/adapters/claude-p.ts";
-import { finishedOf, succeededWith } from "../../src/adapters/hooked-run.ts";
+import { failedWith, finishedOf, succeededWith } from "../../src/adapters/hooked-run.ts";
 import { readTranscript } from "../../src/adapters/transcript.ts";
 import type { z } from "zod";
 import { choicesAnswer, type IdeateAnswer, type PickAnswer } from "../../src/decide/talk.ts";
@@ -496,6 +496,40 @@ test("a pass hum stops mid-run keeps the run open, so the next pass asks for tha
 	expect(new Set(builds).size).toBe(1);
 });
 
+test("a pass stopped mid-run ends only once its run has", async () => {
+	const w = await world({ script: [{}, NOTE] });
+	const id = w.repo.seed("Write the note");
+	const real = w.thinPath().runner;
+	const building = Promise.withResolvers<void>();
+	const finishing = Promise.withResolvers<void>();
+	const ended: string[] = [];
+
+	const runner: Runner = {
+		...real,
+		run: async (request) => {
+			if (!request.name?.includes(" build ")) return real.run(request);
+
+			building.resolve();
+			await new Promise((resolve) => request.signal?.addEventListener("abort", resolve, { once: true }));
+			await finishing.promise;
+			ended.push("run");
+
+			return { kind: "stopped" };
+		},
+	};
+
+	const stop = new AbortController();
+	const passed = runThinPath(w.thinPath({ runner, signal: stop.signal })).finally(() => ended.push("pass"));
+
+	await building.promise;
+	stop.abort();
+	await Promise.race([passed, Bun.sleep(1000)]);
+	finishing.resolve();
+
+	expect(await passed).toEqual({ outcome: "lost", item: id });
+	expect(ended).toEqual(["run", "pass"]);
+});
+
 test("a claim another worker holds is lost, and no run starts", async () => {
 	const w = await world({ script: [{}, NOTE] });
 	const id = w.repo.seed("Write the note");
@@ -810,7 +844,7 @@ const SETTLED = {
 	"draft 3": async () => said({ pick: "a card", found: "two drafts, a card and a banner" }),
 } satisfies Talks;
 
-const runName = ({ name }: RunRequest): string | undefined => /^hum \S+ (.+) #\d+$/.exec(name ?? "")?.[1];
+const runName = ({ name }: Pick<RunRequest, "name">): string | undefined => /^hum \S+ (.+) #\d+$/.exec(name ?? "")?.[1];
 
 /** A runner whose runs the owner can talk with, as Rail rows are: a talk run ends as `talks` says by its name, and every other run goes to `rest`. */
 const talkingRunner = (rest: Runner, talks: Talks) => {
@@ -879,6 +913,37 @@ test("where runs talk with the owner, a feature opens with ideate and shape, who
 	expect(plan?.prompt).toContain(ORDER.ask);
 	expect(plan?.prompt).toContain("- How it looks: a card. two drafts, a card and a banner");
 	expect(plan?.prompt).toContain("- Its tone: plain");
+});
+
+test("a pick row that fails parks its item stuck, naming the row, and leaves its sibling rows open: once the owner runs it again, the next pass takes each sibling over by its name, and only the failed choice starts a new row", async () => {
+	let find: RunOutcome = finishedOf(undefined, readTranscript(""), failedWith('the row "find 1" ended before it answered', "stopped"));
+	const w = await world({ script: [{}, NOTE] });
+	const id = w.repo.seed("Write the note");
+	const waits = async (): Promise<RunOutcome> => ({ kind: "waiting" });
+	const talk = talkingRunner(w.thinPath().runner, { ...SETTLED, "find 1": async () => find, "spike 2": waits, "draft 3": waits });
+	const copy = talkCopyIn(tempDir("talk"));
+	const pass = () => runThinPath(w.thinPath({ judge: featureJudge, runner: talk.runner, talkCopy: copy.talkCopy, itemId: id }));
+
+	const asks = (run: string) => {
+		const named = talk.asked.filter((request) => runName(request) === run).map(({ name }) => name);
+
+		return { asks: named.length, names: new Set(named).size };
+	};
+
+	expect(await pass()).toEqual({ outcome: "stuck", item: id, detail: expect.stringContaining('the row "find 1" ended before it answered') });
+	expect(w.state.parked.get(id)).toMatchObject({ why: "stuck" });
+	expect(w.state.faults.list().filter(({ item }) => item === id).map(({ code }) => code)).toContain("item-stuck");
+
+	find = said({ pick: "our own words", found: "no tool writes notes" });
+	w.state.parked.remove(id);
+	w.state.items.remove(id);
+
+	expect(await pass()).toEqual({ outcome: "waiting", item: id });
+	expect([asks("find 1"), asks("spike 2"), asks("draft 3")]).toEqual([
+		{ asks: 2, names: 2 },
+		{ asks: 2, names: 1 },
+		{ asks: 2, names: 1 },
+	]);
 });
 
 test("a part split from an item the owner talked through keeps the work order and the picks they settled", async () => {

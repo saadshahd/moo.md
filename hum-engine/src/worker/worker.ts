@@ -211,6 +211,8 @@ export class Worker {
 	readonly #unread = new Set<string>();
 	readonly #merged: Status["merged"] = [];
 	readonly #wakes = new EventTarget();
+	/** Aborted once the worker stops its work: nothing new starts beside the tick after it, and every pass in flight stops. */
+	readonly #halt = new AbortController();
 	readonly #latest: () => Promise<string | undefined>;
 	readonly #ciTick: () => Promise<number | undefined>;
 	readonly #judge: ModelCall;
@@ -219,8 +221,8 @@ export class Worker {
 	#updating: string | undefined;
 	/** The scores that gate on a judge that changed since they were measured: the config is the worker's for its life. */
 	readonly #stale: readonly StaleScore[];
-	/** Stops the measurement of changed judges while one runs. */
-	#remeasuring: AbortController | undefined;
+	/** Whether a measurement of changed judges runs. */
+	#measuring = false;
 	#remeasureAt = Number.NEGATIVE_INFINITY;
 
 	get config(): Config {
@@ -260,7 +262,7 @@ export class Worker {
 		return [...this.#inFlight.keys()];
 	}
 
-	/** Resolves when no pass runs and no slot upkeep a pass asked for is left: a returned slot is ready again. */
+	/** Resolves when no tick or pass runs and no slot upkeep is left: a returned slot is ready again. */
 	async idle(): Promise<void> {
 		await this.#pool.onIdle();
 		await this.#o.slots?.idle();
@@ -556,13 +558,24 @@ export class Worker {
 		return { outcome: "waiting", item: o.itemId };
 	}
 
-	#begin(id: string, known: Known, t: number): void {
+	/** Starts `task` beside the tick, where `idle` waits for it, and says whether it started: once the worker stops its work, nothing new does. */
+	#beside(task: () => Promise<void>): boolean {
+		if (this.#halt.signal.aborted) return false;
+
+		void this.#pool.add(task);
+
+		return true;
+	}
+
+	/** Begins the item's pass beside the tick, stopped when its claim is lost or the worker stops its work; says whether it began. */
+	#begin(id: string, known: Known, t: number): boolean {
 		const { state, config, adapters } = this.#o;
 		const abort = new AbortController();
 
-		this.#inFlight.set(id, { abort, since: t, known });
-		void this.#pool.add(() =>
-			this.#pass({
+		return this.#beside(() => {
+			this.#inFlight.set(id, { abort, since: t, known });
+
+			return this.#pass({
 				workSource: adapters.workSource,
 				questions: adapters.questions,
 				state,
@@ -578,7 +591,7 @@ export class Worker {
 				talkCopy: this.#o.talkCopy,
 				dir: this.#o.dir,
 				itemId: ItemId.parse(id),
-				signal: abort.signal,
+				signal: AbortSignal.any([abort.signal, this.#halt.signal]),
 				gate: this.#gate,
 				now: this.#now,
 				runnerVariables: this.#o.runnerVariables,
@@ -590,8 +603,8 @@ export class Worker {
 			}).then(
 				(result) => this.#ended(id, known, result),
 				(error: Error) => this.#failed(id, error),
-			),
-		);
+			);
+		});
 	}
 
 	#ended(id: string, known: Known, result: ThinResult): void {
@@ -606,7 +619,7 @@ export class Worker {
 				mergedAt: this.#now(),
 			});
 
-		if (result.outcome === "merged" && this.#o.ciJob === undefined) void this.#pool.add(() => this.#checkBase(id));
+		if (result.outcome === "merged" && this.#o.ciJob === undefined) this.#beside(() => this.#checkBase(id));
 
 		if ((result.outcome === "held" && this.#o.state.landings.get(id) !== undefined) || doesStartOver(result)) this.#resuming.add(id);
 
@@ -652,7 +665,7 @@ export class Worker {
 		if (t - this.#loopAt < config.hum.loopIntervalSeconds * SECOND_MS) return;
 
 		this.#loopAt = t;
-		void this.#pool.add(() =>
+		this.#beside(() =>
 			this.#runLoop().catch((error: Error) => {
 				state.faults.raise({ code: "review-loop", cause: `The review-note loop failed: ${error.message}`.slice(0, ERROR_EXCERPT), fix: "It runs again next interval; look at the cause if this card stays." });
 			}),
@@ -717,26 +730,27 @@ export class Worker {
 
 		if (remeasure === undefined) return this.#showJudgeCard(gating, "Run `bunx hum setup measure` where Claude Code is signed in and commit .hum/hum.json; CI cannot keep a rate it measures.");
 
-		if (this.#remeasuring !== undefined || t - this.#remeasureAt < config.hum.loopIntervalSeconds * SECOND_MS || runner.limitedUntil() > t) return;
+		if (this.#measuring || t - this.#remeasureAt < config.hum.loopIntervalSeconds * SECOND_MS || runner.limitedUntil() > t) return;
 
-		const abort = new AbortController();
+		const { signal } = this.#halt;
 		const failed = (why: string) => this.#showJudgeCard(`${gating} Measuring them again failed: ${why}`, "hum tries again after loopIntervalSeconds; `bunx hum setup measure` measures them now.");
 
 		this.#remeasureAt = t;
-		this.#remeasuring = abort;
-		void this.#pool.add(async () => {
+		this.#beside(async () => {
+			this.#measuring = true;
+
 			try {
 				for (const measurement of byModel(stale)) {
-					if (abort.signal.aborted) return;
+					if (signal.aborted) return;
 
-					const measured = await remeasure({ ...measurement, runs: config.hum.evalRuns }, abort.signal);
+					const measured = await remeasure({ ...measurement, runs: config.hum.evalRuns }, signal);
 
-					if (!measured.ok && !abort.signal.aborted) failed(`${measurement.model}: ${measured.why}`);
+					if (!measured.ok && !signal.aborted) failed(`${measurement.model}: ${measured.why}`);
 				}
 			} catch (error) {
 				failed(error instanceof Error ? error.message : String(error));
 			} finally {
-				this.#remeasuring = undefined;
+				this.#measuring = false;
 			}
 		});
 	}
@@ -754,10 +768,9 @@ export class Worker {
 		this.wake();
 	}
 
-	async #stopRuns(): Promise<void> {
-		for (const run of this.#inFlight.values()) run.abort.abort();
-
-		this.#remeasuring?.abort();
+	/** Stops the worker's work: nothing new starts, every pass and measurement in flight stops, and it resolves once they and the tick in flight have ended. */
+	async #stopWork(): Promise<void> {
+		this.#halt.abort();
 
 		await this.idle();
 	}
@@ -886,18 +899,22 @@ export class Worker {
 		return start.flatMap(({ id }) => {
 			const known = knownOf.get(id);
 
-			if (!known) return [];
+			if (!known || !this.#begin(id, known, t)) return [];
 
 			this.#answered.delete(id);
 			this.#timedOut.delete(id);
 			this.#resuming.delete(id);
-			this.#begin(id, known, t);
 
 			return [id];
 		});
 	}
 
-	async tick(): Promise<TickResult> {
+	/** One tick, which `idle` waits for as it does for the work the tick starts. */
+	tick(): Promise<TickResult> {
+		return this.#pool.add(() => this.#tick());
+	}
+
+	async #tick(): Promise<TickResult> {
 		const { state, config } = this.#o;
 		const t = this.#now();
 
@@ -918,7 +935,7 @@ export class Worker {
 		if (update !== undefined) {
 			await this.#publish(t, signature, update);
 
-			return this.#inFlight.size === 0 && this.#remeasuring === undefined ? { kind: "exit", reason: update } : { kind: "draining", reason: update };
+			return this.#inFlight.size === 0 && !this.#measuring ? { kind: "exit", reason: update } : { kind: "draining", reason: update };
 		}
 
 		const sources = await this.#readSources();
@@ -954,7 +971,7 @@ export class Worker {
 		const life = runLifecycle(
 			{
 				tick: () => this.tick(),
-				stopRuns: () => this.#stopRuns(),
+				stopWork: () => this.#stopWork(),
 				tickIntervalMs: config.hum.tickIntervalSeconds * SECOND_MS,
 				drainTimeoutMs: config.hum.drainTimeoutSeconds * SECOND_MS,
 			},

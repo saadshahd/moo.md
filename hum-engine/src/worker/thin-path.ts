@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import PQueue from "p-queue";
 import { z } from "zod";
 import { type AnyActor, type AnyActorLogic, createActor, createAsyncLogic } from "xstate";
 import type { Holder, Item, ItemId, Question, Questions, ThreadEntry, WorkSource } from "../adapter-api.ts";
@@ -482,9 +483,9 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	const { version } = kind.machine;
 	const maxFixes = config.hum.maxFixRuns;
 	const result = Promise.withResolvers<ThinResult>();
+	/** The pass's agent runs: the pass ends only once they have, so no run outlives it. */
+	const runs = new PQueue();
 
-	// The worker lost the claim or is exiting for an update: the run stops, and its actor with it.
-	d.signal?.addEventListener("abort", () => result.resolve({ outcome: "lost", item: id }), { once: true });
 	// The total over all runs is saved; the cap counts what the item spent since the owner last answered.
 	const tally = tallyOf(state, id);
 
@@ -610,7 +611,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		const tier = await tierFor(role);
 		const named = { name: `hum ${id} ${run} #${key.attempt}`, sessionId: d.newSessionId() };
 
-		const { begun, outcome } = await answerOnce(state, { key, launch: named, machineVersion: version, question: judged && { prompt, ...tier, ...judged } }, async (begun) => {
+		const { begun, outcome } = await runs.add(() => answerOnce(state, { key, launch: named, machineVersion: version, question: judged && { prompt, ...tier, ...judged } }, async (begun) => {
 			const lease = await d.gate?.enter(prefix, signal);
 
 			const ran = await runner
@@ -635,7 +636,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			if (!isPaused(ran)) tally.spend(ran.tokens);
 
 			return ran;
-		});
+		}));
 
 		if (!isPaused(outcome)) begun.end(held.length === 0 ? undefined : outcome.kind === "finished" ? rulesUsed(outcome, held) : []);
 
@@ -1049,10 +1050,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		actor = restored.value;
 		// The wait it was saved in is already handled; only what follows the answer needs a reaction.
 		handled = String(actor.getSnapshot().value);
-	} else {
-		state.events.add(machineStarted({ itemId: id, machineVersion: version, afresh: d.restarted }));
-		actor = createActor(kindMachine(kind, invokedSources(kind, nothingRuns, sources), reads));
-	}
+	} else actor = createActor(kindMachine(kind, invokedSources(kind, nothingRuns, sources), reads));
 
 	const react = async (value: string) => {
 		if (handled === value) return;
@@ -1094,6 +1092,14 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	});
 
 	await look();
+
+	/* A signal aborted already never calls its listener, so a pass the worker stopped before here ends lost before its machine starts a run. */
+	if (d.signal?.aborted) return { outcome: "lost", item: id };
+
+	d.signal?.addEventListener("abort", () => result.resolve({ outcome: "lost", item: id }), { once: true });
+
+	if (!d.resume) state.events.add(machineStarted({ itemId: id, machineVersion: version, afresh: d.restarted }));
+
 	actor.start();
 
 	if (d.answered && d.resume) {
@@ -1104,7 +1110,10 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		actor.send({ type: resume });
 	} else due?.fireDue();
 
-	return result.promise.finally(() => actor.stop());
+	return result.promise.finally(async () => {
+		actor.stop();
+		await runs.onIdle();
+	});
 };
 
 /** An owner wait whose timeout goes on to work, not to stuck, tells the owner when it goes on without them. */

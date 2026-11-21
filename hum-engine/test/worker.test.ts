@@ -168,6 +168,37 @@ test("a run's end while a tick is busy brings the next tick once that tick ends"
 	expect(await served).toEqual({ reason: "stopped" });
 });
 
+test("a worker stopped during a tick starts no pass from that tick, and its serve ends only once the tick has", async () => {
+	const w = await workerWorld({ items: { a: { writeForItem: true } } }, { settings: { tickIntervalSeconds: 3600 } });
+	const reading = Promise.withResolvers<void>();
+	const gate = Promise.withResolvers<void>();
+	const source = w.adapter.workSource!;
+
+	w.item("a", "docs/a.md");
+
+	const listReady = async () => {
+		reading.resolve();
+		await gate.promise;
+
+		return source.listReady();
+	};
+
+	const stopped = w.workerWith({ adapters: { workSource: { ...source, listReady }, questions: w.adapter.questions!, answers: w.adapter.answers } });
+	const stop = new AbortController();
+	const served = stopped.serve(stop.signal);
+
+	await reading.promise;
+	stop.abort();
+	gate.resolve();
+
+	expect(await served).toEqual({ reason: "stopped" });
+	expect(readHeartbeat(w.state.heartbeatPath)?.inFlight).toEqual([]);
+
+	await stopped.idle();
+
+	expect(w.shim.calls().filter((call) => call.itemId)).toEqual([]);
+});
+
 test("a new engine in node_modules makes the worker exit within one tick, saying so in its heartbeat and status; an item file does not", async () => {
 	const w = await workerWorld({});
 
