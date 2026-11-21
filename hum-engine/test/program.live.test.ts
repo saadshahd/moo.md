@@ -4,9 +4,13 @@ import { join } from "node:path";
 import { x } from "tinyexec";
 import { z } from "zod";
 import { railName } from "../src/adapters/rail.ts";
+import { ROW_REFUSED_CODE } from "../src/adapters/rail-rows.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { type ProgramEntry, programEntry, programFields } from "../src/service/program.ts";
 import { writeSetup } from "../src/setup/write.ts";
+import { readStatus } from "../src/status/file.ts";
+import type { Status } from "../src/status/format.ts";
+import { SECOND_MS } from "../src/time.ts";
 import { installedSkills } from "./fixtures/config.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { ROUNDUP_APP, type Rig, SLOTS_DIR, startRig } from "./fixtures/rows-rig.ts";
@@ -16,6 +20,9 @@ const live = process.env.HUM_LIVE === "1" && existsSync(ROUNDUP_APP);
 if (!live) console.log("skip hum serve as roundup's program: set HUM_LIVE=1 on a Mac with roundup.app installed; the rig starts a throwaway roundup Daemon on a fresh data folder with a stub claude, and makes no model call");
 
 const RIG_MS = 180_000;
+
+/** How often hum serve ticks on the rig. */
+const TICK_SECONDS = 2;
 
 const CLI = join(import.meta.dir, "..", "src", "cli", "main.ts");
 
@@ -73,7 +80,14 @@ const isAlive = (pid: string): boolean => {
 	}
 };
 
-const buildRows = async () => z.array(Node).parse(await rig.user.call("rail.tree")).filter((node) => node.kind === "agent" && node.name === railName(`hum ${item} build #0`));
+/** The status hum's worker last wrote. */
+const humStatus = () => readStatus(join(repo, ".git", "hum", "status.json"));
+
+/** Whether the status shows the rig's item in flight in its build. */
+const isBuilding = ({ inFlight }: Status) => inFlight.some((flight) => flight.item === item && flight.state === "building");
+
+/** The rows of every attempt at the item's build. */
+const buildRows = async () => z.array(Node).parse(await rig.user.call("rail.tree")).filter((node) => node.kind === "agent" && node.name.startsWith(railName(`hum ${item} build #`)));
 
 const startProgram = async ({ argv, dir, adoptDir }: ProgramEntry): Promise<void> => {
 	await rig.stopProgram();
@@ -102,7 +116,7 @@ beforeAll(async () => {
 				runSlots: { ...SHIPPED_DEFAULTS.runSlots, enabled: true },
 				runners: 1,
 				defaultKind: "docs",
-				tickIntervalSeconds: 2,
+				tickIntervalSeconds: TICK_SECONDS,
 				claimExpirySeconds: 600,
 			},
 			waitHours: {},
@@ -141,6 +155,37 @@ test.skipIf(!live)(
 		expect(readFileSync(join(rig.dir, "cwd-build.txt"), "utf8")).toStartWith(`${join(realpathSync(repo), SLOTS_DIR)}/`);
 		expect(JSON.stringify(await rig.events())).not.toContain("outside_program_directory");
 		expect(readFileSync(join(rig.dir, "stub-p.log"), "utf8").split("\n").filter((line) => line.startsWith("refused"))).toEqual([]);
+	},
+	RIG_MS,
+);
+
+test.skipIf(!live)(
+	"a hum serve stopped mid-build, as an update stops it, leaves its build row running, and back again it takes that row over and starts no second one",
+	async () => {
+		const before = await shownStatus(/^#\d+ rig docs item: building/u);
+		const [row] = await buildRows();
+
+		process.kill(before.program_pid ?? 0, "SIGTERM");
+
+		await waitFor(async () => {
+			const terminal = await programTerminal();
+
+			return terminal && terminal.id !== before.id ? terminal : undefined;
+		}, "hum serve back");
+
+		const backAt = Date.now();
+
+		await waitFor(async () => {
+			const read = humStatus();
+
+			return read.ok && read.status.writtenAt > backAt && isBuilding(read.status) ? true : undefined;
+		}, "the restarted worker to build its item");
+		await Bun.sleep(3 * TICK_SECONDS * SECOND_MS);
+
+		const after = humStatus();
+
+		expect(after.ok && { building: isBuilding(after.status), refused: after.status.cards.filter(({ code }) => code === ROW_REFUSED_CODE) }).toEqual({ building: true, refused: [] });
+		expect((await buildRows()).map(({ id, status }) => ({ id, done: status?.kind === "done" }))).toEqual([{ id: row?.id ?? "no build row", done: false }]);
 	},
 	RIG_MS,
 );

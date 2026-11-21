@@ -2,7 +2,10 @@ import { expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { isAlive, until } from "./fixtures/process.ts";
-import { markdownSettings, sh } from "./fixtures/work-repo.ts";
+import { itemFile, markdownSettings, sh } from "./fixtures/work-repo.ts";
+import type { Runner } from "../src/adapters/claude-p.ts";
+import { finishedOf, succeededWith } from "../src/adapters/hooked-run.ts";
+import { readTranscript } from "../src/adapters/transcript.ts";
 import { FakeGitHub } from "./fixtures/fake-github.ts";
 import { NOW, TTL, workerWorld, type WorkerWorld } from "./fixtures/worker-world.ts";
 import { readHeartbeat, readStatus } from "../src/status/file.ts";
@@ -17,6 +20,9 @@ import { OWNER_APPROVAL } from "../src/decide/merge.ts";
 import { isTrusted } from "../src/decide/prose.ts";
 import type { Measured, Measurement } from "../src/measure/remeasure.ts";
 import { configWith, trustedScores } from "./fixtures/config.ts";
+
+/** The work order the owner takes in a talk row. */
+const WORK_ORDER = { title: "Write the note", ask: "Write docs/a.md.", done: "docs/a.md exists.", limits: ["Change no other file."] };
 
 const merged = (w: WorkerWorld) => w.results.filter((r) => r.outcome === "merged").map((r) => r.item).sort();
 
@@ -335,6 +341,51 @@ test("an item id in the inbox folder wakes a waiting item at once and its questi
 
 	expect(openAfter.ok && openAfter.status.questions).toEqual([]);
 	expect(w.state.events.list("a").map((e) => e.type)).toContain("answered");
+});
+
+test("an item that waits on the owner in a talk row holds no runner: another item builds meanwhile, and once the row's answer counts the waiting item runs again and takes it", async () => {
+	const w = await workerWorld({ items: { b: { writeForItem: true } } }, { settings: { runners: 1 } });
+	const real = w.thinPath().runner;
+	const talked: string[] = [];
+	let answered = false;
+
+	const runner: Runner = {
+		...real,
+		talks: true,
+		talking: async () => new Map([["a", !answered]]),
+		run: async (request) => {
+			if (request.talk !== true) return real.run(request);
+
+			talked.push(request.name ?? "");
+
+			return answered && request.name?.includes(" ideate ") ? finishedOf(undefined, readTranscript(""), succeededWith({ order: WORK_ORDER })) : { kind: "waiting" };
+		},
+	};
+
+	const worker = w.workerWith({ runner, talkCopy: async () => ({ folder: tempDir("talk"), env: {} }) });
+
+	w.repo.add("a", itemFile("a", { body: "kind: feature\ntouches: docs/a.md\n\nWrite the note." }));
+	w.item("b", "docs/b.md");
+
+	expect(await worker.tick()).toEqual({ kind: "ran", started: ["a"] });
+	await worker.idle();
+	expect(w.results).toEqual([{ outcome: "waiting", item: "a" }]);
+
+	expect(await worker.tick()).toEqual({ kind: "ran", started: ["b"] });
+	await worker.idle();
+	expect(merged(w)).toEqual(["b"]);
+
+	answered = true;
+
+	expect(await worker.tick()).toEqual({ kind: "ran", started: ["a"] });
+	await worker.idle();
+	expect(w.results.at(-1)).toEqual({ outcome: "waiting", item: "a" });
+	expect(w.state.talks.get("a")?.order).toEqual(WORK_ORDER);
+
+	const [ideate, again, next] = talked;
+
+	expect(again).toBe(ideate);
+	expect(next).toContain(" shape ");
 });
 
 test("a saved deadline fires on the next event, not only on a tick: a question the owner never answers ends stuck", async () => {

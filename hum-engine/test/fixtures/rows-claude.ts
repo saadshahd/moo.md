@@ -119,6 +119,7 @@ const EARLY = {
  * second saves its early answer before it asks, then asks with Claude Code's question and hands over what its step says.
  */
 const talkRow = (step: keyof typeof TALKED) => async (): Promise<void> => {
+	writeFileSync(join(rig, `prepared-${scenario}.txt`), existsSync(".hum-prepared") ? "yes" : "no");
 	await turn(() => undefined);
 	await Bun.sleep(1500);
 	await turn(async () => {

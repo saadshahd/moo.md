@@ -2,7 +2,6 @@ import { docsJudge, scriptedJudge, SOUND } from "../fixtures/judge.ts";
 import type { RunOutcome, Runner, RunRequest } from "../../src/adapters/claude-p.ts";
 import { finishedOf, succeededWith } from "../../src/adapters/hooked-run.ts";
 import { readTranscript } from "../../src/adapters/transcript.ts";
-import { until } from "../fixtures/process.ts";
 import type { z } from "zod";
 import { choicesAnswer, type IdeateAnswer, type PickAnswer } from "../../src/decide/talk.ts";
 import { type ModelCall, modelCallOver } from "../../src/adapters/model-call.ts";
@@ -12,7 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 import { SlotPool } from "../../src/slots/pool.ts";
-import { type Checkout, PLAN_MARK, PROSE_PROMPTS, runBranch, runThinPath } from "../../src/worker/thin-path.ts";
+import { type Checkout, PLAN_MARK, PROSE_PROMPTS, runBranch, runThinPath, type TalkCopy } from "../../src/worker/thin-path.ts";
 import { CRITIC_PATHS, configWith, type Tree, withCritic } from "../fixtures/config.ts";
 import { OWNER } from "../fixtures/identity.ts";
 import { itemFile, sh } from "../fixtures/work-repo.ts";
@@ -474,6 +473,29 @@ test("a run that says a secret is missing asks about it only when the runner lac
 	expect(await runThinPath(w.thinPath({ itemId: present, runnerVariables: new Set(["PATH"]) }))).toMatchObject({ outcome: "asked", item: present, detail: "Is it set?" });
 });
 
+test("a pass hum stops mid-run keeps the run open, so the next pass asks for that same run by its name and takes it over rather than starting a second", async () => {
+	const w = await world({ script: [{}, NOTE] });
+	const id = w.repo.seed("Write the note");
+	const real = w.thinPath().runner;
+	const builds: string[] = [];
+
+	const building = (stops: boolean): Runner => ({
+		...real,
+		run: async (request) => {
+			if (!request.name?.includes(" build ")) return real.run(request);
+
+			builds.push(request.name);
+
+			return stops ? { kind: "stopped" } : real.run(request);
+		},
+	});
+
+	expect(await runThinPath(w.thinPath({ runner: building(true) }))).toEqual({ outcome: "lost", item: id });
+	expect(await runThinPath(w.thinPath({ runner: building(false), itemId: id }))).toEqual({ outcome: "merged", item: id });
+	expect(builds).toHaveLength(2);
+	expect(new Set(builds).size).toBe(1);
+});
+
 test("a claim another worker holds is lost, and no run starts", async () => {
 	const w = await world({ script: [{}, NOTE] });
 	const id = w.repo.seed("Write the note");
@@ -813,26 +835,41 @@ const talkingRunner = (rest: Runner, talks: Talks) => {
 	return { runner, asked, names: () => asked.map(runName) };
 };
 
+/** An item's talk copy in `folder`, with each ask of it. */
+const talkCopyIn = (folder: string) => {
+	const asked: Parameters<TalkCopy>[0][] = [];
+	const talkCopy: TalkCopy = async (request) => (asked.push(request), { folder, env: {} });
+
+	return { folder, asked, talkCopy };
+};
+
 /** The skills a run's prompt names. */
 const skillsIn = (prompt: string): string | undefined => /Use these skills with the Skill tool where they apply: (.+)\./.exec(prompt)?.[1];
 
-test("where runs talk with the owner, a feature opens with ideate and shape, whose open choices each run a row of their role side by side; planning waits until every choice carries the owner's pick, then reads the order and the picks", async () => {
-	const draft = Promise.withResolvers<void>();
+test("where runs talk with the owner, a feature opens with ideate and shape, whose open choices each run a row of their role side by side in the item's talk copy; a pass ends while a row waits on the owner, and the next takes that same row's pick, then plans from the order and the picks", async () => {
+	let draft: RunOutcome = { kind: "waiting" };
 	const w = await world({ script: [{}, NOTE], decisions: [READY_PLAN] });
 	const id = w.repo.seed("Write the note");
-	const talk = talkingRunner(w.thinPath().runner, { ...SETTLED, "draft 3": async () => (await draft.promise, said({ pick: "a card", found: "two drafts, a card and a banner" })) });
-	const picked = () => (w.state.talks.get(id)?.choices ?? []).filter(({ pick }) => pick !== undefined).length;
-	const passed = runThinPath(w.thinPath({ judge: featureJudge, runner: talk.runner }));
+	const talk = talkingRunner(w.thinPath().runner, { ...SETTLED, "draft 3": async () => draft });
+	const copy = talkCopyIn(tempDir("talk"));
+	const pass = () => runThinPath(w.thinPath({ judge: featureJudge, runner: talk.runner, talkCopy: copy.talkCopy, itemId: id }));
 
-	await until(() => talk.asked.length === 5 && picked() === 3);
-	await Bun.sleep(200);
+	expect(await pass()).toEqual({ outcome: "waiting", item: id });
 	expect(w.shim.decisions()).toEqual([]);
-	draft.resolve();
+	expect((w.state.talks.get(id)?.choices ?? []).filter(({ pick }) => pick !== undefined)).toHaveLength(3);
 
-	expect(await passed).toEqual({ outcome: "merged", item: id });
+	draft = said({ pick: "a card", found: "two drafts, a card and a banner" });
+
+	expect(await pass()).toEqual({ outcome: "merged", item: id });
 	expect(talk.names().slice(0, 2)).toEqual(["ideate", "shape"]);
-	expect(talk.names().slice(2).toSorted()).toEqual(["draft 3", "find 1", "spike 2"]);
-	expect(talk.asked.map((request) => request.talk)).toEqual([true, true, true, true, true]);
+	expect(talk.names().slice(2, 5).toSorted()).toEqual(["draft 3", "find 1", "spike 2"]);
+	expect(talk.names().slice(5)).toEqual(["draft 3"]);
+
+	const drafts = talk.asked.filter((request) => runName(request) === "draft 3").map(({ name }) => name);
+
+	expect(drafts).toEqual([drafts[0], drafts[0]]);
+	expect(talk.asked.every((request) => request.talk === true && request.cwd === copy.folder)).toBe(true);
+	expect(copy.asked.filter(({ prepared }) => prepared)).toHaveLength(1);
 	expect(Object.fromEntries(talk.asked.map((request) => [runName(request), skillsIn(request.prompt)]))).toEqual({ ideate: "hope:intent", "shape": "hope:shape", "find 1": "sound:find", "spike 2": undefined, "draft 3": "hope:freeze, hope:draft" });
 
 	const [plan] = w.shim.decisions();
@@ -854,7 +891,7 @@ test("a part split from an item the owner talked through keeps the work order an
 	const id = w.repo.seed("Write two parts");
 	const talk = talkingRunner(w.thinPath().runner, SETTLED);
 
-	expect(await runThinPath(w.thinPath({ judge: featureJudge, runner: talk.runner }))).toEqual({ outcome: "merged", item: id });
+	expect(await runThinPath(w.thinPath({ judge: featureJudge, runner: talk.runner, talkCopy: talkCopyIn(tempDir("talk")).talkCopy }))).toEqual({ outcome: "merged", item: id });
 
 	const settled = w.state.talks.get(id);
 	const filed = await w.adapter.workSource!.listReady();
@@ -870,20 +907,6 @@ test("where runs cannot talk with the owner, a feature plans at once, and its pl
 	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toEqual({ outcome: "merged", item: id });
 	expect(w.state.talks.get(id)).toBeUndefined();
 	expect(skillsIn(w.shim.decisions()[0]?.prompt ?? "")).toBe("hope:intent, hope:shape");
-});
-
-test("a pass that stops while a choice's row is open keeps what the owner settled, so the next pass runs only that row", async () => {
-	const w = await world({ script: [{}, NOTE], decisions: [READY_PLAN] });
-	const id = w.repo.seed("Write the note");
-	const picked = () => (w.state.talks.get(id)?.choices ?? []).filter(({ pick }) => pick !== undefined).length;
-	const stopping = talkingRunner(w.thinPath().runner, { ...SETTLED, "draft 3": async () => (await until(() => picked() === 3), { kind: "stopped" }) });
-
-	expect(await runThinPath(w.thinPath({ judge: featureJudge, runner: stopping.runner }))).toEqual({ outcome: "lost", item: id });
-
-	const again = talkingRunner(w.thinPath().runner, SETTLED);
-
-	expect(await runThinPath(w.thinPath({ judge: featureJudge, runner: again.runner, itemId: id }))).toEqual({ outcome: "merged", item: id });
-	expect(again.names()).toEqual(["draft 3"]);
 });
 
 const APP = "apps/desktop/src/app.tsx";

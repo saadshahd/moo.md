@@ -75,14 +75,14 @@ export const npmLatest = async (): Promise<string | undefined> => {
  * Where agent runs run: Rail rows where hum runs as its roundup Project's program, background agents where an owner
  * can see agent view (on the Mac, when `hum.json` allows it), and `claude -p` processes elsewhere, as in CI.
  */
-type RunPlace = { readonly kind: "rows"; readonly roundup: RoundupClient } | { readonly kind: "background" } | { readonly kind: "headless" };
+type RunPlace = { readonly kind: "rows"; readonly roundup: RoundupClient; readonly closing: AbortController } | { readonly kind: "background" } | { readonly kind: "headless" };
 
 const runPlaceOf = async ({ backgroundRuns }: Pick<HumConfig, "backgroundRuns">, where: WorkerOptions["where"], env: Env, faults: WorkerOptions["state"]["faults"]): Promise<RunPlace> => {
 	if (where === "ci") return { kind: "headless" };
 
 	const roundup = await roundupProgram(env, faults);
 
-	if (roundup) return { kind: "rows", roundup };
+	if (roundup) return { kind: "rows", roundup, closing: new AbortController() };
 
 	return backgroundRuns ? { kind: "background" } : { kind: "headless" };
 };
@@ -93,7 +93,7 @@ const startAgentRunner = async (place: RunPlace, options: RunnerOptions & { read
 		case "rows": {
 			const started = await startRunner(options);
 
-			return { ...started, runner: railRunner({ call: place.roundup.call, state: options.state, config, fallback: started.runner, now: options.now }) };
+			return { ...started, runner: railRunner({ call: place.roundup.call, state: options.state, config, fallback: started.runner, now: options.now, signal: place.closing.signal }) };
 		}
 
 		case "background":
@@ -119,11 +119,14 @@ export const closingAfter = async <T>({ adapters }: Pick<WorkerOptions, "adapter
 	}
 };
 
-/** Ends what the adapters hold open, and roundup's connection where runs are Rail rows. */
+/** Ends what the adapters hold open, and where runs are Rail rows, the watch of the rows the owner talks to and roundup's connection. */
 const closeAll =
 	(close: () => Promise<void>, place: RunPlace) =>
 	async (): Promise<void> => {
-		if (place.kind === "rows") place.roundup.close();
+		if (place.kind === "rows") {
+			place.closing.abort();
+			place.roundup.close();
+		}
 
 		await close();
 	};
@@ -182,7 +185,7 @@ export const workerOptions = async (repo: string, options: OpenWorkerOptions): P
 	const runner = judgmentsOnly ? judgmentRunner(runnerOptions) : (await startAgentRunner(place, runnerOptions, config.hum, repo)).runner;
 
 	// A slot is a worktree a background run or a Rail row starts in, so the pool stands only where runs are agents.
-	const slots = config.hum.runSlots.enabled && place.kind !== "headless" ? new SlotPool({ repo, state, config: config.hum, base: rest.base ?? DEFAULT_BASE, liveRuns: runner.liveRuns, now }) : undefined;
+	const slots = config.hum.runSlots.enabled && place.kind !== "headless" ? new SlotPool({ repo, state, config: config.hum, base: rest.base ?? DEFAULT_BASE, liveRuns: runner.liveRuns, talking: runner.talking, now }) : undefined;
 	const github = options.integrations ? undefined : repoFromRemote(remote);
 	const pulls = github === undefined ? undefined : gitHubPullRequests(github, { timeoutMs, env });
 	const commits = github === undefined ? undefined : gitHubCommits(github, { timeoutMs, env });
@@ -191,5 +194,5 @@ export const workerOptions = async (repo: string, options: OpenWorkerOptions): P
 	/** A measurement writes the owner's `.hum/hum.json`, which a CI checkout throws away. */
 	const remeasure = rest.where === "ci" ? undefined : (measurement: Measurement, signal: AbortSignal) => measureOn(repo, measurement, { inherit: false, signal });
 
-	return { ...rest, holder: holder ?? installationHolder(rest.where ?? "mac", state.dir), remeasure, checks: config.hum.checks, checkout: rest.checkout ?? slots?.checkout, slots, repo, state, config, adapters: { workSource, questions, answers, close: closeAll(resolved.close, place) }, runner, remote, pulls, commits, loop, runnerVariables: new Set(Object.entries(withoutGitHubTokens(env)).flatMap(([name, value]) => (value === undefined ? [] : [name]))) };
+	return { ...rest, holder: holder ?? installationHolder(rest.where ?? "mac", state.dir), remeasure, checks: config.hum.checks, checkout: rest.checkout ?? slots?.checkout, talkCopy: rest.talkCopy ?? slots?.talkCopy, slots, repo, state, config, adapters: { workSource, questions, answers, close: closeAll(resolved.close, place) }, runner, remote, pulls, commits, loop, runnerVariables: new Set(Object.entries(withoutGitHubTokens(env)).flatMap(([name, value]) => (value === undefined ? [] : [name]))) };
 };

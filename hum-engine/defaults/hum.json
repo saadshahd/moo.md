@@ -52,7 +52,8 @@
 		"spike": {
 			"file": "roles/spike.md",
 			"purpose": "pick",
-			"skills": []
+			"skills": [],
+			"prepared": true
 		},
 		"draft": {
 			"file": "roles/draft.md",

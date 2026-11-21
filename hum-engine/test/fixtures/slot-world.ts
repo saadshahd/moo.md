@@ -31,7 +31,7 @@ export const poolConfig = (pool: string, { runners = 2, recipe = {}, services, p
 });
 
 /** An owner\'s checkout with a remote, a pool folder, saved state, and a pool over them. Nothing leaves temp folders. */
-export const slotWorld = (settings: SlotSettings = {}, liveRuns?: PoolOptions["liveRuns"]) => {
+export const slotWorld = (settings: SlotSettings = {}, liveRuns?: PoolOptions["liveRuns"], talking?: PoolOptions["talking"]) => {
 	const repo = new WorkRepo();
 	const pool = settings.pool ?? tempDir("pool");
 	const stateDir = tempDir("slot-state");
@@ -40,7 +40,7 @@ export const slotWorld = (settings: SlotSettings = {}, liveRuns?: PoolOptions["l
 	const { recipe } = settings;
 	const config = poolConfig(pool, { ...settings, recipe: recipe instanceof Function ? recipe(repo.owner) : recipe });
 	const state = openState(stateDir, { now: Date.now });
-	const options: PoolOptions = { repo: repo.owner, state, config, base: BASE, liveRuns, now: Date.now };
+	const options: PoolOptions = { repo: repo.owner, state, config, base: BASE, liveRuns, talking, now: Date.now };
 	const slots = new SlotPool(options);
 
 	/** A pool over the same saved state, as a restarted worker would open it. */

@@ -18,10 +18,10 @@ const PRIVATE = 0o600;
 
 /**
  * What passes between hum and one run's row: the schema the answer must match, the answers the run saved, the reports
- * its hooks drop, the row hum started for it, the mark that hum sent the row its one note, and when roundup first
- * showed the row waiting on the owner.
+ * its hooks drop, the row hum started for it, the mark that hum sent the row its one note, when roundup first showed
+ * the row waiting on the owner, and for a run the owner talks to, what a look at its row reads while no pass watches it.
  */
-export type RunFolder = { readonly root: string; readonly schema: string; readonly answers: string; readonly hooks: string; readonly row: string; readonly noted: string; readonly asked: string };
+export type RunFolder = { readonly root: string; readonly schema: string; readonly answers: string; readonly hooks: string; readonly row: string; readonly noted: string; readonly asked: string; readonly talk: string };
 
 export const runFolderAt = (root: string): RunFolder => ({
 	root,
@@ -31,6 +31,7 @@ export const runFolderAt = (root: string): RunFolder => ({
 	row: join(root, "row.json"),
 	noted: join(root, "noted"),
 	asked: join(root, "asked.json"),
+	talk: join(root, "talk.json"),
 });
 
 /** The folder of every run under hum's state; the secret beside them is no run. */
@@ -112,6 +113,16 @@ export const markAsked = (folder: RunFolder, since: number): void => {
 };
 
 type Saved = z.infer<typeof Saved>;
+
+/** What hum keeps of a run the owner talks to, so it looks at the run's row while no pass watches it: the item, and the tokens the run may spend. */
+const TalkRun = z.strictObject({ item: z.string(), tokenCap: z.number().optional() });
+
+export type TalkRun = z.infer<typeof TalkRun>;
+
+export const keepTalkRun = (folder: RunFolder, talk: TalkRun): void => atomicWrite(folder.talk, JSON.stringify(talk));
+
+/** What hum keeps of the run, where the owner talks to it. */
+export const talkRunOf = (folder: RunFolder): TalkRun | undefined => orMissing(() => TalkRun.parse(JSON.parse(readFileSync(folder.talk, "utf8"))), undefined);
 
 /** Writes the schema a run's answer must match, where its `hum run-answer` reads it. */
 export const keepSchema = (folder: RunFolder, { schema }: Pick<RunRequest, "schema">): void => atomicWrite(folder.schema, JSON.stringify(schema));

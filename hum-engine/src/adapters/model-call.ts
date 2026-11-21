@@ -25,6 +25,7 @@ const NOT_ANSWERED = {
 	held: "the runner is held",
 	"over-cap": "the call passed its token cap",
 	stopped: "the call timed out",
+	waiting: "the call waited on the owner",
 } as const satisfies Record<Exclude<RunOutcome, { kind: "finished" }>["kind"], string>;
 
 const abstained = (why: string) => ({ kind: "abstained", why }) as const;

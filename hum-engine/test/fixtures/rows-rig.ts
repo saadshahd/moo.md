@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { x } from "tinyexec";
 import { z } from "zod";
@@ -27,10 +27,26 @@ export const refusing: Runner = {
 	limitedUntil: () => 0,
 };
 
+/** Resolves once something drops a file into hum's `inbox`, as the talk watch does to wake an item, and takes what it dropped, as the worker does; at once when `signal` aborts. */
+export const woken = async (inbox: string, signal: AbortSignal): Promise<void> => {
+	for (;;) {
+		const dropped = existsSync(inbox) ? readdirSync(inbox) : [];
+
+		for (const file of dropped) rmSync(join(inbox, file), { force: true });
+
+		if (dropped.length > 0 || signal.aborted) return;
+
+		await Bun.sleep(100);
+	}
+};
+
 /** The run slots the rig's repo holds, one per scenario, each a worktree on a branch of its own. */
 const SLOTS = 8;
 
 export const SLOTS_DIR = ".hum-slots";
+
+/** The slot recipe's prepare in the rig's talk copies: it leaves the mark a talk row looks for as it starts. */
+export const PREPARE_STEP = "touch .hum-prepared";
 
 const Event = z.looseObject({ name: z.string(), data: z.looseObject({}).optional() });
 

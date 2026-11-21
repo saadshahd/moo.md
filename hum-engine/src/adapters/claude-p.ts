@@ -229,17 +229,19 @@ export type RunOutcome =
 	/** The run was stopped at the item's token cap. */
 	| { readonly kind: "over-cap"; readonly tokens: number }
 	/** The caller's signal stopped the run. */
-	| { readonly kind: "stopped" };
+	| { readonly kind: "stopped" }
+	/** The run's row waits on the owner, who talks with it, and no answer of its counts yet: the row goes on with no pass watching it. */
+	| { readonly kind: "waiting" };
 
 /** What one process ended as, before the runner acts on a limit it could not read. */
 type Ended = RunOutcome | LimitEnded;
 
 export const hasSucceeded = (outcome: Finished): boolean => outcome.subtype === "success" && !outcome.isError;
 
-/** A run that ended with no answer and no token to count: a usage limit, a hold, or a stop. */
-export type Paused = Extract<RunOutcome, { kind: "limited" | "held" | "stopped" }>;
+/** A run that ended, or waits, with no answer and no token to count: a usage limit, a hold, a stop, or a row that waits on the owner. */
+export type Paused = Extract<RunOutcome, { kind: "limited" | "held" | "stopped" | "waiting" }>;
 
-const PAUSED_KINDS: readonly string[] = ["limited", "held", "stopped"] satisfies readonly Paused["kind"][];
+const PAUSED_KINDS: readonly string[] = ["limited", "held", "stopped", "waiting"] satisfies readonly Paused["kind"][];
 
 export const isPaused = (outcome: RunOutcome): outcome is Paused => PAUSED_KINDS.includes(outcome.kind);
 
@@ -331,6 +333,11 @@ export type Runner = {
 	readonly liveRuns?: () => Promise<ReadonlySet<string>>;
 	/** The owner can talk with its runs: each is a Rail row they see. */
 	readonly talks?: boolean;
+	/**
+	 * The items whose runs the owner talks to the runner keeps, each with whether all of them wait on the owner: a row
+	 * hum has nothing to take from or do about. Only a runner whose runs are Rail rows keeps any.
+	 */
+	readonly talking?: () => Promise<ReadonlyMap<string, boolean>>;
 };
 
 export type RunnerOptions = {

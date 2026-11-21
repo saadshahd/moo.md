@@ -12,10 +12,11 @@ import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 import { RUN_AGAIN } from "../../src/decide/answer.ts";
 import { openState } from "../../src/state/open.ts";
 import { SECOND_MS } from "../../src/time.ts";
-import { runThinPath } from "../../src/worker/thin-path.ts";
+import { SlotPool } from "../../src/slots/pool.ts";
+import { runThinPath, type TalkCopy } from "../../src/worker/thin-path.ts";
 import { configWith } from "./config.ts";
 import { scriptedJudge, SOUND } from "./judge.ts";
-import { refusing, SLOTS_DIR } from "./rows-rig.ts";
+import { PREPARE_STEP, refusing, SLOTS_DIR, woken } from "./rows-rig.ts";
 import { TTL, workerWorld } from "./worker-world.ts";
 
 /**
@@ -99,7 +100,8 @@ const park = async (): Promise<object> => {
 
 /**
  * A Workstream of feature items, and thin-path passes over the roundup adapter with Rail rows, as hum serve runs
- * them, in a run slot of the scenario's own; their talk rows act out the owner.
+ * them, in a run slot of the scenario's own, their talk rows in talk copies the slot pool gives; their talk rows act
+ * out the owner. A pass that ends waiting on the owner runs again once the talk watch wakes the item.
  */
 const talkWorld = async (workstream: string, slot: string) => {
 	const seeder = roundupRpc(socket);
@@ -112,6 +114,20 @@ const talkWorld = async (workstream: string, slot: string) => {
 
 	const source = roundupOn(dir, { report: () => {}, now, env: process.env }, workstream);
 	const folder = join(rig, "repo", SLOTS_DIR, slot);
+	const runner = railRunner({ call: program.call, state, config: { ...SHIPPED_DEFAULTS, backgroundPollSeconds: 0.2 }, fallback: refusing, now });
+	const runSlots = { ...SHIPPED_DEFAULTS.runSlots, enabled: true, recipe: { ...SHIPPED_DEFAULTS.runSlots.recipe, prepare: [PREPARE_STEP] } };
+	const pool = new SlotPool({ repo: join(rig, "repo"), state, config: { ...SHIPPED_DEFAULTS, runSlots }, base: "main", talking: runner.talking, now });
+	const prepareMs: number[] = [];
+
+	/** The pool's talk copy, timing each ask that runs the recipe's prepare first. */
+	const talkCopy: TalkCopy = async (request) => {
+		const at = Date.now();
+		const copy = await pool.talkCopy(request);
+
+		if (request.prepared) prepareMs.push(Date.now() - at);
+
+		return copy;
+	};
 
 	const seed = async (title: string, body: string): Promise<ItemId> => {
 		const { id } = z.looseObject({ id: z.int() }).parse(await seeder.call("todo.create", { title, body }));
@@ -126,19 +142,35 @@ const talkWorld = async (workstream: string, slot: string) => {
 			workSource: source.workSource,
 			questions: source.questions,
 			state,
-			runner: railRunner({ call: program.call, state, config: { ...SHIPPED_DEFAULTS, backgroundPollSeconds: 0.2 }, fallback: refusing, now }),
+			runner,
 			config: configWith(),
 			judge: scriptedJudge({ kind: { kind: "feature" }, alignment: SOUND }),
 			remote: join(rig, "origin.git"),
 			checks: ["true"],
 			holder: Holder.parse("rig"),
 			checkout: async () => ({ folder, env: {}, readyFailure: async () => undefined, giveBack: async () => {} }),
+			talkCopy,
 			itemId: item,
 			now,
 			runnerVariables: new Set(),
 			newSessionId: randomUUID,
 			signal,
 		}).catch((error: Error) => ({ error: error.message }));
+
+	/** The item's passes until one ends other than waiting on the owner, each after the talk watch woke the item. */
+	const passesOf = async (item: ItemId, signal: AbortSignal) => {
+		const outcomes: string[] = [];
+
+		for (;;) {
+			const passed = await passOf(item, signal);
+
+			outcomes.push("outcome" in passed ? passed.outcome : "error");
+
+			if (!("outcome" in passed) || passed.outcome !== "waiting" || signal.aborted) return { ...passed, outcomes };
+
+			await woken(state.inbox, signal);
+		}
+	};
 
 	const rowsOf = async (item: ItemId) => {
 		const nodes = await railTree(seeder.call);
@@ -147,10 +179,10 @@ const talkWorld = async (workstream: string, slot: string) => {
 		return nodes.filter(({ parent }) => parent !== undefined && parent === own?.id);
 	};
 
-	/** The item's rows once its plan row started: the pass stops there, as the plan row waits. */
+	/** The item's rows once its plan row started: the passes stop there, as the plan row waits. */
 	const rowsToPlan = async (item: ItemId) => {
 		const stop = new AbortController();
-		const passed = passOf(item, stop.signal);
+		const passed = passesOf(item, stop.signal);
 
 		for (const deadline = Date.now() + ANSWER_WAIT_MS; !(await rowsOf(item)).some(({ name }) => name.includes(" plan-after-talk ")) && Date.now() < deadline; ) await Bun.sleep(200);
 
@@ -158,10 +190,10 @@ const talkWorld = async (workstream: string, slot: string) => {
 
 		stop.abort();
 
-		return { rows, talk: state.talks.get(item), outcome: await passed, faults: state.faults.list() };
+		return { rows, talk: state.talks.get(item), passes: await passed, prepareMs, faults: state.faults.list() };
 	};
 
-	return { seed, passOf, rowsToPlan, source };
+	return { seed, passesOf, rowsToPlan, source };
 };
 
 /** A feature item's talk rows, then its plan row. */
@@ -178,7 +210,7 @@ const split = async (): Promise<object> => {
 
 	writeFileSync(join(rig, `go-split-${item}`), "");
 
-	const parent = await world.passOf(item, new AbortController().signal);
+	const parent = await world.passesOf(item, new AbortController().signal);
 	const part = (await world.source.workSource.listReady()).find(({ title }) => title.endsWith("Write part one"));
 
 	if (!part) return { error: `the split filed no ready part: ${JSON.stringify(parent)}` };

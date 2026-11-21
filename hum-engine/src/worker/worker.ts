@@ -46,7 +46,7 @@ import { type AnswerScope, settleAnswers } from "./answers.ts";
 import { PARK_OPTIONS, RUN_AGAIN } from "../decide/answer.ts";
 import { queueQuestion, recentlyAsked, releaseQuestions } from "./questions.ts";
 import type { Parked } from "../state/saved.ts";
-import { answerTo, type Checkout, doesStartOver, ownerWaitStage, claimTtlMs, DEFAULT_BASE, gatherItem, hasEndedStuck, isGathered, park, parkQuestion, rememberKinds, runThinPath, type ThinPathOptions, type ThinResult, isWaitingOnOwner } from "./thin-path.ts";
+import { answerTo, type Checkout, doesStartOver, ownerWaitStage, claimTtlMs, DEFAULT_BASE, gatherItem, hasEndedStuck, isGathered, isTalking, park, parkQuestion, rememberKinds, runThinPath, type TalkCopy, talkWaits, type ThinPathOptions, type ThinResult, isWaitingOnOwner } from "./thin-path.ts";
 import { ownerAnswered } from "../state/item-log.ts";
 import { hasProgress } from "./kind.ts";
 
@@ -80,6 +80,8 @@ export type WorkerOptions = {
 	readonly workDir?: string;
 	/** Gives each pass its working copy; by default a `git clone`. */
 	readonly checkout?: Checkout;
+	/** Gives the rows the owner talks to their item's talk copy; where runs are Rail rows, the run slots give it. */
+	readonly talkCopy?: TalkCopy;
 	/** The run slots behind `checkout`, if any: each tick asks them to keep slots ready, and the worker is idle once their upkeep ends. */
 	readonly slots?: Pick<SlotPool, "keepReady" | "idle">;
 	readonly dir?: string;
@@ -275,11 +277,29 @@ export class Worker {
 		return found && { name: found[0], kind: found[1] };
 	}
 
-	/** Whether the item waits on the owner in its saved state. */
+	/** Whether the item waits on the owner in its saved state: at an owner wait, or in a talk with them. */
 	#isAsleep(saved: SavedSnapshot): boolean {
 		const kind = this.#kindNamed(saved.kind)?.kind;
 
-		return kind !== undefined && isWaitingOnOwner(kind, saved.state);
+		return kind !== undefined && (isWaitingOnOwner(kind, saved.state) || isTalking(this.#o.config, kind, saved.state));
+	}
+
+	/** Whether the item's saved state is a talk with the owner. */
+	#isTalking(saved: SavedSnapshot): boolean {
+		const kind = this.#kindNamed(saved.kind)?.kind;
+
+		return kind !== undefined && isTalking(this.#o.config, kind, saved.state);
+	}
+
+	/**
+	 * A sleeping item in a talk wakes, as an answered item does, once its talk no longer waits on the owner: a row's
+	 * answer counts, a row needs hum, or no row waits. The runner's talk watch brings that tick forward.
+	 */
+	async #wakeTalks(sleeping: readonly SavedSnapshot[]): Promise<void> {
+		for (const { itemId } of sleeping.filter((saved) => this.#isTalking(saved) && !this.#inFlight.has(saved.itemId)))
+			await this.#readThread(itemId, async () => {
+				if (!(await talkWaits(this.#o.runner, itemId))) this.#answered.add(itemId);
+			});
 	}
 
 	#dueWaits(t: number): SavedWait[] {
@@ -555,6 +575,7 @@ export class Worker {
 				holder: this.#o.holder,
 				workDir: this.#o.workDir,
 				checkout: this.#o.checkout,
+				talkCopy: this.#o.talkCopy,
 				dir: this.#o.dir,
 				itemId: ItemId.parse(id),
 				signal: abort.signal,
@@ -913,6 +934,8 @@ export class Worker {
 			this.#loopIfDue(t);
 			this.#judgesIfDue(t);
 		}
+
+		await this.#wakeTalks(sleeping);
 
 		const ready = await this.#readReady(sources, sleeping);
 		const started = ready ? await this.#startPicked(t, ready, sleeping) : [];

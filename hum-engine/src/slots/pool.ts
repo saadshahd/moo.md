@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import PQueue from "p-queue";
 import { type Git, gitIn, whenGitFailed } from "../adapters/git.ts";
@@ -9,10 +9,11 @@ import type { State } from "../state/open.ts";
 import type { FreeSlot, HeldSlot, Slot } from "../state/saved.ts";
 import { SECOND_MS } from "../time.ts";
 import { runChecks } from "../worker/checks.ts";
-import type { Checkedout, Checkout } from "../worker/thin-path.ts";
-import { slotEnv, slotFolder, slotName } from "./env.ts";
+import type { Checkedout, Checkout, TalkCopy } from "../worker/thin-path.ts";
+import { type SlotIdentity, slotEnv, slotFolder, slotName, talkCopyName } from "./env.ts";
 import { excludeFromRepo } from "./exclude.ts";
 import { isWorktreeOf } from "./worktree.ts";
+import { orMissing } from "../state/fs.ts";
 
 export const SLOT_OUT_CODE = "slot-out";
 
@@ -32,6 +33,8 @@ export type PoolOptions = {
 	readonly base: string;
 	/** The names of the runs alive outside this process; a taken slot whose item has none of them is returned. */
 	readonly liveRuns?: () => Promise<ReadonlySet<string>>;
+	/** The items whose runs the owner talks to the runner keeps; an item's talk copy stays while it has one. */
+	readonly talking?: () => Promise<ReadonlyMap<string, boolean>>;
 	readonly now: () => number;
 };
 
@@ -68,6 +71,10 @@ export class SlotPool {
 	/** Slots whose pass runs in this process, by slot name. */
 	readonly #active = new Map<string, string>();
 	readonly #returning = new Set<string>();
+	/** Makes and drops talk copies one at a time, apart from slot upkeep, so a talk row never waits on a slot's install. */
+	readonly #talkCopies = new PQueue({ concurrency: 1 });
+	/** The recipe's prepare in each item's talk copy, run once by this process. */
+	readonly #prepared = new Map<string, Promise<void>>();
 	readonly #now: () => number;
 	#recheckOut = true;
 
@@ -96,12 +103,12 @@ export class SlotPool {
 		return saved;
 	}
 
-	#envOf(slot: Slot): Record<string, string> {
+	#envOf(slot: SlotIdentity): Record<string, string> {
 		return slotEnv(this.#settings, slot);
 	}
 
 	/** Runs `commands` in the slot; a failing one runs again up to `reruns` times before its failure counts. */
-	#run(slot: Slot, commands: readonly string[], reruns = 0): Promise<string | undefined> {
+	#run(slot: SlotIdentity, commands: readonly string[], reruns = 0): Promise<string | undefined> {
 		return runChecks(commands, slot.folder, { env: this.#envOf(slot), timeoutMs: this.#settings.stepTimeoutSeconds * SECOND_MS, reruns });
 	}
 
@@ -243,6 +250,7 @@ export class SlotPool {
 		this.#recheckOut = false;
 
 		await this.#reclaim().catch((error: Error) => this.#maintenanceFailed("reclaim", error));
+		await this.#dropIdleTalkCopies().catch((error: Error) => this.#maintenanceFailed("talk copies", error));
 
 		for (let index = 0; index < config.runners; index++) {
 			const name = slotName(index);
@@ -282,6 +290,81 @@ export class SlotPool {
 	/** The slots, in order. */
 	list(): Slot[] {
 		return this.#slots();
+	}
+
+	/** An item's talk copy: in the pool folder beside the slots, with the block of ports past theirs. */
+	#talkCopyOf(item: string): SlotIdentity {
+		const name = talkCopyName(item);
+
+		return { name, index: this.#o.config.runners, folder: slotFolder(this.#o.repo, this.#settings.pool, name) };
+	}
+
+	/** Makes the talk copy's worktree at the latest base where it is not there. */
+	async #makeTalkCopy({ folder }: SlotIdentity): Promise<void> {
+		if (existsSync(folder)) return;
+
+		const { repo, base } = this.#o;
+
+		mkdirSync(dirname(folder), { recursive: true });
+		await excludeFromRepo(repo, dirname(folder), commandTimeoutMs(this.#o.config));
+		await this.#git(repo).raw(["fetch", "-q", "origin"]);
+		await this.#git(repo).raw(["worktree", "add", "-q", "--detach", folder, `origin/${base}`]);
+	}
+
+	/** Runs the recipe's prepare in the item's talk copy once; a failure throws, and the next ask runs it again. */
+	#prepareTalkCopy(item: string, copy: SlotIdentity): Promise<void> {
+		const known = this.#prepared.get(item);
+
+		if (known) return known;
+
+		const started = this.#run(copy, this.#settings.recipe.prepare).then((failure) => {
+			if (failure === undefined) return;
+
+			this.#prepared.delete(item);
+
+			throw new Error(`the slot recipe's prepare failed in ${item}'s talk copy: ${failure}`);
+		});
+
+		this.#prepared.set(item, started);
+
+		return started;
+	}
+
+	/**
+	 * The seam the rows the owner talks to take their item's talk copy from: a worktree of the owner's checkout at the
+	 * latest base, in the pool folder and no run slot. It is made at the first ask and stays across the item's passes
+	 * while the item has a pass in this process or a run the owner talks to; upkeep drops it after, with all its rows
+	 * left there. Asked `prepared`, the recipe's prepare runs in it once first; an ask for none never waits on that.
+	 */
+	readonly talkCopy: TalkCopy = async ({ item, prepared }) => {
+		const copy = this.#talkCopyOf(item);
+
+		await this.#talkCopies.add(() => this.#makeTalkCopy(copy));
+
+		if (prepared) await this.#prepareTalkCopy(item, copy);
+
+		return { folder: copy.folder, env: this.#envOf(copy) };
+	};
+
+	/** Drops each talk copy whose item has no pass in this process and no run the owner talks to, each decided as it is dropped. */
+	async #dropIdleTalkCopies(): Promise<void> {
+		const { repo } = this.#o;
+		const prefix = this.#talkCopyOf("").folder;
+		const pool = dirname(prefix);
+		const copies = orMissing(() => readdirSync(pool), []).map((entry) => join(pool, entry)).filter((folder) => folder.startsWith(prefix));
+
+		for (const folder of copies) {
+			const item = folder.slice(prefix.length);
+
+			await this.#talkCopies.add(async () => {
+				const talks = (await this.#o.talking?.())?.has(item) ?? false;
+
+				if (talks || [...this.#active.values()].includes(item) || !(await isWorktreeOf(repo, folder, commandTimeoutMs(this.#o.config)))) return;
+
+				await this.#git(repo).raw(["worktree", "remove", "--force", folder]);
+				this.#prepared.delete(item);
+			});
+		}
 	}
 
 	/** The slot for the item's pass: the one that already holds the item, else the first free one, waiting for a return when none is. */

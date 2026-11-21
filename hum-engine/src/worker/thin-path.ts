@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { type AnyActor, type AnyActorLogic, createActor, createAsyncLogic } from "xstate";
 import type { Holder, Item, ItemId, Question, Questions, ThreadEntry, WorkSource } from "../adapter-api.ts";
-import { type Finished, type Paused, type Runner, hasSucceeded, isPaused } from "../adapters/claude-p.ts";
+import { type Finished, type Paused, type RunOutcome, type Runner, hasSucceeded, isPaused } from "../adapters/claude-p.ts";
 import { configuredModelCall, type ModelCall } from "../adapters/model-call.ts";
 import { visibleText } from "../adapters/marked.ts";
 import { filesBetween, type Git, gitIn, isAncestor, PATCH, withConfigPinned } from "../adapters/git.ts";
@@ -92,6 +92,8 @@ export type ThinPathOptions = {
 	readonly workDir?: string;
 	/** Gives the run its working copy on the remote's base branch, and takes it back when the item's pass ends. By default a `git clone` in a temp folder. */
 	readonly checkout?: Checkout;
+	/** Gives the rows the owner talks to their item's talk copy; where runs are Rail rows, the run slots give it. */
+	readonly talkCopy?: TalkCopy;
 	readonly dir?: string;
 	/** Take this item; default the first ready one. */
 	readonly itemId?: ItemId;
@@ -175,6 +177,17 @@ const hasTag = (kind: Kind, state: string | undefined, tag: string): boolean => 
 export const isWaitingOnOwner = (kind: Kind, state: string | undefined): boolean => hasTag(kind, state, OWNER_WAIT_TAG);
 
 export const hasEndedStuck = (kind: Kind, state: string | undefined): boolean => hasTag(kind, state, STUCK_TAG);
+
+/** Whether the kind's machine in this state runs a role the owner talks to. */
+export const isTalking = (config: RunConfig, kind: Kind, state: string | undefined): boolean => {
+	const source = state === undefined ? undefined : kind.machine.states[state]?.invoke?.src;
+	const purpose = source === undefined ? undefined : (config.hum.roles[source]?.purpose ?? source);
+
+	return TALK_PURPOSES.some((talk) => talk === purpose);
+};
+
+/** Whether every row of the item's talk waits on the owner, so a pass would find nothing to take from them or do about them. */
+export const talkWaits = async (runner: Runner, id: string): Promise<boolean> => (await runner.talking?.())?.get(id) === true;
 
 /** Placeholder sources: enough to restore a snapshot and read its state before the real sources exist. */
 const stubSources = (kind: Kind) => invokedSources(kind, createAsyncLogic({ run: async () => {} }));
@@ -288,6 +301,8 @@ export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gather
 
 	if (isAwaitingAnswer && timedOut === undefined) return { outcome: "waiting", item: id };
 
+	if (isTalking(o.config, kind, at) && (await talkWaits(o.runner, id))) return { outcome: "waiting", item: id };
+
 	const stopped = answered !== undefined && isOverCapStop(visibleText(answered.question), answered.option);
 
 	if (stopped && asking) return park(o, { outcome: "stuck", item: id, detail: "the owner stopped it at the token cap" });
@@ -374,10 +389,11 @@ export type Source = { readonly remote: string; readonly base: string };
 /** What a checkout is asked for: a working copy of `source` for the item's pass, and the signal that ends the wait for one. */
 type CheckoutRequest = Source & { readonly item: string; readonly signal: AbortSignal | undefined };
 
-/** A run's working copy: its folder, the environment its runs and checks add, and the call that takes it back. */
-export type Checkedout = {
-	readonly folder: string;
-	readonly env: Readonly<Record<string, string>>;
+/** A working copy: its folder, and the environment its runs and checks add. */
+export type Workspace = { readonly folder: string; readonly env: Readonly<Record<string, string>> };
+
+/** A run's working copy, with its ready check and the call that takes it back. */
+export type Checkedout = Workspace & {
 	/** The working copy's ready check, run again around each run: its failure, undefined where it passes or the copy has none. */
 	readonly readyFailure: () => Promise<string | undefined>;
 	readonly giveBack: () => Promise<void>;
@@ -389,6 +405,13 @@ export type Checkedout = {
  * worktree of the owner's checkout.
  */
 export type Checkout = (request: CheckoutRequest) => Promise<Checkedout>;
+
+/**
+ * Gives the rows the owner talks to their item's talk copy: a working copy of the base of the item's own, outside the
+ * run slots, kept across its passes, so a row goes on once its pass ends. With `prepared`, the slot recipe's prepare
+ * has run in it first, once, as a row that runs the repo's code needs.
+ */
+export type TalkCopy = (request: { readonly item: string; readonly prepared: boolean }) => Promise<Workspace>;
 
 /** A fresh `git clone` in a new folder under `workDir` (a temp folder by default), removed when the pass ends. */
 const clonesIn =
@@ -572,27 +595,29 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	};
 
 	/**
-	 * One agent run of the item. A limit, a hold or a stop pauses the item; passing the token cap asks the owner where
-	 * the state can, and ends stuck where it cannot. The owner's answer runs on past the cap, or with `stop` ends the item. A run given what it judges is answered from the item's log when
-	 * the log keeps an answer to the same prompt on the same change, and that answer spends nothing again.
+	 * Starts one agent run of the item in `place`, or takes over the one begun under its key, and hands back what it
+	 * came to. A run given what it judges is answered from the item's log when the log keeps an answer to the same prompt
+	 * on the same change, and that answer spends nothing again. The run's record ends only once hum took what the run
+	 * came to: a run that stopped with hum, waits on the owner, or ended with no answer keeps it, so the next pass asks
+	 * for the same run by its name and takes its row over.
 	 */
-	const runAgent = async (role: string, text: string, schema: JsonSchema, signal: AbortSignal, judged?: Judged, run = role): Promise<Finished> => {
+	const launch = async (role: string, text: string, schema: JsonSchema, signal: AbortSignal, { place = { folder: clone, env: d.env }, judged, run = role }: Launch = {}): Promise<RunOutcome> => {
 		const purpose = purposeOf(config, role);
 		const key = state.runs.keyFor(id, run);
 		const held = purpose === "build" || purpose === "fix" ? readMemory(join(clone, ".hum", "memory.md"), config.hum.memoryMaxBytes).entries : [];
 		const prefix = config.hum.roles[role]?.file ?? role;
 		const prompt = `${text}${memorySection(held)}`;
 		const tier = await tierFor(role);
-		const launch = { name: `hum ${id} ${run} #${key.attempt}`, sessionId: d.newSessionId() };
+		const named = { name: `hum ${id} ${run} #${key.attempt}`, sessionId: d.newSessionId() };
 
-		const { begun, outcome } = await answerOnce(state, { key, launch, machineVersion: version, question: judged && { prompt, ...tier, ...judged } }, async (begun) => {
+		const { begun, outcome } = await answerOnce(state, { key, launch: named, machineVersion: version, question: judged && { prompt, ...tier, ...judged } }, async (begun) => {
 			const lease = await d.gate?.enter(prefix, signal);
 
 			const ran = await runner
 				.run({
 					prompt,
-					cwd: clone,
-					env: d.env,
+					cwd: place.folder,
+					env: place.env,
 					...tier,
 					schema,
 					tokenCap: kind.tokenCap.tokens - tally.sinceAnswer(),
@@ -612,8 +637,17 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			return ran;
 		});
 
-		begun.end(held.length === 0 ? undefined : outcome.kind === "finished" ? rulesUsed(outcome, held) : []);
+		if (!isPaused(outcome)) begun.end(held.length === 0 ? undefined : outcome.kind === "finished" ? rulesUsed(outcome, held) : []);
 
+		return outcome;
+	};
+
+	/**
+	 * What a run came to for the item. A limit, a hold or a stop pauses the item; passing the token cap asks the owner
+	 * where the state can, and ends stuck where it cannot. The owner's answer runs on past the cap, or with `stop` ends
+	 * the item.
+	 */
+	const settle = async (outcome: RunOutcome): Promise<Finished> => {
 		if (isPaused(outcome)) return pause(pauseOf(id, outcome));
 
 		if (outcome.kind === "over-cap") {
@@ -628,6 +662,9 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 		return outcome;
 	};
+
+	/** One agent run of the item in its clone, as `settle` takes what it came to. */
+	const runAgent = async (role: string, text: string, schema: JsonSchema, signal: AbortSignal, judged?: Judged): Promise<Finished> => settle(await launch(role, text, schema, signal, { judged }));
 
 	/** The owner is asked, or the run's choice stands and is listed under the choices made without them. */
 	const settleNeed = async (wants: z.infer<typeof Wants>): Promise<{ asked: Pending } | { chose: string }> => {
@@ -887,72 +924,88 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			await send(pick.event);
 		});
 
-	/** A run the owner talks to, under its own name, whose answer must match `answer`; only a runner whose runs are Rail rows hosts one. */
-	const talk = async <Answer>(role: string, run: string, contract: string, answer: z.ZodType<Answer>, signal: AbortSignal): Promise<Answer> => {
+	/**
+	 * A run the owner talks to, under its own name, in its item's talk copy, whose answer must match `answer`: undefined
+	 * while its row waits on the owner. Only a runner whose runs are Rail rows hosts one.
+	 */
+	const talk = async <Answer>(role: string, run: string, contract: string, answer: z.ZodType<Answer>, signal: AbortSignal): Promise<Answer | undefined> => {
 		if (runner.talks !== true) throw failed(`the ${run} run talks with the owner, which only a Rail row can host: run hum as its roundup Project's program`);
 
+		if (d.talkCopy === undefined) throw failed(`the ${run} run talks with the owner in its item's talk copy, which only run slots give`);
+
 		const head = (await g(["rev-parse", "HEAD"])).trim();
-		const outcome = await runAgent(role, [roleOf(config, role), itemHeading(talked()), contract].join("\n\n"), jsonSchemaOf(answer), signal, { head }, run);
+		const place = await d.talkCopy({ item: id, prepared: config.hum.roles[role]?.prepared === true }).catch((error: Error) => Promise.reject(failed(`the ${run} run has no talk copy: ${error.message}`)));
+		const outcome = await launch(role, [roleOf(config, role), itemHeading(talked()), contract].join("\n\n"), jsonSchemaOf(answer), signal, { place, judged: { head }, run });
 
-		if (!hasSucceeded(outcome)) throw failed(`the ${run} run ended as ${outcome.subtype}: ${outcome.text.slice(0, CARD_EXCERPT)}`);
+		if (outcome.kind === "waiting") return undefined;
 
-		const read = answer.safeParse(outcome.structured);
+		const finished = await settle(outcome);
+
+		if (!hasSucceeded(finished)) throw failed(`the ${run} run ended as ${finished.subtype}: ${finished.text.slice(0, CARD_EXCERPT)}`);
+
+		const read = answer.safeParse(finished.structured);
 
 		if (!read.success) throw failed(`the ${run} run's answer does not match its contract: ${read.error.message.slice(0, CARD_EXCERPT)}`);
 
 		return read.data;
 	};
 
+	/** The pass ends while the owner's rows hold the talk; the item sleeps until one of them needs hum. */
+	const waitOnOwner = (): Promise<never> => pause({ outcome: "waiting", item: id });
+
 	/** The ideate state: the owner talks with its row until they take a work order, which the item keeps, so a kept order runs nothing again. */
 	const ideate = (role: string) =>
 		invoked(async ({ signal }) => {
 			if (savedTalk().order !== undefined) return;
 
-			const { order } = await talk(role, role, TALK_CONTRACTS.ideate(), IdeateAnswer, signal);
+			const answered = await talk(role, role, TALK_CONTRACTS.ideate(), IdeateAnswer, signal);
 
-			keepTalk({ order });
+			if (answered === undefined) return waitOnOwner();
+
+			keepTalk({ order: answered.order });
 		});
 
 	/** The roles whose row settles one choice with the owner. */
 	const pickRoles = Object.entries(config.hum.roles).flatMap(([name, { purpose }]) => (purpose === "pick" ? [name] : []));
 
-	/** The choices a shape run names with the owner, which the item keeps. */
-	const nameChoices = async (role: string, signal: AbortSignal): Promise<readonly BuildChoice[]> => {
-		const { choices } = await talk(role, role, TALK_CONTRACTS.design(pickRoles), choicesAnswer(pickRoles), signal);
+	/** The choices a shape run names with the owner, which the item keeps; undefined while its row waits on the owner. */
+	const nameChoices = async (role: string, signal: AbortSignal): Promise<readonly BuildChoice[] | undefined> => {
+		const answered = await talk(role, role, TALK_CONTRACTS.design(pickRoles), choicesAnswer(pickRoles), signal);
 
-		keepTalk({ choices });
+		if (answered !== undefined) keepTalk({ choices: answered.choices });
 
-		return choices;
+		return answered?.choices;
 	};
 
-	/** The owner's pick on the choice at `at`, settled in a row of the role it names, under a name of its own; the item keeps it. */
-	const pickFor = async (choice: BuildChoice, at: number, signal: AbortSignal): Promise<void> => {
+	/** The owner's pick on the choice at `at`, settled in a row of the role it names, under a name of its own, which the item keeps; false while that row waits on the owner. */
+	const pickFor = async (choice: BuildChoice, at: number, signal: AbortSignal): Promise<boolean> => {
 		if (choice.role === undefined) throw failed(`the choice "${choice.title}" names neither the owner's pick nor a role whose row settles it`);
 
 		const picked = await talk(choice.role, `${choice.role} ${at + 1}`, TALK_CONTRACTS.pick(choice), PickAnswer, signal);
 
-		keepTalk({ choices: savedTalk().choices?.map((kept, index) => (index === at ? { ...kept, ...picked } : kept)) });
+		if (picked !== undefined) keepTalk({ choices: savedTalk().choices?.map((kept, index) => (index === at ? { ...kept, ...picked } : kept)) });
+
+		return picked !== undefined;
 	};
 
 	/**
 	 * The shape state: the owner talks with its row until it names every choice the build depends on, then each choice
 	 * still open runs a row of the role it names, side by side, and the state ends once every choice carries the owner's
-	 * pick. A row that fails leaves the others to finish, and their picks stay. Choices and picks the item kept run
-	 * nothing again, and what the rows leave in the working copy goes.
+	 * pick. Once every open choice's row started, the pass ends while one waits on the owner; a row that fails ends the
+	 * state, and the picks the others settle stay. Choices and picks the item kept run nothing again.
 	 */
 	const design = (role: string) =>
 		invoked(async ({ signal }) => {
-			const left = await changedFiles(d.git);
+			const choices = savedTalk().choices ?? (await nameChoices(role, signal));
 
-			try {
-				const choices = savedTalk().choices ?? (await nameChoices(role, signal));
-				const settled = await Promise.allSettled(choices.map((choice, at) => (choice.pick === undefined ? pickFor(choice, at, signal) : undefined)));
-				const failure = settled.find((one) => one.status === "rejected");
+			if (choices === undefined) return waitOnOwner();
 
-				if (failure !== undefined) throw failure.reason;
-			} finally {
-				await undoRunIn(d.git, left);
-			}
+			const settled = await Promise.allSettled(choices.map((choice, at) => (choice.pick === undefined ? pickFor(choice, at, signal) : true)));
+			const failure = settled.find((one) => one.status === "rejected");
+
+			if (failure !== undefined) throw failure.reason;
+
+			if (settled.some((one) => one.status === "fulfilled" && !one.value)) return waitOnOwner();
 		});
 
 	/** A pick role's row runs only for a choice a shape run named. */
@@ -1122,6 +1175,9 @@ const TALKS: ReadonlySet<Purpose> = new Set(TALK_PURPOSES);
  */
 type Judged = { readonly head: string };
 
+/** Where a run works, what it judges, and the name it runs under, past its role's own: the clone, nothing, and its role by default. */
+type Launch = { readonly place?: Workspace; readonly judged?: Judged; readonly run?: string };
+
 /** What a run reads from its config: the settings and the role files. */
 export type RunConfig = Pick<Config, "hum" | "roles">;
 
@@ -1253,6 +1309,8 @@ const pauseOf = (id: string, outcome: Paused): ThinResult => {
 			return { outcome: "held", item: id, why: outcome.card.cause };
 		case "stopped":
 			return { outcome: "lost", item: id };
+		case "waiting":
+			return { outcome: "waiting", item: id };
 	}
 };
 

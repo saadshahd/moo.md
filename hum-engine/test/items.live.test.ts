@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { Holder, ItemId } from "../src/adapter-api.ts";
@@ -9,7 +9,7 @@ import { HUM_EXT } from "../src/adapters/roundup-rpc.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { RUN_AGAIN } from "../src/decide/answer.ts";
 import { INBOX_DIR } from "../src/state/open.ts";
-import { ITEMS_DRIVER, ROUNDUP_APP, type Rig, startRig } from "./fixtures/rows-rig.ts";
+import { ITEMS_DRIVER, PREPARE_STEP, ROUNDUP_APP, type Rig, SLOTS_DIR, startRig } from "./fixtures/rows-rig.ts";
 
 const live = process.env.HUM_LIVE === "1" && existsSync(ROUNDUP_APP);
 
@@ -36,6 +36,8 @@ const Result = z.looseObject({
 	rows: z.array(Node.extend({ visibility: z.string().optional() }).loose()).optional(),
 	parent: z.looseObject({ outcome: z.string().optional() }).optional(),
 	talk: z.looseObject({}).optional(),
+	passes: z.looseObject({ outcomes: z.array(z.string()) }).optional(),
+	prepareMs: z.array(z.number()).optional(),
 });
 
 const HOLDER = Holder.parse("rig");
@@ -155,8 +157,8 @@ test.skipIf(!live)("the roundup adapter keeps the adapter contract as the Projec
 const stepsOf = (rows: readonly { readonly id: string; readonly name: string; readonly visibility?: string }[]) =>
 	rows.toSorted((one, other) => Number(one.id) - Number(other.id)).map(({ name, visibility }) => [name.replace(/^hum \S+ /u, "").replace(/ #\d+$/u, ""), visibility]);
 
-test.skipIf(!live)("a feature item shows its ideate row, then its shape row and a row for each open choice, all shown; each takes only the answer saved once it asked the owner and gets no note, and planning starts once every choice carries a pick", async () => {
-	const { rows = [], talk } = await run("talk");
+test.skipIf(!live)("a feature item shows its ideate row, then its shape row and a row for each open choice, all shown, each in the item's talk copy; each takes only the answer saved once it asked the owner and gets no note, a pass ends while one waits on the owner and the next runs once the talk watch wakes it, and planning starts once every choice carries a pick", async () => {
+	const { rows = [], talk, passes, prepareMs = [] } = await run("talk");
 	const steps = stepsOf(rows);
 
 	expect(steps.slice(0, 2)).toEqual([
@@ -171,6 +173,11 @@ test.skipIf(!live)("a feature item shows its ideate row, then its shape row and 
 	expect(steps.slice(5)).toEqual([["plan-after-talk", "internal"]]);
 	expect(talk).toMatchObject({ order: { title: "Write the note" }, choices: [{ pick: "the first" }, { pick: "the first" }, { pick: "the first" }, { pick: "plain" }] });
 	expect(JSON.stringify(talk)).not.toContain("early");
+
+	expect(passes?.outcomes.filter((outcome) => outcome === "waiting").length).toBeGreaterThanOrEqual(3);
+	expect(readFileSync(join(rig.dir, "cwd-ideate.txt"), "utf8")).toContain(`${SLOTS_DIR}/repo-talk-`);
+	expect(["ideate", "spike"].map((step) => readFileSync(join(rig.dir, `prepared-${step}.txt`), "utf8"))).toEqual(["no", "yes"]);
+	console.log(`the rig's prepare (${PREPARE_STEP}) took ${prepareMs.join(", ")} ms`);
 
 	const talked = new Set(rows.slice(0, 5).map(({ id }) => id));
 

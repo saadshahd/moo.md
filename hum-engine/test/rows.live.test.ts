@@ -26,7 +26,7 @@ afterAll(async () => {
 
 const Outcome = z.looseObject({ kind: z.string(), subtype: z.string().optional(), text: z.string().optional(), structured: z.unknown().optional() });
 
-const Result = z.looseObject({ error: z.string().optional(), outcome: Outcome.optional() });
+const Result = z.looseObject({ error: z.string().optional(), outcome: Outcome.optional(), waits: z.int().optional() });
 
 const Node = z.looseObject({ id: z.string(), name: z.string(), kind: z.string(), status: z.looseObject({ kind: z.string() }).nullish() });
 
@@ -46,8 +46,8 @@ const liveRow = async (scenario: string): Promise<string> => {
 	}
 };
 
-/** Runs `scenario` as the Project's program, doing `during` while it runs, and returns the outcome it wrote. */
-const run = async (scenario: string, during: () => Promise<void> = async () => {}) => {
+/** Runs `scenario` as the Project's program, doing `during` while it runs, and returns the result it wrote. */
+const resultOf = async (scenario: string, during: () => Promise<void> = async () => {}) => {
 	await rig.runProgram(scenario);
 	await during();
 
@@ -56,8 +56,11 @@ const run = async (scenario: string, during: () => Promise<void> = async () => {
 	await rig.stopProgram();
 	expect(result.error).toBeUndefined();
 
-	return result.outcome;
+	return result;
 };
+
+/** The outcome `scenario` wrote. */
+const run = async (scenario: string, during?: () => Promise<void>) => (await resultOf(scenario, during)).outcome;
 
 const rigFile = (name: string): string => (existsSync(join(rig.dir, name)) ? readFileSync(join(rig.dir, name), "utf8") : "");
 
@@ -126,14 +129,15 @@ test.skipIf(!live)(
 );
 
 test.skipIf(!live)(
-	"a row the owner talks to that answers without asking them gets one note to ask first, and hum stops it once it answers so again",
+	"a row the owner talks to comes back waiting at once and goes on with no run watching it; the talk watch wakes hum when it answers without asking the owner, hum sends one note to ask first, and stops it once it answers so again",
 	async () => {
-		const outcome = await run("unasked");
+		const { outcome, waits } = await resultOf("unasked");
 		const [row] = await rowsOf("unasked");
 		const notes = await notesTo(row?.id ?? "");
 
 		expect(outcome).toMatchObject({ kind: "finished", subtype: ROW_STOPPED });
 		expect(outcome?.text).toContain("without asking the owner");
+		expect(waits).toBe(2);
 		expect(notes).toHaveLength(1);
 		expect(JSON.stringify(notes)).toContain("AskUserQuestion");
 	},

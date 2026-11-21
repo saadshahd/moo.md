@@ -5,7 +5,7 @@ import { railRunner, roundupProgram } from "../../src/adapters/rail-rows.ts";
 import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 import { openState } from "../../src/state/open.ts";
 import { RUN_SCHEMA } from "../../src/worker/thin-path.ts";
-import { refusing } from "./rows-rig.ts";
+import { refusing, woken } from "./rows-rig.ts";
 
 /**
  * The rig's program: a Rail rows runner that runs one scenario's run, named for the scenario, and writes its outcome
@@ -33,7 +33,7 @@ const result = async (): Promise<object> => {
 
 	const runner = railRunner({ call: roundup.call, state, config: { ...SHIPPED_DEFAULTS, backgroundPollSeconds: 0.2, rowNoteWaitSeconds: 60 }, fallback: refusing, now: Date.now });
 
-	const outcome = await runner.run({
+	const request = {
 		name: `hum 1 ${scenario} #1`,
 		item: { id: ItemId.parse("1"), title: "rig item" },
 		prompt: `Rig scenario ${scenario}.`,
@@ -43,9 +43,14 @@ const result = async (): Promise<object> => {
 		schema: RUN_SCHEMA,
 		talk: TALKS.has(scenario),
 		signal: abort.signal,
-	});
+	} as const;
 
-	return { outcome, faults: state.faults.list() };
+	/* A run the owner talks to comes back waiting while its row waits on them, and runs again once the talk watch wakes its item, as a pass does. */
+	for (let outcome = await runner.run(request), waits = 0; ; outcome = await runner.run(request), waits++) {
+		if (outcome.kind !== "waiting" || abort.signal.aborted) return { outcome, waits, faults: state.faults.list() };
+
+		await woken(state.inbox, abort.signal);
+	}
 };
 
 const outcome = JSON.stringify(await result().catch((error: Error) => ({ error: error.stack ?? error.message })));

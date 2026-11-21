@@ -19,6 +19,9 @@ const NOT_NAME_CHARACTER = /[^A-Za-z0-9]+/g;
 /** The name of the slot at this position among the slots. */
 export const slotName = (index: number): string => `slot-${index + 1}`;
 
+/** The name of an item's talk copy, which lies in the pool folder beside the slots. */
+export const talkCopyName = (item: string): string => `talk-${item}`;
+
 /** Where a slot's worktree is: in the pool folder, named for the checkout it belongs to and the slot. */
 export const slotFolder = (repo: string, pool: string, name: string): string => join(resolve(repo, pool), `${basename(repo)}-${name}`);
 

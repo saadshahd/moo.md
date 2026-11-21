@@ -9,14 +9,14 @@ import { SLOT_KEPT_CODE, SLOT_OUT_CODE } from "../src/slots/pool.ts";
 import type { Slot } from "../src/state/saved.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { sh } from "./fixtures/work-repo.ts";
-import { type SlotSettings, slotWorld, type SlotWorld } from "./fixtures/slot-world.ts";
+import { BASE, type SlotSettings, slotWorld, type SlotWorld } from "./fixtures/slot-world.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
 const worlds: SlotWorld[] = [];
 
-const world = (settings?: SlotSettings, liveRuns?: Parameters<typeof slotWorld>[1]): SlotWorld => {
-	const made = slotWorld(settings, liveRuns);
+const world = (settings?: SlotSettings, liveRuns?: Parameters<typeof slotWorld>[1], talking?: Parameters<typeof slotWorld>[2]): SlotWorld => {
+	const made = slotWorld(settings, liveRuns, talking);
 
 	worlds.push(made);
 
@@ -238,4 +238,34 @@ test("a pool outside the checkout adds nothing to the checkout's info/exclude", 
 	await w.ask("a");
 
 	expect(excludedLines(w.repo.owner)).toEqual([]);
+});
+
+test("an item's talk copy is a worktree of the checkout at the base, beside the slots and none of them, with the ports past theirs; the recipe's prepare runs in it once, only for an ask that needs it, and upkeep drops it once its item no longer talks", async () => {
+	const log = join(tempDir("prepare"), "log");
+	let talks = true;
+	const w = world({ runners: 1, recipe: { prepare: [`echo "$HUM_SLOT" >> ${log}`] } }, undefined, async () => new Map(talks ? [["a", true]] : []));
+
+	const plain = await w.slots.talkCopy({ item: "a", prepared: false });
+
+	expect(existsSync(log)).toBe(false);
+
+	const prepared = await w.slots.talkCopy({ item: "a", prepared: true });
+
+	await w.slots.talkCopy({ item: "a", prepared: true });
+
+	expect(prepared.folder).toBe(plain.folder);
+	expect(plain.folder).toBe(join(w.pool, `${basename(w.repo.owner)}-talk-a`));
+	expect(plain.env[SLOT_ENV.portBase]).toBe(String(SHIPPED_DEFAULTS.runSlots.ports.base + SHIPPED_DEFAULTS.runSlots.ports.stride));
+	expect(sh(plain.folder, ["rev-parse", "HEAD"])).toBe(sh(w.repo.owner, ["rev-parse", `origin/${BASE}`]));
+	expect(readFileSync(log, "utf8")).toBe("talk-a\n");
+
+	await w.slots.maintain();
+
+	expect(w.slots.list().map(({ folder }) => folder)).not.toContain(plain.folder);
+	expect(existsSync(plain.folder)).toBe(true);
+
+	talks = false;
+	await w.slots.maintain();
+
+	expect(existsSync(plain.folder)).toBe(false);
 });

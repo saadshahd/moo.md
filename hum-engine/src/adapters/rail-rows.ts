@@ -4,17 +4,17 @@ import { z } from "zod";
 import type { HumConfig } from "../config/schema.ts";
 import type { Json } from "../config/json.ts";
 import { commandTimeoutMs, type Env, shellQuote } from "../exec.ts";
-import { atomicWrite, orMissing } from "../state/fs.ts";
+import { atomicWrite, dropInto, orMissing } from "../state/fs.ts";
 import type { State } from "../state/open.ts";
 import { PROGRAM_FIX, readProgram } from "../service/program.ts";
 import { SECOND_MS } from "../time.ts";
 import { type RunOutcome, type RunRequest, type Runner } from "./claude-p.ts";
 import { gitIn } from "./git.ts";
 import { failedWith, finishedOf, hookReports, runSettings, STOP_EVENT, succeededWith, tokensOf } from "./hooked-run.ts";
-import { limitOf, savedLimitUntil, settleLimit } from "./limit.ts";
+import { type LimitEnded, limitOf, savedLimitUntil, settleLimit } from "./limit.ts";
 import { itemWorkstream, NEEDS_YOU, RailNode, railName, railTree } from "./rail.ts";
 import { HUM_EXT, type RoundupCall, type RoundupClient, RoundupRefusal } from "./roundup-rpc.ts";
-import { askedSince, dropAnswers, hasSavedAnswer, keepSchema, markAsked, type RunFolder, runFolder, runFolders, runKey, takeAnswer } from "./run-answer.ts";
+import { askedSince, dropAnswers, hasSavedAnswer, keepSchema, keepTalkRun, markAsked, type RunFolder, runFolder, runFolders, runKey, takeAnswer, talkRunOf } from "./run-answer.ts";
 import { readTranscript, type RunTranscript } from "./transcript.ts";
 
 const RowRecord = z.strictObject({ id: z.string(), name: z.string() });
@@ -145,36 +145,73 @@ export const startRow = async (call: RoundupCall, { stateDir, config }: { readon
 
 export type RowsOptions = {
 	readonly call: RoundupCall;
-	readonly state: Pick<State, "dir" | "faults" | "limit">;
+	readonly state: Pick<State, "dir" | "faults" | "limit" | "inbox">;
 	readonly config: Pick<HumConfig, "deniedRunCommands" | "runAutoMode" | "backgroundPollSeconds" | "rowNoteWaitSeconds" | "commandTimeoutSeconds">;
 	/** The runner for a cheap model call and a run with no name. */
 	readonly fallback: Runner;
 	readonly now: () => number;
+	/** Ends the watch of the rows the owner talks to, as when hum stops. */
+	readonly signal?: AbortSignal;
 };
 
 /** What hum reads of a run's row at one moment. */
 type Reading = { readonly node: RailNode | undefined; readonly transcript: RunTranscript; readonly sessionId: string | undefined; readonly stops: number };
 
+/** A run hum looks at: its name, its folder, the row it runs as, whether the owner talks to it, and the tokens it may spend. */
+type Looked = { readonly name: string; readonly folder: RunFolder; readonly row: string; readonly talks: boolean; readonly tokenCap: number | undefined };
+
+/**
+ * What hum does about a run's row after one reading of it: nothing yet, send the row its one note, or end the run, with
+ * the row stopped first where it still runs, and with the usage limit it hit saved.
+ */
+type Verdict =
+	| { readonly kind: "wait" }
+	| { readonly kind: "note"; readonly body: string }
+	| { readonly kind: "end"; readonly stop: boolean; readonly outcome: RunOutcome }
+	| { readonly kind: "limit"; readonly limit: LimitEnded };
+
+const WAIT: Verdict = { kind: "wait" };
+
+const WAITING: RunOutcome = { kind: "waiting" };
+
+/** What a look at a run's row has seen so far: the session the row reported, and whether its first model message came. */
+type Seen = { session?: string; announced: boolean };
+
+/** The card for a read of the Rail that failed while hum watched the rows the owner talks to. */
+export const TALK_WATCH_CODE = "talk-watch";
+
 /**
  * Runs each named agent run as a Rail row, an Agent roundup starts in the run's slot under the item's Workstream, so
  * the owner sees it, its diff and its questions. The run's prompt rides in a Pad, and its answer comes back through
  * `hum run-answer`, which counts only under the run's key. A row found alive under the run's name is taken over, never
- * started twice, and one hum stops on its way out is left running for the next hum to take over. A row that ends a turn with no answer gets one note; a second such turn, or no new turn within the
- * configured wait, stops it and fails the run. A run the owner talks to starts shown, in the run's working copy
- * without adopting it, so several such rows run there side by side. It waits on the owner through its turns, and its
- * answer counts only once roundup showed the row waiting on the owner; one that answers and goes idle without asking
- * gets one note to ask first, and hum drops what it saved so far. Answering so again stops it and fails the run. A cheap model call and a run with no
- * name go to `fallback`.
+ * started twice, and one hum stops on its way out is left running for the next hum to take over. A row that ends a turn
+ * with no answer gets one note; a second such turn, or no new turn within the configured wait, stops it and fails the
+ * run. A run the owner talks to starts shown, in the run's working copy without adopting it, so several such rows run
+ * there side by side. Its answer counts only once roundup showed the row waiting on the owner; one that answers and goes
+ * idle without asking gets one note to ask first, and hum drops what it saved so far. Answering so again stops it and
+ * fails the run. Each call looks at such a run's row once: while the row waits on the owner the run comes back waiting
+ * and the row goes on, and one watch reads the Rail each poll for every such row, marks a row asked once roundup shows it
+ * waiting on the owner, and wakes the worker for an item whose row hum must look at. A cheap model call and a run with
+ * no name go to `fallback`.
  */
-export const railRunner = ({ call, state, config, fallback, now }: RowsOptions): Runner => {
+export const railRunner = ({ call, state, config, fallback, now, signal }: RowsOptions): Runner => {
 	const pollMs = config.backgroundPollSeconds * SECOND_MS;
 	const noteWaitMs = config.rowNoteWaitSeconds * SECOND_MS;
 
 	const tree = (): Promise<RailNode[]> => railTree(call);
 
-	/** The live row of a run: the one its folder records, else one of its name in the item's Workstream, as after a crash between start and record. */
-	const liveRow = async (folder: RunFolder, name: string, workstream: string): Promise<string | undefined> => {
-		const recorded = orMissing(() => RowRecord.parse(JSON.parse(readFileSync(folder.row, "utf8"))).id, undefined);
+	const recordOf = (folder: RunFolder) => orMissing(() => RowRecord.parse(JSON.parse(readFileSync(folder.row, "utf8"))), undefined);
+
+	/**
+	 * The row a run is taken over in: the one its folder records, else a live one of its name in the item's Workstream,
+	 * as after a crash between start and record. A run the owner talks to keeps its recorded row once that ended, so a
+	 * look reads the end; any other run whose recorded row ended starts anew.
+	 */
+	const rowOf = async (folder: RunFolder, name: string, workstream: string, talks: boolean): Promise<string | undefined> => {
+		const recorded = recordOf(folder)?.id;
+
+		if (talks && recorded !== undefined) return recorded;
+
 		const live = (await tree()).filter((node) => node.status?.kind !== ENDED);
 
 		return live.find((node) => node.id === recorded)?.id ?? live.find((node) => node.parent === workstream && node.name === railName(name))?.id;
@@ -186,13 +223,13 @@ export const railRunner = ({ call, state, config, fallback, now }: RowsOptions):
 		});
 	};
 
-	const readRow = async (row: string, folder: RunFolder): Promise<Reading> => {
+	const readRow = (row: string, folder: RunFolder, nodes: readonly RailNode[]): Reading => {
 		const reports = hookReports(folder.hooks);
 		const path = reports.find(({ transcriptPath }) => transcriptPath !== undefined)?.transcriptPath;
 		const text = path === undefined ? "" : orMissing(() => readFileSync(path, "utf8"), "");
 
 		return {
-			node: (await tree()).find((node) => node.id === row),
+			node: nodes.find((node) => node.id === row),
 			transcript: readTranscript(text),
 			sessionId: reports[0]?.sessionId,
 			stops: reports.filter(({ event }) => event === STOP_EVENT).length,
@@ -217,95 +254,171 @@ export const railRunner = ({ call, state, config, fallback, now }: RowsOptions):
 		atomicWrite(folder.noted, JSON.stringify({ stops }));
 	};
 
-	const watch = async (request: RunRequest, name: string, row: string, folder: RunFolder): Promise<RunOutcome> => {
+	/** The answer the run saved; a run the owner talks to counts only one saved once roundup showed its row waiting on the owner. */
+	const answerAt = ({ folder, name, talks }: Looked, node: RailNode | undefined): Json | undefined => {
 		const key = runKey(state.dir, name);
-		const talks = request.talk === true;
-		let session: string | undefined;
-		let announced = false;
 
-		/** The answer the row saved; a row the owner talks to counts only one saved once roundup showed it waiting on the owner. */
-		const answerAt = (node: RailNode | undefined): Json | undefined => {
-			if (!talks) return takeAnswer(folder, key, name);
+		if (!talks) return takeAnswer(folder, key, name);
 
-			if (node?.status?.kind === NEEDS_YOU) markAsked(folder, node.status.since ?? now());
+		if (node?.status?.kind === NEEDS_YOU) markAsked(folder, node.status.since ?? now());
 
-			const since = askedSince(folder);
+		const since = askedSince(folder);
 
-			return since === undefined ? undefined : takeAnswer(folder, key, name, since);
-		};
+		return since === undefined ? undefined : takeAnswer(folder, key, name, since);
+	};
 
-		const ended = (reading: Reading, why: string): RunOutcome => finishedOf(reading.sessionId, reading.transcript, failedWith(why, ROW_STOPPED));
+	/** What hum does about a run's row at `reading`. */
+	const verdictOf = (looked: Looked, { node, transcript, sessionId, stops }: Reading): Verdict => {
+		const { name, folder, talks, tokenCap } = looked;
+		const answer = answerAt(looked, node);
+		const ended = (why: string, stop = true): Verdict => ({ kind: "end", stop, outcome: finishedOf(sessionId, transcript, failedWith(why, ROW_STOPPED)) });
 
-		for (;;) {
-			/* hum itself stops here, as when it shuts down: the row and its folder stay, so the next hum takes the row over. */
-			if (request.signal?.aborted) return { kind: "stopped" };
+		if (answer !== undefined) return { kind: "end", stop: true, outcome: finishedOf(sessionId, transcript, succeededWith(answer)) };
 
-			const reading = await readRow(row, folder);
-			const answer = answerAt(reading.node);
+		if (node === undefined || node.status?.kind === ENDED) return ended(`the row "${railName(name)}" ended before it answered`, false);
 
-			if (session === undefined && reading.sessionId !== undefined) request.onSession?.((session = reading.sessionId));
+		const tokens = tokensOf(transcript);
 
-			if (!announced && Object.keys(reading.transcript.messages).length > 0) {
-				announced = true;
-				request.onFirstToken?.();
-			}
+		if (tokenCap !== undefined && tokens > tokenCap) return { kind: "end", stop: true, outcome: { kind: "over-cap", tokens } };
 
-			if (answer !== undefined) {
-				await stop(row);
+		if (transcript.limit !== undefined) return { kind: "limit", limit: limitOf(transcript.limit.text, transcript.limit.resetsAt) };
 
-				return finishedOf(reading.sessionId, reading.transcript, succeededWith(answer));
-			}
+		if (transcript.apiError !== undefined) return ended(transcript.apiError);
 
-			if (reading.node === undefined || reading.node.status?.kind === ENDED) {
-				const late = answerAt(reading.node);
+		const mark = noted(folder);
+		const idle = node.status?.kind === IDLE;
+		const due = talks ? idle && askedSince(folder) === undefined && hasSavedAnswer(folder) : stops > 0;
 
-				return late === undefined ? ended(reading, `the row "${railName(name)}" ended before it answered`) : finishedOf(reading.sessionId, reading.transcript, succeededWith(late));
-			}
+		if (mark === undefined && due) return { kind: "note", body: talks ? NOTES.ask() : NOTES.answer(name) };
 
-			const tokens = tokensOf(reading.transcript);
+		if (mark !== undefined && due && stops > mark.stops) return ended(talks ? `the row "${railName(name)}" answered again after hum's note without asking the owner` : `the row "${railName(name)}" ended a turn after hum's note with no answer`);
 
-			if (request.tokenCap !== undefined && tokens > request.tokenCap) {
-				await stop(row);
+		if (!talks && mark !== undefined && idle && now() - mark.at > noteWaitMs) return ended(`the row "${railName(name)}" stayed idle ${config.rowNoteWaitSeconds} seconds after hum's note with no answer`);
 
-				return { kind: "over-cap", tokens };
-			}
+		return WAIT;
+	};
 
-			if (reading.transcript.limit !== undefined) {
-				await stop(row);
-
-				return settleLimit(state, limitOf(reading.transcript.limit.text, reading.transcript.limit.resetsAt));
-			}
-
-			if (reading.transcript.apiError !== undefined) {
-				await stop(row);
-
-				return ended(reading, reading.transcript.apiError);
-			}
-
-			const mark = noted(folder);
-			const idle = reading.node.status?.kind === IDLE;
-			const due = talks ? idle && askedSince(folder) === undefined && hasSavedAnswer(folder) : reading.stops > 0;
-
-			if (mark === undefined && due) {
+	/** Carries a verdict out: the note sent, or the run's end with its row stopped first where it still runs; undefined while the run goes on. */
+	const act = async (verdict: Verdict, { row, folder, talks }: Looked, stops: number): Promise<RunOutcome | undefined> => {
+		switch (verdict.kind) {
+			case "wait":
+				return undefined;
+			case "note":
 				if (talks) dropAnswers(folder);
 
-				await note(row, talks ? NOTES.ask() : NOTES.answer(name), folder, reading.stops);
-			}
+				await note(row, verdict.body, folder, stops);
 
-			if (mark !== undefined && due && reading.stops > mark.stops) {
+				return undefined;
+			case "end":
+				if (verdict.stop) await stop(row);
+
+				return verdict.outcome;
+			case "limit":
 				await stop(row);
 
-				return ended(reading, talks ? `the row "${railName(name)}" answered again after hum's note without asking the owner` : `the row "${railName(name)}" ended a turn after hum's note with no answer`);
-			}
+				return settleLimit(state, verdict.limit);
+		}
+	};
 
-			if (!talks && mark !== undefined && idle && now() - mark.at > noteWaitMs) {
-				await stop(row);
+	/** One look at a run's row: what hum reads of it, then what it does about that; undefined while the run goes on. */
+	const look = async (looked: Looked, request: Pick<RunRequest, "onSession" | "onFirstToken">, seen: Seen): Promise<RunOutcome | undefined> => {
+		const reading = readRow(looked.row, looked.folder, await tree());
 
-				return ended(reading, `the row "${railName(name)}" stayed idle ${config.rowNoteWaitSeconds} seconds after hum's note with no answer`);
-			}
+		if (seen.session === undefined && reading.sessionId !== undefined) request.onSession?.((seen.session = reading.sessionId));
+
+		if (!seen.announced && Object.keys(reading.transcript.messages).length > 0) {
+			seen.announced = true;
+			request.onFirstToken?.();
+		}
+
+		return act(verdictOf(looked, reading), looked, reading.stops);
+	};
+
+	/** Looks at a run's row each poll until the run ends. hum itself stops here, as when it shuts down: the row and its folder stay, so the next hum takes the row over. */
+	const watch = async (request: RunRequest, looked: Looked): Promise<RunOutcome> => {
+		const seen: Seen = { announced: false };
+
+		for (;;) {
+			if (request.signal?.aborted) return { kind: "stopped" };
+
+			const outcome = await look(looked, request, seen);
+
+			if (outcome !== undefined) return outcome;
 
 			await Bun.sleep(pollMs);
 		}
+	};
+
+	/** The runs the owner talks to that hum keeps, each with its item, and with what a look reads once its row is recorded. */
+	const keptTalks = (): { readonly item: string; readonly folder: RunFolder; readonly looked: Looked | undefined }[] =>
+		runFolders(state.dir).flatMap((folder) => {
+			const talk = talkRunOf(folder);
+			const row = recordOf(folder);
+
+			return talk === undefined ? [] : [{ item: talk.item, folder, looked: row && { name: row.name, folder, row: row.id, talks: true, tokenCap: talk.tokenCap } }];
+		});
+
+	/**
+	 * Each kept run the owner talks to, with whether its row waits on them, from one read of the Rail. The runs are read
+	 * from their folders after the Rail, so a run begun meanwhile counts. One whose row is not recorded needs a pass to
+	 * start or find it; a read that fails raises one card and finds every recorded row waiting, so none wakes on it.
+	 */
+	const talkReadings = async (): Promise<{ readonly item: string; readonly folder: RunFolder; readonly waits: boolean }[]> => {
+		if (keptTalks().length === 0) return [];
+
+		const nodes = await tree().then(
+			(read) => {
+				state.faults.clear({ code: TALK_WATCH_CODE });
+
+				return read;
+			},
+			(error: Error) => {
+				if (signal?.aborted) return undefined;
+
+				state.faults.raise({ code: TALK_WATCH_CODE, cause: `hum could not read roundup's Rail to watch the rows you talk to: ${error.message}`, fix: "hum reads it again at its next poll or tick." });
+
+				return undefined;
+			},
+		);
+
+		return keptTalks().map(({ item, folder, looked }) => ({ item, folder, waits: looked !== undefined && (nodes === undefined || verdictOf(looked, readRow(looked.row, folder, nodes)).kind === "wait") }));
+	};
+
+	/** Whether the talk watch runs: one at a time. */
+	let watching = false;
+
+	/** The runs whose need of hum the talk watch told the worker of; a call that looks at a run takes it off, so a later need tells again. */
+	const told = new Set<string>();
+
+	/**
+	 * Reads the Rail each poll while a row the owner talks to waits on them, with no pass watching it. A read marks a row
+	 * asked once roundup shows it waiting on the owner, and a row hum must look at wakes the worker for its item, once.
+	 */
+	const watchTalks = (): void => {
+		if (watching || signal?.aborted) return;
+
+		watching = true;
+
+		const watched = async (): Promise<void> => {
+			while (!signal?.aborted) {
+				const readings = await talkReadings();
+
+				for (const { item, folder } of readings.filter(({ waits, folder: run }) => !waits && !told.has(run.root))) {
+					told.add(folder.root);
+					dropInto(state.inbox, item);
+				}
+
+				if (!readings.some(({ waits }) => waits)) return;
+
+				await Bun.sleep(pollMs);
+			}
+		};
+
+		void watched()
+			.catch((error: Error) => void state.faults.raise({ code: TALK_WATCH_CODE, cause: `hum stopped watching the rows you talk to: ${error.message}`, fix: "hum starts watching them again at its next tick." }))
+			.finally(() => {
+				watching = false;
+			});
 	};
 
 	/** A refusal to start a row, held with one card that names roundup's words and the fix. */
@@ -318,6 +431,7 @@ export const railRunner = ({ call, state, config, fallback, now }: RowsOptions):
 		}),
 	});
 
+	/** Starts a row and records it in its run's folder, or takes over the one recorded or alive under the run's name, and looks at it. */
 	const run = async (request: RunRequest): Promise<RunOutcome> => {
 		const { name, item } = request;
 
@@ -328,20 +442,27 @@ export const railRunner = ({ call, state, config, fallback, now }: RowsOptions):
 		if (now() < savedLimitUntil(state)) return { kind: "limited", until: savedLimitUntil(state) };
 
 		const folder = runFolder(state.dir, name);
+		const talks = request.talk === true;
 
 		keepSchema(folder, request);
+
+		if (talks) keepTalkRun(folder, { item: item.id, tokenCap: request.tokenCap });
+
 		/* The row's hooks write into this folder and do not make it. */
 		mkdirSync(folder.hooks, { recursive: true });
+		told.delete(folder.root);
 
 		try {
 			const workstream = await itemWorkstream(call, item);
-			const row = (await liveRow(folder, name, workstream)) ?? (await startRow(call, { stateDir: state.dir, config }, { name, folder, request, workstream, adopt: request.talk !== true })).id;
+			const row = (await rowOf(folder, name, workstream, talks)) ?? (await startRow(call, { stateDir: state.dir, config }, { name, folder, request, workstream, adopt: !talks })).id;
 
 			state.faults.clear({ code: ROW_REFUSED_CODE });
 
-			const outcome = await watch(request, name, row, folder);
+			const looked: Looked = { name, folder, row, talks, tokenCap: request.tokenCap };
+			const outcome = talks ? ((await look(looked, request, { announced: false })) ?? WAITING) : await watch(request, looked);
 
-			if (outcome.kind !== "stopped") rmSync(folder.root, { recursive: true, force: true });
+			if (outcome.kind === "waiting") watchTalks();
+			else if (outcome.kind !== "stopped") rmSync(folder.root, { recursive: true, force: true });
 
 			return outcome;
 		} catch (error) {
@@ -351,15 +472,29 @@ export const railRunner = ({ call, state, config, fallback, now }: RowsOptions):
 		}
 	};
 
-	/** The names of the runs whose rows are alive. */
+	/** The items whose runs the owner talks to hum keeps, each with whether all of them wait on the owner; while one does, the talk watch runs. */
+	const talking = async (): Promise<ReadonlyMap<string, boolean>> => {
+		const readings = await talkReadings();
+
+		if (readings.some(({ waits }) => waits)) watchTalks();
+
+		return readings.reduce((items, { item, waits }) => items.set(item, (items.get(item) ?? true) && waits), new Map<string, boolean>());
+	};
+
+	/** The names of the runs whose rows are alive in a run slot; a run the owner talks to holds none. */
 	const liveRuns = async (): Promise<ReadonlySet<string>> => {
 		const live = new Set((await tree()).filter((node) => node.status?.kind !== ENDED).map(({ id }) => id));
-		const rows = runFolders(state.dir).flatMap(({ row }) => orMissing(() => [RowRecord.parse(JSON.parse(readFileSync(row, "utf8")))], []));
+
+		const rows = runFolders(state.dir).flatMap((folder) => {
+			const row = talkRunOf(folder) === undefined ? recordOf(folder) : undefined;
+
+			return row === undefined ? [] : [row];
+		});
 
 		return new Set(rows.filter(({ id }) => live.has(id)).map(({ name }) => name));
 	};
 
-	return { run, limitedUntil: fallback.limitedUntil, liveRuns, talks: true };
+	return { run, limitedUntil: fallback.limitedUntil, liveRuns, talking, talks: true };
 };
 
 /**
