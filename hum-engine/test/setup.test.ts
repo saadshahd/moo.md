@@ -367,7 +367,7 @@ test("where roundup serves a slot, setup writes no service unit and prints the P
 
 	expect(result.ok && result.program).toEqual({
 		open: PROGRAM_PLACE,
-		fields: { Command: `"${bun}" ${join(realpathSync(repo), "node_modules", ".bin", "hum")} serve`, Folder: "", "Worktree path": ".hum-slots" },
+		fields: { Command: `"${bun}" ${join(realpathSync(repo), "node_modules", "@moo.md", "hum", "src", "cli", "main.ts")} serve`, Folder: "", "Worktree path": ".hum-slots" },
 		start: PROGRAM_START,
 	});
 	expect(existsSync(join(repo, ".hum-slots"))).toBe(true);

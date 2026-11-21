@@ -24,7 +24,8 @@ const RIG_MS = 180_000;
 /** How often hum serve ticks on the rig. */
 const TICK_SECONDS = 2;
 
-const CLI = join(import.meta.dir, "..", "src", "cli", "main.ts");
+/** This checkout's engine, which the rig's repo installs as a package manager does. */
+const ENGINE = join(import.meta.dir, "..");
 
 const ProgramRun = z.looseObject({ state: z.string(), terminalId: z.string().optional() });
 
@@ -114,8 +115,8 @@ beforeAll(async () => {
 
 	rig = await startRig(undefined, { slots: 0 });
 	repo = join(rig.dir, "repo");
-	mkdirSync(join(repo, "node_modules", ".bin"), { recursive: true });
-	symlinkSync(CLI, join(repo, "node_modules", ".bin", "hum"));
+	mkdirSync(join(repo, "node_modules", "@moo.md"), { recursive: true });
+	symlinkSync(ENGINE, join(repo, "node_modules", "@moo.md", "hum"));
 	appendFileSync(join(repo, ".git", "info", "exclude"), "node_modules/\n");
 	mkdirSync(join(repo, ".claude"), { recursive: true });
 	writeFileSync(join(repo, ".claude", "settings.json"), JSON.stringify(PROJECT_SETTINGS));
@@ -232,10 +233,17 @@ test.skipIf(!live)(
 		const restartedAt = Date.now();
 
 		await startProgram(entry);
-		await waitFor(async () => (startChecks() > checks ? true : undefined), "its worker's start check", 90_000, 10);
 
 		const starting = await waitFor(programTerminal, "the Program's Terminal");
-		const [worker] = await childrenOf(starting.program_pid);
+
+		const [worker] = await waitFor(async () => {
+			const children = await childrenOf(starting.program_pid);
+
+			return children.length > 0 ? children : undefined;
+		}, "its worker");
+
+		await waitFor(async () => (startChecks() > checks ? true : undefined), "its worker's start check", 90_000, 10);
+
 		const beat = humHeartbeat();
 
 		process.kill(starting.program_pid ?? 0, "SIGTERM");

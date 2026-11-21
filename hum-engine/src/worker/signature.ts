@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { z } from "zod";
+import { installedEngine } from "../engine.ts";
 import { EVALS_DIR } from "../measure/remeasure.ts";
 import { isMissing } from "../state/fs.ts";
 
@@ -27,7 +28,7 @@ const filesUnder = ({ root, folder, skipped }: { readonly root: string; readonly
 /** The engine version installed in the owner's repo, else `fallback` (the running one). */
 export const installedVersion = (repo: string, fallback: string): string => {
 	try {
-		return Package.safeParse(JSON.parse(readFileSync(join(repo, "node_modules", "@moo.md", "hum", "package.json"), "utf8"))).data?.version ?? fallback;
+		return Package.safeParse(JSON.parse(readFileSync(join(installedEngine(repo), "package.json"), "utf8"))).data?.version ?? fallback;
 	} catch (error) {
 		if (error instanceof Error && isMissing(error)) return fallback;
 

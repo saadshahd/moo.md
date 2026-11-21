@@ -1,7 +1,8 @@
 import { realpathSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { relative, resolve } from "node:path";
 import { z } from "zod";
 import { type RoundupClient, RoundupRefusal, roundupRpc } from "../adapters/roundup-rpc.ts";
+import { installedCli } from "../engine.ts";
 import type { Env } from "../exec.ts";
 
 /** Where the owner names the Project's program in roundup: its menu item, then the section. */
@@ -39,8 +40,8 @@ const commandWord = (word: string): string => {
 	return word.includes('"') ? `'${word}'` : `"${word}"`;
 };
 
-/** `hum serve` from the repo's pinned engine, run by `bun`. */
-export const serveCommand = (repo: string, bun: string): string[] => [bun, join(repo, "node_modules", ".bin", "hum"), "serve"];
+/** `hum serve` from the repo's pinned engine: `bun` runs its CLI file, since pnpm writes `.bin/hum` as a shell script. */
+export const serveCommand = (repo: string, bun: string): string[] => [bun, installedCli(repo), "serve"];
 
 /**
  * The program setup names: `hum serve` in the Project folder, adopting run slots in `pool`. The repo is read as its
