@@ -647,23 +647,24 @@ const abstained = (boundary: Boundary, why: string): Unclear => ({ cause: "absta
 
 const unmeasured = (models: readonly string[]): string => `${models.join(", ") || "no model"} has no measured rate that meets the bar`;
 
-/** The role that plans an item of `kind`: one a state of its machine runs whose purpose is plan; undefined where the kind never plans. */
-const planRoleOf = (config: Config, kind: Kind): string | undefined =>
-	Object.values(kind.machine.states).flatMap(({ invoke }) => (invoke !== undefined && config.hum.roles[invoke.src]?.purpose === "plan" ? [invoke.src] : []))[0];
+/** The roles that plan an item of `kind`: each one a state of its machine runs whose purpose is plan; none where the kind never plans. */
+const planRolesOf = (config: Config, kind: Kind): string[] => [
+	...new Set(Object.values(kind.machine.states).flatMap(({ invoke }) => (invoke !== undefined && config.hum.roles[invoke.src]?.purpose === "plan" ? [invoke.src] : []))),
+];
 
 /**
- * The models behind the item's plan: the one its kind's tier table gives the plan run, with any the run reported,
- * which can only add to it; none where the kind never plans.
+ * The models behind the item's plan: the ones its kind's tier table gives each of its plan roles, since the item ran
+ * one of them, with any the run reported, which can only add to them; none where the kind never plans.
  */
 const planModelsOf = async (ctx: LandContext): Promise<readonly string[] | undefined> => {
 	const kind = ctx.config.kinds[ctx.kind];
-	const role = kind && planRoleOf(ctx.config, kind);
+	const roles = kind === undefined ? [] : planRolesOf(ctx.config, kind);
 
-	if (kind === undefined || role === undefined) return undefined;
+	if (kind === undefined || roles.length === 0) return undefined;
 
-	const { model } = await tierOf(ctx, kind, { role, purpose: "plan" }, declaredChange(ctx.item));
+	const tiers = await Promise.all(roles.map((role) => tierOf(ctx, kind, { role, purpose: "plan" }, declaredChange(ctx.item))));
 
-	return [...new Set([model, ...(ctx.state.plans.get(ctx.id)?.models ?? [])])];
+	return [...new Set([...tiers.map(({ model }) => model), ...(ctx.state.plans.get(ctx.id)?.models ?? [])])];
 };
 
 /** Every model judgment behind the change that abstained, or came from a model id its boundary was not measured on. */

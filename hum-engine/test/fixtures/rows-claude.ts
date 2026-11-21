@@ -126,6 +126,7 @@ const SCENARIOS = new Map<string, () => Promise<void>>(Object.entries({
 	spike: talkRow("pick"),
 	draft: talkRow("pick"),
 	plan: async () => undefined,
+	"plan-after-talk": async () => undefined,
 	finish: () => turn(() => answer(DONE)),
 	fix: () =>
 		turn(() => {
@@ -142,6 +143,11 @@ const SCENARIOS = new Map<string, () => Promise<void>>(Object.entries({
 		await turn(() => undefined);
 		await until(() => existsSync(join(env.HUM_RUN_DIR ?? "", "noted")));
 		await turn(() => undefined);
+	},
+	unasked: async () => {
+		await turn(() => answer(DONE));
+		await until(() => existsSync(join(env.HUM_RUN_DIR ?? "", "noted")));
+		await turn(() => answer(DONE));
 	},
 	"silent-restart": async () => {
 		await turn(() => undefined);

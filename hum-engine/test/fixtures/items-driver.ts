@@ -149,7 +149,7 @@ const talk = async (): Promise<object> => {
 		return nodes.filter(({ parent }) => parent !== undefined && parent === own?.id);
 	};
 
-	for (const deadline = Date.now() + ANSWER_WAIT_MS; !(await rows()).some(({ name }) => name.includes(" plan ")) && Date.now() < deadline; ) await Bun.sleep(200);
+	for (const deadline = Date.now() + ANSWER_WAIT_MS; !(await rows()).some(({ name }) => name.includes(" plan-after-talk ")) && Date.now() < deadline; ) await Bun.sleep(200);
 
 	const seen = await rows();
 

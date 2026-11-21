@@ -92,6 +92,9 @@ const orThrown = <T>(read: () => T): T | undefined => {
 
 const Saved = z.strictObject({ mac: z.string(), text: z.string() });
 
+/** Whether the run saved an answer that hum has not taken, whether or not it would count. */
+export const hasSavedAnswer = (folder: RunFolder): boolean => listFiles(folder.answers).length > 0;
+
 /** When roundup first showed a row waiting on the owner. */
 const AskedMark = z.strictObject({ since: z.number() });
 

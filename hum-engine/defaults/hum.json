@@ -65,6 +65,14 @@
 		"plan": {
 			"file": "roles/plan.md",
 			"purpose": "plan",
+			"skills": [
+				"hope:intent",
+				"hope:shape"
+			]
+		},
+		"plan-after-talk": {
+			"file": "roles/plan.md",
+			"purpose": "plan",
 			"skills": []
 		},
 		"build": {

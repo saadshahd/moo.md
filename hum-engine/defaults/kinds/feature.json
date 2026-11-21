@@ -130,7 +130,7 @@
 		"initial": "opening",
 		"states": {
 			"opening": {
-				"description": "Where a run can talk with the owner, the item opens with ideate and shape; elsewhere it goes straight to planning.",
+				"description": "Where a run can talk with the owner, the item opens with ideate and shape, then plans from what the owner settled; elsewhere it goes straight to planning, whose role does that work itself.",
 				"always": [
 					{
 						"target": "ideating",
@@ -158,7 +158,7 @@
 				"invoke": {
 					"src": "shape",
 					"onDone": {
-						"target": "planning"
+						"target": "planning-after-talk"
 					},
 					"onError": {
 						"target": "stuck"
@@ -168,6 +168,26 @@
 			"planning": {
 				"invoke": {
 					"src": "plan",
+					"onError": {
+						"target": "stuck"
+					}
+				},
+				"on": {
+					"plan-ready": {
+						"target": "building"
+					},
+					"needs-split": {
+						"target": "done"
+					},
+					"plan-blocked": {
+						"target": "asking"
+					}
+				}
+			},
+			"planning-after-talk": {
+				"description": "Plans from the work order and the picks the owner settled in the talk rows, so its role reaches for no intent or shape skill.",
+				"invoke": {
+					"src": "plan-after-talk",
 					"onError": {
 						"target": "stuck"
 					}

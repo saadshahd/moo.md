@@ -844,6 +844,15 @@ test("where runs talk with the owner, a feature opens with ideate and shape, who
 	expect(plan?.prompt).toContain("- Its tone: plain");
 });
 
+test("where runs cannot talk with the owner, a feature plans at once, and its plan run reaches for hope:intent and hope:shape itself", async () => {
+	const w = await world({ script: [{}, NOTE], decisions: [READY_PLAN] });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toEqual({ outcome: "merged", item: id });
+	expect(w.state.talks.get(id)).toBeUndefined();
+	expect(skillsIn(w.shim.decisions()[0]?.prompt ?? "")).toBe("hope:intent, hope:shape");
+});
+
 test("a pass that stops while a choice's row is open keeps what the owner settled, so the next pass runs only that row", async () => {
 	const w = await world({ script: [{}, NOTE], decisions: [READY_PLAN] });
 	const id = w.repo.seed("Write the note");

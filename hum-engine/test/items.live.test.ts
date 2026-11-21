@@ -163,7 +163,7 @@ test.skipIf(!live)("a feature item shows its ideate row, then its shape row and 
 		["find 1", "shown"],
 		["spike 2", "shown"],
 	]);
-	expect(steps.slice(5)).toEqual([["plan", "internal"]]);
+	expect(steps.slice(5)).toEqual([["plan-after-talk", "internal"]]);
 	expect(talk).toMatchObject({ order: { title: "Write the note" }, choices: [{ pick: "the first" }, { pick: "the first" }, { pick: "the first" }, { pick: "plain" }] });
 	expect(JSON.stringify(talk)).not.toContain("early");
 

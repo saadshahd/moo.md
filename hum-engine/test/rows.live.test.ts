@@ -126,6 +126,21 @@ test.skipIf(!live)(
 );
 
 test.skipIf(!live)(
+	"a row the owner talks to that answers without asking them gets one note to ask first, and hum stops it once it answers so again",
+	async () => {
+		const outcome = await run("unasked");
+		const [row] = await rowsOf("unasked");
+		const notes = await notesTo(row?.id ?? "");
+
+		expect(outcome).toMatchObject({ kind: "finished", subtype: ROW_STOPPED });
+		expect(outcome?.text).toContain("without asking the owner");
+		expect(notes).toHaveLength(1);
+		expect(JSON.stringify(notes)).toContain("AskUserQuestion");
+	},
+	SCENARIO_MS,
+);
+
+test.skipIf(!live)(
 	"a row the owner stops reports stopped",
 	async () => {
 		const outcome = await run("stopped", async () => {

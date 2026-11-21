@@ -15,7 +15,10 @@ import { refusing } from "./rows-rig.ts";
 const [scenario = "", rig = ""] = process.argv.slice(2);
 
 /** Each scenario's run works in a slot of its own. */
-const SLOTS = new Map(Object.entries({ finish: "s1", fix: "s2", keyless: "s3", silent: "s4", stopped: "s5", restart: "s6", "silent-restart": "s7" }));
+const SLOTS = new Map(Object.entries({ finish: "s1", fix: "s2", keyless: "s3", silent: "s4", stopped: "s5", restart: "s6", "silent-restart": "s7", unasked: "s8" }));
+
+/** The scenarios whose run the owner talks to. */
+const TALKS = new Set(["unasked"]);
 
 const state = openState(join(rig, "state"), { now: Date.now });
 
@@ -38,6 +41,7 @@ const result = async (): Promise<object> => {
 		model: "haiku",
 		effort: "low",
 		schema: RUN_SCHEMA,
+		talk: TALKS.has(scenario),
 		signal: abort.signal,
 	});
 

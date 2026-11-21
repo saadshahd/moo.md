@@ -28,7 +28,7 @@ export const refusing: Runner = {
 };
 
 /** The run slots the rig's repo holds, one per scenario, each a worktree on a branch of its own. */
-const SLOTS = 7;
+const SLOTS = 8;
 
 export const SLOTS_DIR = ".hum-slots";
 
@@ -107,6 +107,7 @@ export const startRig = async (driver = DRIVER, { slots = SLOTS }: { readonly sl
 			HUM_ROWS_RIG: dir,
 			HUM_ROWS_CLI: CLI,
 			HUM_ROWS_CLAUDE: claude,
+			HUM_HOPE_ROOT: join(import.meta.dir, "..", "..", "..", "hope"),
 		},
 		stdout: Bun.file(join(dir, "rupd.log")),
 		stderr: Bun.file(join(dir, "rupd.err")),

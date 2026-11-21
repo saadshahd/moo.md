@@ -14,7 +14,7 @@ import { failedWith, finishedOf, hookReports, runSettings, STOP_EVENT, succeeded
 import { limitOf, savedLimitUntil, settleLimit } from "./limit.ts";
 import { itemWorkstream, NEEDS_YOU, RailNode, railName, railTree } from "./rail.ts";
 import { HUM_EXT, type RoundupCall, type RoundupClient, RoundupRefusal } from "./roundup-rpc.ts";
-import { askedSince, keepSchema, markAsked, type RunFolder, runFolder, runFolders, runKey, takeAnswer } from "./run-answer.ts";
+import { askedSince, hasSavedAnswer, keepSchema, markAsked, type RunFolder, runFolder, runFolders, runKey, takeAnswer } from "./run-answer.ts";
 import { readTranscript, type RunTranscript } from "./transcript.ts";
 
 const RowRecord = z.strictObject({ id: z.string(), name: z.string() });
@@ -161,9 +161,10 @@ type Reading = { readonly node: RailNode | undefined; readonly transcript: RunTr
  * `hum run-answer`, which counts only under the run's key. A row found alive under the run's name is taken over, never
  * started twice, and one hum stops on its way out is left running for the next hum to take over. A row that ends a turn with no answer gets one note; a second such turn, or no new turn within the
  * configured wait, stops it and fails the run. A run the owner talks to starts shown, in the run's working copy
- * without adopting it, so several such rows run there side by side; it gets no note, since it waits on the owner
- * through its turns, and its answer counts only once roundup showed the row waiting on the owner. A cheap model call
- * and a run with no name go to `fallback`.
+ * without adopting it, so several such rows run there side by side. It waits on the owner through its turns, and its
+ * answer counts only once roundup showed the row waiting on the owner; one that answers and goes idle without asking
+ * gets one note to ask first, and answering so again stops it and fails the run. A cheap model call and a run with no
+ * name go to `fallback`.
  */
 export const railRunner = ({ call, state, config, fallback, now }: RowsOptions): Runner => {
 	const pollMs = config.backgroundPollSeconds * SECOND_MS;
@@ -202,8 +203,17 @@ export const railRunner = ({ call, state, config, fallback, now }: RowsOptions):
 	const noted = (folder: RunFolder): { readonly at: number; readonly stops: number } | undefined =>
 		orMissing(() => ({ at: statSync(folder.noted).mtimeMs, ...NotedMark.parse(JSON.parse(readFileSync(folder.noted, "utf8"))) }), undefined);
 
-	const note = async (row: string, name: string, folder: RunFolder, stops: number): Promise<void> => {
-		await call("message.send", { to: row, kind: "note", body: `hum has no answer from you yet. Hand it over as the Pad "${briefName(name)}" says: pipe it to hum's answer command until it prints \`answer saved\`.` });
+	/**
+	 * What hum's one note to a row says: a row with no answer yet is told how to hand it over; a row the owner talks to
+	 * that answered without asking them is told to ask first.
+	 */
+	const NOTES = {
+		answer: (name: string) => `hum has no answer from you yet. Hand it over as the Pad "${briefName(name)}" says: pipe it to hum's answer command until it prints \`answer saved\`.`,
+		ask: () => "hum counts your answer only once the owner answered a question of yours in this row. Ask them with your AskUserQuestion tool, then hand your answer over again.",
+	} as const;
+
+	const note = async (row: string, body: string, folder: RunFolder, stops: number): Promise<void> => {
+		await call("message.send", { to: row, kind: "note", body });
 		atomicWrite(folder.noted, JSON.stringify({ stops }));
 	};
 
@@ -272,17 +282,19 @@ export const railRunner = ({ call, state, config, fallback, now }: RowsOptions):
 				return ended(reading, reading.transcript.apiError);
 			}
 
-			const mark = talks ? undefined : noted(folder);
+			const mark = noted(folder);
+			const idle = reading.node.status?.kind === IDLE;
+			const due = talks ? idle && askedSince(folder) === undefined && hasSavedAnswer(folder) : reading.stops > 0;
 
-			if (!talks && mark === undefined && reading.stops > 0) await note(row, name, folder, reading.stops);
+			if (mark === undefined && due) await note(row, talks ? NOTES.ask() : NOTES.answer(name), folder, reading.stops);
 
-			if (mark !== undefined && reading.stops > mark.stops) {
+			if (mark !== undefined && due && reading.stops > mark.stops) {
 				await stop(row);
 
-				return ended(reading, `the row "${railName(name)}" ended a turn after hum's note with no answer`);
+				return ended(reading, talks ? `the row "${railName(name)}" answered again after hum's note without asking the owner` : `the row "${railName(name)}" ended a turn after hum's note with no answer`);
 			}
 
-			if (mark !== undefined && reading.node.status?.kind === IDLE && now() - mark.at > noteWaitMs) {
+			if (!talks && mark !== undefined && idle && now() - mark.at > noteWaitMs) {
 				await stop(row);
 
 				return ended(reading, `the row "${railName(name)}" stayed idle ${config.rowNoteWaitSeconds} seconds after hum's note with no answer`);
