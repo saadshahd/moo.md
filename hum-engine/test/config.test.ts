@@ -88,9 +88,9 @@ test("a rename that strands a saved item is refused; with a map the item restore
 		const next = clone(setUp());
 		const text = JSON.stringify(next.kinds.feature).replaceAll("owner-review", "deep-review");
 		next.kinds.feature = JSON.parse(text);
-		next.kinds.feature.machine.version = "2";
+		next.kinds.feature.machine.version = "3";
 
-		if (map) next.kinds.feature.stateMap = { "1": { "owner-review": "deep-review" } };
+		if (map) next.kinds.feature.stateMap = { "2": { "owner-review": "deep-review" } };
 
 		return next;
 	};
@@ -266,7 +266,7 @@ test("hum ships no email address: its defaults and its schema hold none", () => 
 });
 
 test("a plugin skill no installed plugin has is refused, naming the skill and the role", () => {
-	const fake = { installedSkills: new Set(["hope:intent", "hope:shape"]) };
+	const fake = { installedSkills: new Set([...env.installedSkills].filter((skill) => skill !== "hope:judge")) };
 	const result = loadConfig(setUp(), { env: fake });
 
 	expect(result.ok).toBe(false);
@@ -279,9 +279,9 @@ test("a plugin skill no installed plugin has is refused, naming the skill and th
 test("a role may name another plugin's skill once that plugin is installed, and a bare skill name is the repo's own", () => {
 	const named = clone(setUp());
 
-	named.hum.roles.build.skills = ["sound:prime", "sound:review", "my-own-skill"];
+	named.hum.roles.build.skills = ["other:prime", "other:review", "my-own-skill"];
 
-	expect(loadConfig(named, { env: { installedSkills: new Set([...env.installedSkills, "sound:prime", "sound:review"]) } }).ok).toBe(true);
+	expect(loadConfig(named, { env: { installedSkills: new Set([...env.installedSkills, "other:prime", "other:review"]) } }).ok).toBe(true);
 	expect(!loadConfig(named, { env }).ok).toBe(true);
 });
 

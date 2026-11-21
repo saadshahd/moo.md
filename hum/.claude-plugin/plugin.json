@@ -7,7 +7,7 @@
     "name": "Saad Shahd",
     "url": "https://saadshahd.github.io"
   },
-  "dependencies": ["hope@moo.md"],
+  "dependencies": ["hope@moo.md", "sound@moo.md"],
   "types": "./types/index.d.ts",
   "userConfig": {
     "pollSeconds": {

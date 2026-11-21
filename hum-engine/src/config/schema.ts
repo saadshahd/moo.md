@@ -35,7 +35,10 @@ const RUN_PARTS: ReadonlySet<string> = new Set(["checks", "shows-bug", "bug-gone
 /** Whether a state's `invoke.src` names an engine part that runs. */
 export const isRunPart = (src: string): boolean => RUN_PARTS.has(src);
 
-export const PURPOSES = ["plan", "build", "fix", "review"] as const;
+/** The purposes of runs the owner talks to in a Rail row: each asks the owner itself and hands back what they settled. */
+export const TALK_PURPOSES = ["ideate", "design", "pick"] as const;
+
+export const PURPOSES = ["plan", "build", "fix", "review", ...TALK_PURPOSES] as const;
 
 /** The integration slots `hum.json` `integrations` names, each to an adapter. */
 export const SLOTS = ["work-source", "questions", "answers", "release"] as const;

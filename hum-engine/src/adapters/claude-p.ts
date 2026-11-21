@@ -308,6 +308,8 @@ export type RunRequest = {
 	readonly name?: string;
 	/** The item the run works on: a Rail row sits in its item's Workstream. */
 	readonly item?: ItemRef;
+	/** The owner talks with the run: only a runner whose `talks` is true hosts it. */
+	readonly talk?: boolean;
 	/** Tokens the item may still spend. */
 	readonly tokenCap?: number;
 	readonly sessionId?: string;
@@ -327,6 +329,8 @@ export type Runner = {
 	readonly limitedUntil: () => number;
 	/** The names of the runs alive outside this process: a background runner lists them, a `claude -p` runner has none. */
 	readonly liveRuns?: () => Promise<ReadonlySet<string>>;
+	/** The owner can talk with its runs: each is a Rail row they see. */
+	readonly talks?: boolean;
 };
 
 export type RunnerOptions = {

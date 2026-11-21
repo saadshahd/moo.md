@@ -119,7 +119,10 @@
 							"plan",
 							"build",
 							"fix",
-							"review"
+							"review",
+							"ideate",
+							"design",
+							"pick"
 						]
 					},
 					"skills": {

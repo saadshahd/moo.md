@@ -10,7 +10,8 @@ const MOO_MARKETPLACE = "moo.md";
 
 const MOO_REPO = "https://github.com/saadshahd/moo.md";
 
-const HOPE_PLUGIN = `hope@${MOO_MARKETPLACE}`;
+/** The moo.md plugins whose skills hum's shipped roles name. */
+export const MOO_PLUGINS = ["hope", "sound"] as const;
 
 /** The engine's folder: `hum-engine` in a moo.md checkout, `node_modules/@moo.md/hum` in an owner's repo. */
 const ENGINE_ROOT = resolve(import.meta.dir, "..", "..");
@@ -74,9 +75,9 @@ const COMMIT_SHA = /^[0-9a-f]{40}$/;
 const isUnpinned = (source: z.infer<typeof Source>): boolean => (source.source === "github" || source.source === "git") && !COMMIT_SHA.test(source.ref ?? "");
 
 /**
- * The `claude` command lines that install hope and the repo's plugins: moo.md from `mooFolder`, its checkout at the
- * shipped commit, which stands in for any moo.md the settings declare; each other marketplace they declare; then hope
- * and every plugin they enable. A marketplace from a repo whose `ref` is no full commit SHA throws: its hooks would run
+ * The `claude` command lines that install hum's plugins and the repo's: moo.md from `mooFolder`, its checkout at the
+ * shipped commit, which stands in for any moo.md the settings declare; each other marketplace they declare; then the
+ * moo.md plugins hum's roles name and every plugin the settings enable. A marketplace from a repo whose `ref` is no full commit SHA throws: its hooks would run
  * in every run as whatever its branch or tag holds that day.
  */
 export const pluginCommands = (settings: RepoPlugins, { repo, mooFolder }: { readonly repo: string; readonly mooFolder: string }): string[][] => {
@@ -88,7 +89,7 @@ export const pluginCommands = (settings: RepoPlugins, { repo, mooFolder }: { rea
 	const marketplaces = declared.map(([, { source }]) => marketplaceArgument(source, repo));
 	const enabled = Object.entries(settings.enabledPlugins).flatMap(([id, on]) => (on === true ? [id] : []));
 
-	return [mooFolder, ...marketplaces].map((source) => ["plugin", "marketplace", "add", source]).concat([...new Set([HOPE_PLUGIN, ...enabled])].map((id) => ["plugin", "install", id]));
+	return [mooFolder, ...marketplaces].map((source) => ["plugin", "marketplace", "add", source]).concat([...new Set([...MOO_PLUGINS.map((plugin) => `${plugin}@${MOO_MARKETPLACE}`), ...enabled])].map((id) => ["plugin", "install", id]));
 };
 
 /** The plugin settings of the repo's `.claude/settings.json`; none where it has no such file. */

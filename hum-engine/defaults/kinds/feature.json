@@ -1,6 +1,57 @@
 {
 	"tiers": [
 		{
+			"purpose": "ideate",
+			"tier": "standard",
+			"effort": "high"
+		},
+		{
+			"purpose": "ideate",
+			"level": "high",
+			"tier": "top",
+			"effort": "high"
+		},
+		{
+			"purpose": "ideate",
+			"level": "critical",
+			"tier": "top",
+			"effort": "high"
+		},
+		{
+			"purpose": "design",
+			"tier": "standard",
+			"effort": "high"
+		},
+		{
+			"purpose": "design",
+			"level": "high",
+			"tier": "top",
+			"effort": "high"
+		},
+		{
+			"purpose": "design",
+			"level": "critical",
+			"tier": "top",
+			"effort": "high"
+		},
+		{
+			"purpose": "pick",
+			"tier": "standard",
+			"effort": "high"
+		},
+		{
+			"purpose": "pick",
+			"level": "high",
+			"tier": "top",
+			"effort": "high"
+		},
+		{
+			"purpose": "pick",
+			"level": "critical",
+			"tier": "top",
+			"effort": "high"
+		},
+		{
 			"purpose": "plan",
 			"tier": "standard",
 			"effort": "high"
@@ -75,9 +126,45 @@
 	},
 	"machine": {
 		"id": "feature",
-		"version": "1",
-		"initial": "planning",
+		"version": "2",
+		"initial": "opening",
 		"states": {
+			"opening": {
+				"description": "Where a run can talk with the owner, the item opens with ideate and shape; elsewhere it goes straight to planning.",
+				"always": [
+					{
+						"target": "ideating",
+						"guard": {
+							"type": "talks"
+						}
+					},
+					{
+						"target": "planning"
+					}
+				]
+			},
+			"ideating": {
+				"invoke": {
+					"src": "ideate",
+					"onDone": {
+						"target": "shaping"
+					},
+					"onError": {
+						"target": "stuck"
+					}
+				}
+			},
+			"shaping": {
+				"invoke": {
+					"src": "shape",
+					"onDone": {
+						"target": "planning"
+					},
+					"onError": {
+						"target": "stuck"
+					}
+				}
+			},
 			"planning": {
 				"invoke": {
 					"src": "plan",

@@ -6,6 +6,7 @@ import { judgeHash } from "../../src/measure/judges.ts";
 import { withTimeouts } from "../../src/setup/waits.ts";
 import { OWNER } from "./identity.ts";
 import { SHIM_MODEL } from "./shim.ts";
+import { MOO_PLUGINS } from "../../src/service/plugins.ts";
 
 export const root = join(import.meta.dir, "..", "..");
 
@@ -87,7 +88,7 @@ export const writeConfigDir = (folder: string, raw: Tree): void => {
 	for (const [path, text] of Object.entries<string>(raw.roles)) put(path, text);
 };
 
-export const installedSkills = (): ReadonlySet<string> => new Set(listPluginSkills("hope", join(root, "../hope")));
+export const installedSkills = (): ReadonlySet<string> => new Set(MOO_PLUGINS.flatMap((plugin) => listPluginSkills(plugin, join(root, "..", plugin))));
 
 /** The shipped config with `edit` applied, loaded as if hope and the plugin skills in `installed` were installed. */
 export const configWith = (edit: (raw: Tree) => void = () => {}, installed: readonly string[] = []): Config => {

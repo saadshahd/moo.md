@@ -104,6 +104,9 @@ const kindProblems = (kind: string, config: Kind, hum: HumConfig): Problem[] => 
 		}
 	}
 
+	/* A design run starts a row of each pick role a choice names, so a kind that runs one runs them all. */
+	if ([...runs.values()].includes("design")) for (const [role, { purpose }] of Object.entries(hum.roles)) if (purpose === "pick") runs.set(role, purpose);
+
 	const levels = levelNames(hum);
 
 	for (const row of config.tiers) {

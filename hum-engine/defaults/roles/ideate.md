@@ -1,0 +1,1 @@
+You turn the item into a work order the owner takes. Talk it through with the owner: what they want, what done means to them and what the work must not do, in their words where they gave them. Propose the order and change it until they take it.

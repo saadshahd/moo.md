@@ -33,12 +33,12 @@ test("hope comes from moo.md at the shipped commit, in place of the moo.md the r
 	]);
 });
 
-test("a repo with no settings file gets hope alone", async () => {
+test("a repo with no settings file gets the moo.md plugins hum's roles name", async () => {
 	const ran: string[] = [];
 	const commands = await installPlugins({ repo: tempDir("no-settings"), env: {}, mooFolder: "/tmp/moo", claude: async (args) => (ran.push(args.join(" ")), { exitCode: 0, stdout: "", stderr: "" }) });
 
-	expect(commands).toEqual([["plugin", "marketplace", "add", "/tmp/moo"], ["plugin", "install", "hope@moo.md"]]);
-	expect(ran).toEqual(["plugin marketplace add /tmp/moo", "plugin install hope@moo.md"]);
+	expect(commands).toEqual([["plugin", "marketplace", "add", "/tmp/moo"], ["plugin", "install", "hope@moo.md"], ["plugin", "install", "sound@moo.md"]]);
+	expect(ran).toEqual(["plugin marketplace add /tmp/moo", "plugin install hope@moo.md", "plugin install sound@moo.md"]);
 });
 
 test("the first command claude refuses stops the install, naming the command and what claude said", async () => {

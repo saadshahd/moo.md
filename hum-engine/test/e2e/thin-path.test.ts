@@ -1,5 +1,10 @@
 import { docsJudge, scriptedJudge, SOUND } from "../fixtures/judge.ts";
-import type { Runner } from "../../src/adapters/claude-p.ts";
+import type { RunOutcome, Runner, RunRequest } from "../../src/adapters/claude-p.ts";
+import { finishedOf, succeededWith } from "../../src/adapters/hooked-run.ts";
+import { readTranscript } from "../../src/adapters/transcript.ts";
+import { until } from "../fixtures/process.ts";
+import type { z } from "zod";
+import { choicesAnswer, type IdeateAnswer, type PickAnswer } from "../../src/decide/talk.ts";
 import { type ModelCall, modelCallOver } from "../../src/adapters/model-call.ts";
 import { expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
@@ -753,6 +758,104 @@ test("a feature runs its plan and review states: the plan run's ready plan reach
 	expect(review?.prompt).not.toContain("Write it.");
 	expect(w.repo.show(id)).toContain("state: done");
 	expect(folded(w, id)).toMatchObject({ doneBy: "review", picks: { plan: { pick: { event: "plan-ready" } }, review: { pick: { event: "approve" } }, alignment: { alignment: { graded: SOUND } } } });
+});
+
+/** The work order the owner takes at ideate in the talk tests. */
+const ORDER = { title: "Write the note", ask: "Write docs/note.md for a first-time reader.", done: "docs/note.md greets the reader.", limits: ["Change no file but docs/note.md."] };
+
+/** What shape names with the owner: three choices a row of its role settles, and one the owner picked in the shape row. */
+const CHOICES = [
+	{ title: "Where the words come from", detail: "a tool or our own", role: "find" },
+	{ title: "How fast it shows", detail: "inline or lazy", role: "spike" },
+	{ title: "How it looks", detail: "a card or a banner", role: "draft" },
+	{ title: "Its tone", detail: "plain or warm", pick: "plain" },
+];
+
+/** What a talk run hands back, in its step's contract. */
+type TalkAnswer = z.input<typeof IdeateAnswer> | z.input<ReturnType<typeof choicesAnswer>> | z.input<typeof PickAnswer>;
+
+/** A talk run that ends with `answer`, as a row the owner answered does. */
+const said = (answer: TalkAnswer): RunOutcome => finishedOf(undefined, readTranscript(""), succeededWith(answer));
+
+/** How each talk run ends, by the run's name. */
+type Talks = Record<string, () => Promise<RunOutcome>>;
+
+const SETTLED = {
+	ideate: async () => said({ order: ORDER }),
+	"shape": async () => said({ choices: CHOICES }),
+	"find 1": async () => said({ pick: "our own words", found: "no tool writes notes" }),
+	"spike 2": async () => said({ pick: "inline", found: "inline shows in 2 ms, lazy in 9 ms" }),
+	"draft 3": async () => said({ pick: "a card", found: "two drafts, a card and a banner" }),
+} satisfies Talks;
+
+const runName = ({ name }: RunRequest): string | undefined => /^hum \S+ (.+) #\d+$/.exec(name ?? "")?.[1];
+
+/** A runner whose runs the owner can talk with, as Rail rows are: a talk run ends as `talks` says by its name, and every other run goes to `rest`. */
+const talkingRunner = (rest: Runner, talks: Talks) => {
+	const asked: RunRequest[] = [];
+
+	const runner: Runner = {
+		...rest,
+		talks: true,
+		run: async (request) => {
+			if (!request.talk) return rest.run(request);
+
+			asked.push(request);
+
+			const ends = talks[runName(request) ?? ""];
+
+			if (ends === undefined) throw new Error(`no talk for ${request.name}`);
+
+			return ends();
+		},
+	};
+
+	return { runner, asked, names: () => asked.map(runName) };
+};
+
+/** The skills a run's prompt names. */
+const skillsIn = (prompt: string): string | undefined => /Use these skills with the Skill tool where they apply: (.+)\./.exec(prompt)?.[1];
+
+test("where runs talk with the owner, a feature opens with ideate and shape, whose open choices each run a row of their role side by side; planning waits until every choice carries the owner's pick, then reads the order and the picks", async () => {
+	const draft = Promise.withResolvers<void>();
+	const w = await world({ script: [{}, NOTE], decisions: [READY_PLAN] });
+	const id = w.repo.seed("Write the note");
+	const talk = talkingRunner(w.thinPath().runner, { ...SETTLED, "draft 3": async () => (await draft.promise, said({ pick: "a card", found: "two drafts, a card and a banner" })) });
+	const picked = () => (w.state.talks.get(id)?.choices ?? []).filter(({ pick }) => pick !== undefined).length;
+	const passed = runThinPath(w.thinPath({ judge: featureJudge, runner: talk.runner }));
+
+	await until(() => talk.asked.length === 5 && picked() === 3);
+	await Bun.sleep(200);
+	expect(w.shim.decisions()).toEqual([]);
+	draft.resolve();
+
+	expect(await passed).toEqual({ outcome: "merged", item: id });
+	expect(talk.names().slice(0, 2)).toEqual(["ideate", "shape"]);
+	expect(talk.names().slice(2).toSorted()).toEqual(["draft 3", "find 1", "spike 2"]);
+	expect(talk.asked.map((request) => request.talk)).toEqual([true, true, true, true, true]);
+	expect(Object.fromEntries(talk.asked.map((request) => [runName(request), skillsIn(request.prompt)]))).toEqual({ ideate: "hope:intent", "shape": "hope:shape", "find 1": "sound:find", "spike 2": undefined, "draft 3": "hope:freeze, hope:draft" });
+
+	const [plan] = w.shim.decisions();
+
+	expect(plan?.purpose).toBe("plan");
+	expect(skillsIn(plan?.prompt ?? "")).toBeUndefined();
+	expect(plan?.prompt).toContain(ORDER.ask);
+	expect(plan?.prompt).toContain("- How it looks: a card. two drafts, a card and a banner");
+	expect(plan?.prompt).toContain("- Its tone: plain");
+});
+
+test("a pass that stops while a choice's row is open keeps what the owner settled, so the next pass runs only that row", async () => {
+	const w = await world({ script: [{}, NOTE], decisions: [READY_PLAN] });
+	const id = w.repo.seed("Write the note");
+	const picked = () => (w.state.talks.get(id)?.choices ?? []).filter(({ pick }) => pick !== undefined).length;
+	const stopping = talkingRunner(w.thinPath().runner, { ...SETTLED, "draft 3": async () => (await until(() => picked() === 3), { kind: "stopped" }) });
+
+	expect(await runThinPath(w.thinPath({ judge: featureJudge, runner: stopping.runner }))).toEqual({ outcome: "lost", item: id });
+
+	const again = talkingRunner(w.thinPath().runner, SETTLED);
+
+	expect(await runThinPath(w.thinPath({ judge: featureJudge, runner: again.runner, itemId: id }))).toEqual({ outcome: "merged", item: id });
+	expect(again.names()).toEqual(["draft 3"]);
 });
 
 const APP = "apps/desktop/src/app.tsx";

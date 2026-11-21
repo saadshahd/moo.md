@@ -11,7 +11,7 @@ import { MergedCase } from "../measure/cases.ts";
 import { OpKeys } from "./ops.ts";
 import { Records } from "./records.ts";
 import { RunRecords } from "./runs.ts";
-import { FiledFollowUp, FiledPart, ItemKind, Landing, Learned, Limit, Parked, PullRequestText, QueuedQuestion, ReadyList, SavedPlan, SavedRepro, SettledAnswer, Slot, Spent, Verdict } from "./saved.ts";
+import { FiledFollowUp, FiledPart, ItemKind, Landing, Learned, Limit, Parked, PullRequestText, QueuedQuestion, ReadyList, SavedPlan, SavedRepro, SavedTalk, SettledAnswer, Slot, Spent, Verdict } from "./saved.ts";
 
 /** Names under the state folder that other modules address by name. */
 export const STATUS_FILE = "status.json";
@@ -67,6 +67,8 @@ export const openState = (dir: string, { now, ...codec }: StateOptions) => {
 		/** Each item's kind, by item id. */
 		itemKinds: new Records(join(dir, "item-kinds"), ItemKind),
 		plans: new Records(join(dir, "plans"), SavedPlan),
+		/** What the owner settled in each item's ideate and shape rows, by item. */
+		talks: new Records(join(dir, "talks"), SavedTalk),
 		verdicts: new Records(join(dir, "verdicts"), Verdict),
 		/** The pull request text the latest build or fix run wrote, by item. */
 		pullRequests: new Records(join(dir, "pull-requests"), PullRequestText),

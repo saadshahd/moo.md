@@ -28,13 +28,44 @@
 	],
 	"paths": [],
 	"roles": {
+		"ideate": {
+			"file": "roles/ideate.md",
+			"purpose": "ideate",
+			"skills": [
+				"hope:intent"
+			]
+		},
+		"shape": {
+			"file": "roles/shape.md",
+			"purpose": "design",
+			"skills": [
+				"hope:shape"
+			]
+		},
+		"find": {
+			"file": "roles/find.md",
+			"purpose": "pick",
+			"skills": [
+				"sound:find"
+			]
+		},
+		"spike": {
+			"file": "roles/spike.md",
+			"purpose": "pick",
+			"skills": []
+		},
+		"draft": {
+			"file": "roles/draft.md",
+			"purpose": "pick",
+			"skills": [
+				"hope:freeze",
+				"hope:draft"
+			]
+		},
 		"plan": {
 			"file": "roles/plan.md",
 			"purpose": "plan",
-			"skills": [
-				"hope:intent",
-				"hope:shape"
-			]
+			"skills": []
 		},
 		"build": {
 			"file": "roles/build.md",

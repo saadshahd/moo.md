@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
-import { type AnyActor, createActor, createAsyncLogic } from "xstate";
+import { type AnyActor, type AnyActorLogic, createActor, createAsyncLogic } from "xstate";
 import type { Holder, Item, ItemId, Question, Questions, ThreadEntry, WorkSource } from "../adapter-api.ts";
 import { type Finished, type Paused, type Runner, hasSucceeded, isPaused } from "../adapters/claude-p.ts";
 import { configuredModelCall, type ModelCall } from "../adapters/model-call.ts";
@@ -12,13 +12,13 @@ import type { PullRequests } from "../adapters/pull-requests.ts";
 import { pickTier } from "../config/checks.ts";
 import type { Config } from "../config/load.ts";
 import { ANSWERED, earliestTimeout, invokedSources, kindMachine, TOKEN_CAP } from "../config/machine.ts";
-import { type Kind, type Naming, OWNER_WAIT_TAG, PURPOSES, STUCK_TAG } from "../config/schema.ts";
+import { type Kind, type Naming, OWNER_WAIT_TAG, PURPOSES, STUCK_TAG, TALK_PURPOSES } from "../config/schema.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { doesLeaveDocs } from "../decide/kind.ts";
-import { type EventPick, isProsePurpose, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, requestedChanges, SPLIT, type SplitPart } from "../decide/prose.ts";
+import { type EventPick, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, requestedChanges, SPLIT, type SplitPart } from "../decide/prose.ts";
 import { answerOnce, foldItem, type ItemFold, keepPick, machineStarted, ownerAnswered, rebuilt } from "../state/item-log.ts";
 import type { State } from "../state/open.ts";
-import type { Parked, SavedRepro } from "../state/saved.ts";
+import type { Parked, SavedRepro, SavedTalk } from "../state/saved.ts";
 import { type SavedSnapshot, persistedSnapshot } from "../state/items.ts";
 import { dueClock, isDue } from "./due.ts";
 import { HOUR_MS, SECOND_MS } from "../time.ts";
@@ -28,6 +28,7 @@ import { OWNER_APPROVAL, REVIEW_APPROVAL } from "../decide/merge.ts";
 import { askDecision, askedQuestion, isOverCapStop, isWaitQuestion, OVER_CAP_OPTIONS, PLAIN_QUESTIONS, type PlainQuestion, RunReason } from "../decide/question.ts";
 import { PARK_OPTIONS, RUN_AGAIN, type Stage } from "../decide/answer.ts";
 import { type ItemText, type ReadFile, reviewInput } from "../decide/review.ts";
+import { IdeateAnswer, PickAnswer, type BuildChoice, choicesAnswer, talkedBody } from "../decide/talk.ts";
 import { NO_REVIEW_FILES, readReviewFiles } from "./review-files.ts";
 import { forgetProgress, keepKind, kindAnswered, pickKind } from "./kind.ts";
 import { settleAnswers } from "./answers.ts";
@@ -524,11 +525,19 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 	const branchDiff = (): Promise<string> => g(["diff", ...PATCH, `origin/${base}...HEAD`]);
 
+	const savedTalk = (): SavedTalk => state.talks.get(id) ?? { item: id };
+
+	/** Keeps what the owner settled, over what the item kept before. */
+	const keepTalk = (settled: Omit<SavedTalk, "item">): void => state.talks.put(id, { ...savedTalk(), ...settled });
+
+	/** The item as its runs read it: its own words, then what the owner settled in its ideate and shape rows. */
+	const talked = (): ItemText => ({ id, title: item.title, body: talkedBody(item.body, savedTalk()) });
+
 	const prompt = async (role: string, change: StepKind): Promise<string> => {
 		const plan = state.plans.get(id);
 		const repro = state.repros.get(id);
 
-		const parts = [roleOf(config, role), `# Item ${id}: ${item.title}\n\n${item.body}`, RUN_CONTRACTS[change]({ branch, evidence: d.evidence })];
+		const parts = [roleOf(config, role), itemHeading(talked()), RUN_CONTRACTS[change]({ branch, evidence: d.evidence })];
 
 		if (plan) parts.push(`## The approved plan (${plan.hash})\n${JSON.stringify(plan.plan, null, 2)}`);
 
@@ -567,14 +576,14 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	 * the state can, and ends stuck where it cannot. The owner's answer runs on past the cap, or with `stop` ends the item. A run given what it judges is answered from the item's log when
 	 * the log keeps an answer to the same prompt on the same change, and that answer spends nothing again.
 	 */
-	const runAgent = async (role: string, text: string, schema: JsonSchema, signal: AbortSignal, judged?: Judged): Promise<Finished> => {
+	const runAgent = async (role: string, text: string, schema: JsonSchema, signal: AbortSignal, judged?: Judged, run = role): Promise<Finished> => {
 		const purpose = purposeOf(config, role);
-		const key = state.runs.keyFor(id, role);
+		const key = state.runs.keyFor(id, run);
 		const held = purpose === "build" || purpose === "fix" ? readMemory(join(clone, ".hum", "memory.md"), config.hum.memoryMaxBytes).entries : [];
 		const prefix = config.hum.roles[role]?.file ?? role;
 		const prompt = `${text}${memorySection(held)}`;
 		const tier = await tierFor(role);
-		const launch = { name: `hum ${id} ${role} #${key.attempt}`, sessionId: d.newSessionId() };
+		const launch = { name: `hum ${id} ${run} #${key.attempt}`, sessionId: d.newSessionId() };
 
 		const { begun, outcome } = await answerOnce(state, { key, launch, machineVersion: version, question: judged && { prompt, ...tier, ...judged } }, async (begun) => {
 			const lease = await d.gate?.enter(prefix, signal);
@@ -589,6 +598,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 					tokenCap: kind.tokenCap.tokens - tally.sinceAnswer(),
 					name: begun.record.name,
 					item: { id, title: item.title },
+					talk: TALKS.has(purpose),
 					// A saved id already has a transcript under it; a fresh run mints its own.
 					sessionId: begun.adopted ? undefined : begun.record.sessionId,
 					signal,
@@ -858,7 +868,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 			const { pick, models } = await decideProse({
 				purpose,
-				prompt: PROSE_PROMPTS[purpose](config, item, diff, role, read.files),
+				prompt: PROSE_PROMPTS[purpose](config, talked(), diff, role, read.files),
 				diff,
 				model: (await tierFor(role)).model,
 				run: (text, schema) => runAgent(role, text, schema, signal, { head }),
@@ -877,14 +887,92 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			await send(pick.event);
 		});
 
-	/** A run for each role: the repro role writes the repro's check; a plan or review role picks the next event; a build or fix role changes the files. */
-	const roleSource = (role: string) => {
-		if (role === REPRO_ROLE) return step(role, "repro");
+	/** A run the owner talks to, under its own name, whose answer must match `answer`; only a runner whose runs are Rail rows hosts one. */
+	const talk = async <Answer>(role: string, run: string, contract: string, answer: z.ZodType<Answer>, signal: AbortSignal): Promise<Answer> => {
+		if (runner.talks !== true) throw failed(`the ${run} run talks with the owner, which only a Rail row can host: run hum as its roundup Project's program`);
 
-		const purpose = purposeOf(config, role);
+		const head = (await g(["rev-parse", "HEAD"])).trim();
+		const outcome = await runAgent(role, [roleOf(config, role), itemHeading(talked()), contract].join("\n\n"), jsonSchemaOf(answer), signal, { head }, run);
 
-		return isProsePurpose(purpose) ? decision(role, purpose) : step(role, purpose);
+		if (!hasSucceeded(outcome)) throw failed(`the ${run} run ended as ${outcome.subtype}: ${outcome.text.slice(0, CARD_EXCERPT)}`);
+
+		const read = answer.safeParse(outcome.structured);
+
+		if (!read.success) throw failed(`the ${run} run's answer does not match its contract: ${read.error.message.slice(0, CARD_EXCERPT)}`);
+
+		return read.data;
 	};
+
+	/** The ideate state: the owner talks with its row until they take a work order, which the item keeps, so a kept order runs nothing again. */
+	const ideate = (role: string) =>
+		invoked(async ({ signal }) => {
+			if (savedTalk().order !== undefined) return;
+
+			const { order } = await talk(role, role, TALK_CONTRACTS.ideate(), IdeateAnswer, signal);
+
+			keepTalk({ order });
+		});
+
+	/** The roles whose row settles one choice with the owner. */
+	const pickRoles = Object.entries(config.hum.roles).flatMap(([name, { purpose }]) => (purpose === "pick" ? [name] : []));
+
+	/** The choices a shape run names with the owner, which the item keeps. */
+	const nameChoices = async (role: string, signal: AbortSignal): Promise<readonly BuildChoice[]> => {
+		const { choices } = await talk(role, role, TALK_CONTRACTS.design(pickRoles), choicesAnswer(pickRoles), signal);
+
+		keepTalk({ choices });
+
+		return choices;
+	};
+
+	/** The owner's pick on the choice at `at`, settled in a row of the role it names, under a name of its own; the item keeps it. */
+	const pickFor = async (choice: BuildChoice, at: number, signal: AbortSignal): Promise<void> => {
+		if (choice.role === undefined) throw failed(`the choice "${choice.title}" names neither the owner's pick nor a role whose row settles it`);
+
+		const picked = await talk(choice.role, `${choice.role} ${at + 1}`, TALK_CONTRACTS.pick(choice), PickAnswer, signal);
+
+		keepTalk({ choices: savedTalk().choices?.map((kept, index) => (index === at ? { ...kept, ...picked } : kept)) });
+	};
+
+	/**
+	 * The shape state: the owner talks with its row until it names every choice the build depends on, then each choice
+	 * still open runs a row of the role it names, side by side, and the state ends once every choice carries the owner's
+	 * pick. A row that fails leaves the others to finish, and their picks stay. Choices and picks the item kept run
+	 * nothing again, and what the rows leave in the working copy goes.
+	 */
+	const design = (role: string) =>
+		invoked(async ({ signal }) => {
+			const left = await changedFiles(d.git);
+
+			try {
+				const choices = savedTalk().choices ?? (await nameChoices(role, signal));
+				const settled = await Promise.allSettled(choices.map((choice, at) => (choice.pick === undefined ? pickFor(choice, at, signal) : undefined)));
+				const failure = settled.find((one) => one.status === "rejected");
+
+				if (failure !== undefined) throw failure.reason;
+			} finally {
+				await undoRunIn(d.git, left);
+			}
+		});
+
+	/** A pick role's row runs only for a choice a shape run named. */
+	const pickOnly = invoked(async () => {
+		throw failed("a state invokes a pick role, whose row runs only for a choice a shape run named");
+	});
+
+	/** A run for each role, by its purpose: a plan or review role picks the next event; a build or fix role changes the files; ideate and shape talk with the owner. */
+	const SOURCES = {
+		plan: (role: string) => decision(role, "plan"),
+		review: (role: string) => decision(role, "review"),
+		build: (role: string) => step(role, "build"),
+		fix: (role: string) => step(role, "fix"),
+		ideate,
+		design,
+		pick: () => pickOnly,
+	} satisfies Record<Purpose, (role: string) => AnyActorLogic>;
+
+	/** The repro role writes the repro's check; every other role runs by its purpose. */
+	const roleSource = (role: string) => (role === REPRO_ROLE ? step(role, "repro") : SOURCES[purposeOf(config, role)](role));
 
 	/** Anything else a state invokes runs nothing: the config check refuses it, and a pass that meets one anyway fails loud. */
 	const nothingRuns = invoked(async () => {
@@ -893,11 +981,13 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 	const sources = { ...Object.fromEntries(Object.keys(config.hum.roles).map((role) => [role, roleSource(role)])), checks: checksSource, "shows-bug": showsBug, "bug-gone": bugGone };
 
+	const reads = { touched: touchedNow, talks: runner.talks === true };
+
 	/** A wait that timed out restores on a clock that keeps its timers, so the pass fires the due ones with the real sources. */
 	const due = d.timedOut === undefined ? undefined : dueClock(state, { kind, saved: d.timedOut }, d.now());
 
 	if (d.resume) {
-		const restored = await state.items.restore(id, kind, { sources: invokedSources(kind, nothingRuns, sources), kindAt: earlierKinds(state, kind), clock: due?.clock, touched: touchedNow });
+		const restored = await state.items.restore(id, kind, { sources: invokedSources(kind, nothingRuns, sources), kindAt: earlierKinds(state, kind), clock: due?.clock, reads });
 
 		if (!restored.ok) return { outcome: "held", item: id, why: restored.fault.cause };
 
@@ -908,7 +998,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		handled = String(actor.getSnapshot().value);
 	} else {
 		state.events.add(machineStarted({ itemId: id, machineVersion: version, afresh: d.restarted }));
-		actor = createActor(kindMachine(kind, invokedSources(kind, nothingRuns, sources), touchedNow));
+		actor = createActor(kindMachine(kind, invokedSources(kind, nothingRuns, sources), reads));
 	}
 
 	const react = async (value: string) => {
@@ -1020,7 +1110,10 @@ const resumeEvent = (snapshot: { can: (event: { type: string }) => boolean }, an
 type Purpose = (typeof PURPOSES)[number];
 
 /** Which runs are placed by the branch's diff so far; the others by the files their item declares. */
-const PLACED_BY_DIFF = { plan: false, build: false, fix: true, review: true } as const satisfies Record<Purpose, boolean>;
+const PLACED_BY_DIFF = { plan: false, build: false, fix: true, review: true, ideate: false, design: false, pick: false } as const satisfies Record<Purpose, boolean>;
+
+/** The purposes of runs the owner talks to. */
+const TALKS: ReadonlySet<Purpose> = new Set(TALK_PURPOSES);
 
 /**
  * What a plan or review run reads besides its prompt: the commit its clone stands at, which fixes the whole diff its
@@ -1031,6 +1124,9 @@ type Judged = { readonly head: string };
 
 /** What a run reads from its config: the settings and the role files. */
 export type RunConfig = Pick<Config, "hum" | "roles">;
+
+/** The item's heading and words, as every run's prompt quotes them. */
+const itemHeading = ({ id, title, body }: ItemText): string => `# Item ${id}: ${title}\n\n${body}`;
 
 /** A role's file, then the skills it names, so the run reaches for them. */
 const roleOf = (config: RunConfig, name: string): string => {
@@ -1050,7 +1146,7 @@ export const PROSE_PROMPTS = {
 	plan: (config: RunConfig, item: ItemText, _diff = "", role = "plan"): string =>
 		[
 			roleOf(config, role),
-			`# Item ${item.id}: ${item.title}\n\n${item.body}`,
+			itemHeading(item),
 			"Plan the change: read the repo, edit nothing. A plan-ready answer holds the plan; a needs-split answer names each part: its title, the files it may touch, the earlier parts it waits on by their place in the list from 1, and the one command that proves it; a plan-blocked answer asks the owner one question.",
 		].join("\n\n"),
 	review: (config: RunConfig, item: ItemText, diff: string, role = REVIEW_ROLE, files: readonly ReadFile[] = []): string => [roleOf(config, role), reviewInput(item, diff, config.hum, files)].join("\n\n"),
@@ -1124,6 +1220,18 @@ const pullRequestContract = ({ branch, evidence }: Workplace): string =>
 		`With "done", give "pullRequest": the title and body of the pull request that lands the branch's whole change, written as this repo's own rules ask a pull request to be; hum commits your change under its title. Where one screenshot or short video shows the change at work, save that one file in ${evidence}, never in the repo, and give its file name as "pullRequest.evidence".`,
 		PROOF_RULES,
 	].join("\n\n");
+
+/** How a run the owner talks to asks them. */
+const ASK_IN_ROW = "The owner talks with you in this row: ask each question with your AskUserQuestion tool, and wait for their answer.";
+
+/** What each run the owner talks to is told about its answer, by its purpose. */
+const TALK_CONTRACTS = {
+	ideate: () => `${ASK_IN_ROW} End once the owner took a work order, with the JSON {"order":{"title":…,"ask":…,"done":…,"limits":[…]}}: the order as they took it, each limit a rule that reads on its own.`,
+	design: (pickRoles: readonly string[]) =>
+		`${ASK_IN_ROW} End with the JSON {"choices":[…]}, one entry per choice the build depends on, each with a "title" and a "detail" of what the owner weighs. A choice the owner picked with you here carries their "pick"; every other choice names in "role" the row that settles it, one of: ${pickRoles.join(", ") || "none, so settle every choice here"}. hum starts those rows once you answer, and planning starts only once every choice carries the owner's pick.`,
+	pick: ({ title, detail }: BuildChoice) =>
+		`## The choice\n\n${title}: ${detail}\n\n${ASK_IN_ROW} Settle this one choice: show the owner what you found, then let them pick. End with the JSON {"pick":…,"found":…}: the option the owner picked, and what you found or measured that the pick rests on.`,
+} as const satisfies Record<(typeof TALK_PURPOSES)[number], (...args: never[]) => string>;
 
 /** What each run that changes files is told about its answer: a build or fix run writes the pull request, a repro run names its check. */
 const RUN_CONTRACTS = {

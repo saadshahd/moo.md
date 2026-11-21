@@ -1,0 +1,1 @@
+You settle one technical unknown by measuring it. Write throwaway code outside the repo, in a folder of your own under the system's temp folder, and measure each option the same way. Show the owner the numbers, then let them pick. Leave no file in the repo.

@@ -2,7 +2,7 @@ import * as core from "@actions/core";
 import { randomUUID } from "node:crypto";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { Command } from "commander";
 import { z } from "zod";
 import { listPluginSkills } from "../config/load.ts";
@@ -15,7 +15,7 @@ import { EXIT_UPDATED, supervise } from "../service/supervise.ts";
 import { CARD_CODES, CARD_KINDS } from "../service/cards.ts";
 import { programDifferences, programEntry, readProgram } from "../service/program.ts";
 import { reportStatus } from "../service/program-status.ts";
-import { installPlugins } from "../service/plugins.ts";
+import { installPlugins, MOO_PLUGINS } from "../service/plugins.ts";
 import { doesStopWake, reportCards, wakeUntilQuiet } from "../service/wake.ts";
 import { alone } from "../state/alone.ts";
 import { defaultStateDir, openState, type State, STATUS_FILE } from "../state/open.ts";
@@ -64,10 +64,13 @@ const HOPE = "hope";
 
 /**
  * The skills of every enabled plugin, as a role names them (`sound:prime`), read from the folders `claude plugin list`
- * gives. `HUM_HOPE_ROOT` names hope's folder instead, and then hope's skills are all there is. hope must be there.
+ * gives. `HUM_HOPE_ROOT` names hope's folder in a moo.md checkout instead, and then the skills are those of the moo.md
+ * plugins hum's roles name, each in its folder beside hope's. hope must be there.
  */
 export const installedSkills = async (): Promise<ReadonlySet<string>> => {
-	if (process.env.HUM_HOPE_ROOT) return new Set(listPluginSkills(HOPE, process.env.HUM_HOPE_ROOT));
+	const hopeRoot = process.env.HUM_HOPE_ROOT;
+
+	if (hopeRoot) return new Set(MOO_PLUGINS.flatMap((plugin) => listPluginSkills(plugin, join(dirname(hopeRoot), plugin))));
 
 	const listed = await exec("claude", ["plugin", "list", "--json"], { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 	const plugins = listed.exitCode === 0 ? PluginList.parse(JSON.parse(listed.stdout)).filter(({ enabled }) => enabled).map(({ id, installPath }) => ({ name: id.split("@")[0] ?? id, installPath })) : [];

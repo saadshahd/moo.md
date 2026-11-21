@@ -3,6 +3,7 @@ import { AlignmentAnswer } from "../decide/alignment.ts";
 import { DISPOSITIONS, RESOLUTION_SOURCES } from "../decide/answer.ts";
 import { Cite, PlanFile } from "../decide/prose.ts";
 import { Change } from "../decide/risk.ts";
+import { BuildChoice, WorkOrder } from "../decide/talk.ts";
 
 const name = z.string().min(1);
 const time = z.int().nonnegative();
@@ -67,6 +68,11 @@ export type ItemKind = z.infer<typeof ItemKind>;
 export const SavedPlan = z.object({ item: name, plan: PlanFile, hash: name, models });
 
 export type SavedPlan = z.infer<typeof SavedPlan>;
+
+/** What the owner settled in the item's ideate and shape rows: the work order they took, then each choice shape named, with their pick once a row settled it. */
+export const SavedTalk = z.object({ item: name, order: WorkOrder.optional(), choices: z.array(BuildChoice).optional() });
+
+export type SavedTalk = z.infer<typeof SavedTalk>;
 
 /** One picture or video of the change at work, kept at `url`, or why the one the run named was left out. */
 export const Evidence = z.union([z.object({ kind: z.enum(["image", "video"]), url: z.url() }), z.object({ left: name })]);
