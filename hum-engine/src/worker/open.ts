@@ -93,7 +93,7 @@ const startAgentRunner = async (place: RunPlace, options: RunnerOptions & { read
 		case "rows": {
 			const started = await startRunner(options);
 
-			return { ...started, runner: railRunner({ call: place.roundup.call, state: options.state, config, fallback: started.runner, now: options.now, signal: place.closing.signal }) };
+			return { ...started, runner: railRunner({ call: place.roundup.call, repo, state: options.state, config, fallback: started.runner, now: options.now, signal: place.closing.signal }) };
 		}
 
 		case "background":

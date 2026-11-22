@@ -1,4 +1,9 @@
 import { expect, test } from "bun:test";
+import type { Json } from "../src/config/json.ts";
+import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
+import { installedCli } from "../src/engine.ts";
+import { startRow } from "../src/adapters/rail-rows.ts";
+import type { RoundupCall } from "../src/adapters/roundup-rpc.ts";
 import { keepSchema, runFolder, runFolders, runKey, saveAnswer, takeAnswer } from "../src/adapters/run-answer.ts";
 import { RUN_SCHEMA } from "../src/worker/thin-path.ts";
 import { tempDir } from "./fixtures/temp.ts";
@@ -27,4 +32,25 @@ test("the run folders under hum's state are the runs' own: the secret beside the
 	runKey(stateDir, RUN);
 
 	expect(runFolders(stateDir)).toEqual([folder]);
+});
+
+test("a row's brief pipes its answer to the engine the repo installs, so a row that outlives an update answers the new engine", async () => {
+	const repo = tempDir("owner");
+	const stateDir = tempDir("run-answer");
+	const pads: Json[] = [];
+
+	const replies = new Map<string, Json>([
+		["project.get", { models: { roles: [] } }],
+		["agent.spawn", { id: "9", name: RUN, kind: "agent" }],
+	]);
+
+	const call: RoundupCall = async (method, params = {}) => {
+		if (method === "pad.create") pads.push(params.text ?? null);
+
+		return replies.get(method) ?? {};
+	};
+
+	await startRow(call, { repo, stateDir, config: SHIPPED_DEFAULTS }, { name: RUN, folder: runFolder(stateDir, RUN), request: { prompt: "work", schema: RUN_SCHEMA, cwd: repo, model: "m", effort: "low" }, workstream: "1", adopt: false });
+
+	expect(String(pads[0])).toContain(`'${installedCli(repo)}'`);
 });

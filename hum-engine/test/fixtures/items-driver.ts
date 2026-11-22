@@ -114,7 +114,7 @@ const talkWorld = async (workstream: string, slot: string) => {
 
 	const source = roundupOn(dir, { report: () => {}, now, env: process.env }, workstream);
 	const folder = join(rig, "repo", SLOTS_DIR, slot);
-	const runner = railRunner({ call: program.call, state, config: { ...SHIPPED_DEFAULTS, backgroundPollSeconds: 0.2 }, fallback: refusing, now });
+	const runner = railRunner({ call: program.call, repo: join(rig, "repo"), state, config: { ...SHIPPED_DEFAULTS, backgroundPollSeconds: 0.2 }, fallback: refusing, now });
 	const runSlots = { ...SHIPPED_DEFAULTS.runSlots, enabled: true, recipe: { ...SHIPPED_DEFAULTS.runSlots.recipe, prepare: [PREPARE_STEP] } };
 	const pool = new SlotPool({ repo: join(rig, "repo"), state, config: { ...SHIPPED_DEFAULTS, runSlots }, base: "main", talking: runner.talking, now });
 	const prepareMs: number[] = [];

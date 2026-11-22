@@ -1,8 +1,8 @@
 import { mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import type { HumConfig } from "../config/schema.ts";
 import type { Json } from "../config/json.ts";
+import { installedCli } from "../engine.ts";
 import { commandTimeoutMs, type Env, shellQuote } from "../exec.ts";
 import { atomicWrite, dropInto, orMissing } from "../state/fs.ts";
 import type { State } from "../state/open.ts";
@@ -36,17 +36,17 @@ export const NOT_PROGRAM_CODE = "rows-not-program";
 /** The card for a row roundup would not start. */
 export const ROW_REFUSED_CODE = "row-refused";
 
-/** The command a row pipes its answer to: this hum's own, so the answer reaches the engine that started the row. */
-const RUN_ANSWER = [process.execPath, fileURLToPath(new URL("../cli/main.ts", import.meta.url)), "run-answer"].map(shellQuote).join(" ");
+/** The command a row pipes its answer to: the engine `repo` installs, so a row that outlives an update answers the engine that runs after it. */
+const runAnswerCommand = (repo: string): string => [process.execPath, installedCli(repo), "run-answer"].map(shellQuote).join(" ");
 
 /** The Pad that carries a run's prompt to its row, since a row's order holds only a short ask. */
 const briefName = (name: string): string => railName(`${name} brief`);
 
-const briefOf = ({ prompt, schema }: Pick<RunRequest, "prompt" | "schema">): string =>
+const briefOf = ({ prompt, schema }: Pick<RunRequest, "prompt" | "schema">, repo: string): string =>
 	[
 		prompt,
 		"## Your answer",
-		`When you are done, pipe your answer, one JSON value that matches the schema below, to \`${RUN_ANSWER}\`. It prints \`answer saved\` once hum has it, or what to fix: fix the answer and pipe it again until it prints \`answer saved\`, then end your turn.`,
+		`When you are done, pipe your answer, one JSON value that matches the schema below, to \`${runAnswerCommand(repo)}\`. It prints \`answer saved\` once hum has it, or what to fix: fix the answer and pipe it again until it prints \`answer saved\`, then end your turn.`,
 		`\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\``,
 	].join("\n\n");
 
@@ -81,9 +81,8 @@ export type RowStart = {
 	readonly adopt: boolean;
 };
 
-const writeBrief = async (call: RoundupCall, name: string, request: RowStart["request"], workstream: string): Promise<void> => {
+const writeBrief = async (call: RoundupCall, name: string, text: string, workstream: string): Promise<void> => {
 	const pad = briefName(name);
-	const text = briefOf(request);
 
 	await call("pad.create", { name: pad, text, visibility: "internal" }).catch(async (error: Error) => {
 		if (!(error instanceof RoundupRefusal)) throw error;
@@ -127,10 +126,10 @@ const launchModel = async (call: RoundupCall, model: string): Promise<string | n
  * Starts a row and records it in its run's folder. Settings carry the run's key, so they reach no Pad, Message, argv or
  * order. A row the owner talks to is shown from its start; every other row starts folded.
  */
-export const startRow = async (call: RoundupCall, { stateDir, config }: { readonly stateDir: string; readonly config: RowConfig }, start: RowStart): Promise<RailNode> => {
+export const startRow = async (call: RoundupCall, { repo, stateDir, config }: { readonly repo: string; readonly stateDir: string; readonly config: RowConfig }, start: RowStart): Promise<RailNode> => {
 	const { name, folder, request, workstream } = start;
 
-	await writeBrief(call, name, request, workstream);
+	await writeBrief(call, name, briefOf(request, repo), workstream);
 
 	const env = { ...request.env, HUM_RUN: name, HUM_RUN_KEY: runKey(stateDir, name), HUM_RUN_DIR: folder.root };
 	const place = await placeOf(config, start);
@@ -145,6 +144,8 @@ export const startRow = async (call: RoundupCall, { stateDir, config }: { readon
 
 export type RowsOptions = {
 	readonly call: RoundupCall;
+	/** The owner's repo, whose installed engine a row pipes its answer to. */
+	readonly repo: string;
 	readonly state: Pick<State, "dir" | "faults" | "limit" | "inbox">;
 	readonly config: Pick<HumConfig, "deniedRunCommands" | "runAutoMode" | "backgroundPollSeconds" | "rowNoteWaitSeconds" | "commandTimeoutSeconds">;
 	/** The runner for a cheap model call and a run with no name. */
@@ -194,7 +195,7 @@ export const TALK_WATCH_CODE = "talk-watch";
  * waiting on the owner, and wakes the worker for an item whose row hum must look at. A cheap model call and a run with
  * no name go to `fallback`.
  */
-export const railRunner = ({ call, state, config, fallback, now, signal }: RowsOptions): Runner => {
+export const railRunner = ({ call, repo, state, config, fallback, now, signal }: RowsOptions): Runner => {
 	const pollMs = config.backgroundPollSeconds * SECOND_MS;
 	const noteWaitMs = config.rowNoteWaitSeconds * SECOND_MS;
 
@@ -454,7 +455,7 @@ export const railRunner = ({ call, state, config, fallback, now, signal }: RowsO
 
 		try {
 			const workstream = await itemWorkstream(call, item);
-			const row = (await rowOf(folder, name, workstream, talks)) ?? (await startRow(call, { stateDir: state.dir, config }, { name, folder, request, workstream, adopt: !talks })).id;
+			const row = (await rowOf(folder, name, workstream, talks)) ?? (await startRow(call, { repo, stateDir: state.dir, config }, { name, folder, request, workstream, adopt: !talks })).id;
 
 			state.faults.clear({ code: ROW_REFUSED_CODE });
 

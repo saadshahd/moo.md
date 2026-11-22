@@ -31,7 +31,7 @@ const result = async (): Promise<object> => {
 
 	if (!roundup) return { error: `roundup did not take this process as its program: ${JSON.stringify(state.faults.list())}` };
 
-	const runner = railRunner({ call: roundup.call, state, config: { ...SHIPPED_DEFAULTS, backgroundPollSeconds: 0.2, rowNoteWaitSeconds: 60 }, fallback: refusing, now: Date.now });
+	const runner = railRunner({ call: roundup.call, repo: join(rig, "repo"), state, config: { ...SHIPPED_DEFAULTS, backgroundPollSeconds: 0.2, rowNoteWaitSeconds: 60 }, fallback: refusing, now: Date.now });
 
 	const request = {
 		name: `hum 1 ${scenario} #1`,
