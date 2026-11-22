@@ -91,7 +91,7 @@ export type WorkerOptions = {
 	readonly runnerVariables: ReadonlySet<string>;
 	/** A fresh id for each run's session. */
 	readonly newSessionId: () => string;
-	/** The engine this process runs, which the heartbeat and status report; the update check reads it as the installed one where `repo` installs none. */
+	/** The engine this process runs, which the heartbeat and status report and the update check compares the installed one with; where `repo` installs none, it counts as installed. */
 	readonly engineVersion?: string;
 	/** The newest published version; a failed or slow read shows no version. */
 	readonly latestVersion?: () => Promise<string | undefined>;
@@ -826,9 +826,12 @@ export class Worker {
 		});
 	}
 
-	/** Why the worker must restart: the installed engine, the lockfile, `.hum/` or `adapters/` differ from those at start. */
+	/**
+	 * Why the worker must restart: the installed engine differs from the one it runs, so a worker that loaded the old code
+	 * just before an update moved the link still sees it, or the lockfile, `.hum/` or `adapters/` differ from those at start.
+	 */
 	#updateSeen(now: Signature): string | undefined {
-		if (now.engineVersion !== this.#start.engineVersion) return `the engine changed from ${this.#start.engineVersion} to ${now.engineVersion}`;
+		if (now.engineVersion !== this.#version) return `the engine changed from ${this.#version} to ${now.engineVersion}`;
 
 		if (now.hash !== this.#start.hash) return "the lockfile, .hum/ or adapters/ changed";
 

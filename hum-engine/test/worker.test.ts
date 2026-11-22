@@ -219,6 +219,14 @@ test("a new engine in node_modules makes the worker exit within one tick, saying
 	expect(status.ok && status.status.engine).toMatchObject({ version: "0.1.0", latest: "0.2.0" });
 });
 
+test("a worker whose repo installs another engine than the one it runs exits at its first tick, as when pnpm moved the link just after the worker loaded", async () => {
+	const w = await workerWorld({});
+
+	w.ownerFile("node_modules/@moo.md/hum/package.json", JSON.stringify({ version: "0.1.1" }));
+
+	expect(await w.workerWith({ engineVersion: "0.1.0" }).tick()).toEqual({ kind: "exit", reason: "the engine changed from 0.1.0 to 0.1.1" });
+});
+
 test.each([
 	[".hum/memory.md", "never touch vendor/\n"],
 	["adapters/mine.ts", "export default () => ({})\n"],

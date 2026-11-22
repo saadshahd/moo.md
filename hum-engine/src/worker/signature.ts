@@ -8,7 +8,7 @@ import { isMissing } from "../state/fs.ts";
 
 const Package = z.looseObject({ version: z.string().min(1) });
 
-/** What the worker compares each tick with the one at its start. A change in either makes it drain and exit. */
+/** What the repo installs. Each tick the worker compares its engine version with the one it runs, and its hash with the one at its start; a change in either makes it drain and exit. */
 export type Signature = { readonly engineVersion: string; readonly hash: string };
 
 const LOCKFILES = ["bun.lock", "bun.lockb", "package-lock.json", "pnpm-lock.yaml", "yarn.lock"];
