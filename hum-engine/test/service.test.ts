@@ -38,6 +38,7 @@ const unit = (over: Partial<Supervision> & { spawn: () => Child }) => {
 		crashWindowMs: 10 * 60_000,
 		backoffMs: 1,
 		maxBackoffMs: 60_000,
+		hasNewEngine: () => false,
 		stop: stop.signal,
 		...over,
 	};

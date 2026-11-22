@@ -199,11 +199,11 @@ test("a worker stopped during a tick starts no pass from that tick, and its serv
 	expect(w.shim.calls().filter((call) => call.itemId)).toEqual([]);
 });
 
-test("a new engine in node_modules makes the worker exit within one tick, saying so in its heartbeat and status; an item file does not", async () => {
+test("a new engine in node_modules makes the worker exit within one tick, saying so in its heartbeat and status, which report the engine it runs; an item file does not", async () => {
 	const w = await workerWorld({});
 
 	w.ownerFile("node_modules/@moo.md/hum/package.json", JSON.stringify({ version: "0.1.0" }));
-	const worker = w.workerWith({ latestVersion: async () => "0.2.0" });
+	const worker = w.workerWith({ latestVersion: async () => "0.2.0", engineVersion: "0.1.0" });
 
 	expect(await worker.tick()).toEqual({ kind: "ran", started: [] });
 	w.ownerFile(".hum/work/new-item.md", "---\ntitle: x\nstate: ready\n---\n");
@@ -215,8 +215,8 @@ test("a new engine in node_modules makes the worker exit within one tick, saying
 	const beat = readHeartbeat(w.state.heartbeatPath);
 	const status = readStatus(w.state.statusPath);
 
-	expect(beat).toMatchObject({ engineVersion: "0.1.1", configHash: w.config.hash, restarting: "the engine changed from 0.1.0 to 0.1.1", inFlight: [] });
-	expect(status.ok && status.status.engine).toMatchObject({ version: "0.1.1", latest: "0.2.0" });
+	expect(beat).toMatchObject({ engineVersion: "0.1.0", configHash: w.config.hash, restarting: "the engine changed from 0.1.0 to 0.1.1", inFlight: [] });
+	expect(status.ok && status.status.engine).toMatchObject({ version: "0.1.0", latest: "0.2.0" });
 });
 
 test.each([

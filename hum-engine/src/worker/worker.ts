@@ -91,7 +91,7 @@ export type WorkerOptions = {
 	readonly runnerVariables: ReadonlySet<string>;
 	/** A fresh id for each run's session. */
 	readonly newSessionId: () => string;
-	/** The engine this process runs; the update check compares the one installed in `repo` with it. */
+	/** The engine this process runs, which the heartbeat and status report; the update check reads it as the installed one where `repo` installs none. */
 	readonly engineVersion?: string;
 	/** The newest published version; a failed or slow read shows no version. */
 	readonly latestVersion?: () => Promise<string | undefined>;
@@ -189,6 +189,7 @@ export class Worker {
 	readonly #o: WorkerOptions;
 	readonly #now: () => number;
 	readonly #start: Signature;
+	readonly #version: string;
 	readonly #gate: PrefixGate;
 	readonly #pool = new PQueue();
 	#loopAt = Number.NEGATIVE_INFINITY;
@@ -237,7 +238,8 @@ export class Worker {
 
 		this.#latest = readEvery(options.latestVersion, { everyMs: options.config.hum.latestVersionCacheSeconds * SECOND_MS, timeoutMs });
 		this.#ciTick = readEvery(options.ciTick, { everyMs: options.config.hum.ciTickCacheSeconds * SECOND_MS, timeoutMs });
-		this.#start = signatureOf({ repo: options.repo, fallbackVersion: options.engineVersion ?? ENGINE_VERSION, itemsDir: options.config.hum.itemsDir });
+		this.#version = options.engineVersion ?? ENGINE_VERSION;
+		this.#start = signatureOf({ repo: options.repo, fallbackVersion: this.#version, itemsDir: options.config.hum.itemsDir });
 		this.#stale = staleScores(options.config);
 		this.#judge = options.judge ?? configuredModelCall(options.runner, options.config.hum, (item, tokens) => tallyOf(options.state, item).spend(tokens));
 		rememberKinds(options.state, options.config);
@@ -775,13 +777,13 @@ export class Worker {
 		await this.idle();
 	}
 
-	/** The heartbeat and the status file, both by temp file and rename. */
-	async #publish(t: number, signature: Signature, restarting: string | undefined): Promise<void> {
+	/** The heartbeat and the status file, both by temp file and rename, each with the version of the engine this process runs. */
+	async #publish(t: number, restarting: string | undefined): Promise<void> {
 		const { state, config, where = "mac" } = this.#o;
 
 		writeHeartbeat(state.heartbeatPath, {
 			time: t,
-			engineVersion: signature.engineVersion,
+			engineVersion: this.#version,
 			configHash: config.hash,
 			inFlight: this.running(),
 			intervalMs: config.hum.tickIntervalSeconds * SECOND_MS,
@@ -789,7 +791,7 @@ export class Worker {
 		});
 
 		const read = readStatus(state.statusPath);
-		const before = read.ok ? read.status : emptyStatus(signature.engineVersion, t);
+		const before = read.ok ? read.status : emptyStatus(this.#version, t);
 		const memory = readMemory(join(this.#o.repo, ".hum", "memory.md"), config.hum.memoryMaxBytes);
 
 		this.#showRefusedMemory(memory.refused);
@@ -801,7 +803,7 @@ export class Worker {
 			writtenAt: t,
 			workers: { ...before.workers, ci: ci ?? before.workers.ci, [where]: t },
 			engine: {
-				version: signature.engineVersion,
+				version: this.#version,
 				adapterApi: ADAPTER_API_VERSION,
 				configSchema: SCHEMA_VERSION,
 				latest,
@@ -922,7 +924,7 @@ export class Worker {
 
 		if (config.hum.ciToken) checkTokenAge(state.faults, { setUp: config.hum.ciToken.setUp, now: t, warnDays: config.hum.tokenWarnDays });
 
-		const signature = signatureOf({ repo: this.#o.repo, fallbackVersion: this.#o.engineVersion ?? ENGINE_VERSION, itemsDir: this.#o.config.hum.itemsDir });
+		const signature = signatureOf({ repo: this.#o.repo, fallbackVersion: this.#version, itemsDir: this.#o.config.hum.itemsDir });
 		const update = this.#updateSeen(signature);
 
 		this.#updating = update;
@@ -933,7 +935,7 @@ export class Worker {
 		this.#o.slots?.keepReady();
 
 		if (update !== undefined) {
-			await this.#publish(t, signature, update);
+			await this.#publish(t, update);
 
 			return this.#inFlight.size === 0 && !this.#measuring ? { kind: "exit", reason: update } : { kind: "draining", reason: update };
 		}
@@ -957,7 +959,7 @@ export class Worker {
 		const ready = await this.#readReady(sources, sleeping);
 		const started = ready ? await this.#startPicked(t, ready, sleeping) : [];
 
-		await this.#publish(t, signature, undefined);
+		await this.#publish(t, undefined);
 
 		return { kind: "ran", started };
 	}

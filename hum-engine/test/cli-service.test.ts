@@ -12,6 +12,8 @@ import { openState } from "../src/state/open.ts";
 import { readStatus } from "../src/status/file.ts";
 import { DAY_MS } from "../src/time.ts";
 import { installedCli } from "../src/engine.ts";
+import { EXIT_UPDATED } from "../src/service/supervise.ts";
+import { ENGINE_VERSION } from "../src/state/format.ts";
 import { HELD_MS, HOLDING_SLOTS, writeHoldingAdapter } from "./fixtures/holding-adapter.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { installEngine, MAIN, ownerRepo } from "./fixtures/owner-repo.ts";
@@ -297,23 +299,24 @@ test("hum serve reads its crash limit from the config, restarts a worker that re
 	expect(readdirSync(join(stateDir(o), "faults"))).toHaveLength(1);
 });
 
-/** How long hum serve may take to give up on a worker that exits at once. */
-const GIVE_UP_MS = 20_000;
+/** How long hum serve may take to exit once its worker has. */
+const SERVE_MS = 20_000;
 
-test("hum serve starts its worker from the engine the repo installs, the file the Program command names, whichever file serve itself runs from", async () => {
-	const o = owner({}, {}, (raw) => void Object.assign(raw.hum, { maxCrashes: 1 }));
+test("hum serve starts its worker from the engine the repo installs, the file the Program command names, and exits for an update once that worker exits for one and the repo installs another engine", async () => {
+	const o = owner({});
 	const engine = tempDir("engine");
 	const started = join(engine, "started");
 	const cli = installedCli(o.repo.owner);
 
 	installEngine(o.repo.owner, engine);
+	writeFileSync(join(engine, "package.json"), JSON.stringify({ version: `${ENGINE_VERSION}-next` }));
 	mkdirSync(dirname(cli), { recursive: true });
-	writeFileSync(cli, `import { appendFileSync } from "node:fs";\nappendFileSync(${JSON.stringify(started)}, \`\${process.argv.slice(2).join(" ")}\\n\`);\nprocess.exit(1);\n`);
+	writeFileSync(cli, `import { appendFileSync } from "node:fs";\nappendFileSync(${JSON.stringify(started)}, \`\${process.argv.slice(2).join(" ")}\\n\`);\nprocess.exit(${EXIT_UPDATED});\n`);
 
 	const serve = Bun.spawn({ ...humCommand(o, ["serve"]), stdout: "ignore", stderr: "ignore" });
 
 	try {
-		expect(await Promise.race([serve.exited, Bun.sleep(GIVE_UP_MS).then(() => "still serving")])).toBe(0);
+		expect(await Promise.race([serve.exited, Bun.sleep(SERVE_MS).then(() => "still serving")])).toBe(EXIT_UPDATED);
 		expect(readFileSync(started, "utf8")).toBe("work\n");
 	} finally {
 		serve.kill("SIGKILL");

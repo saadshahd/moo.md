@@ -6,7 +6,11 @@ import { readHeartbeat, writeCards } from "../status/file.ts";
 import { MINUTE_MS, SECOND_MS } from "../time.ts";
 import { CARD_CODES, CARD_KINDS } from "./cards.ts";
 
-/** The exit code of a worker that stopped because an update arrived. `EX_TEMPFAIL`: the supervisor starts it again without counting a crash. */
+/**
+ * The exit code of a worker that stopped because an update arrived. `EX_TEMPFAIL`: the supervisor starts it again without
+ * counting a crash. hum serve exits with it once the update installed another engine: a unit starts it again after a
+ * failure, and roundup its Program after any exit.
+ */
 export const EXIT_UPDATED = 75;
 
 /** A worker process, or a stand-in for one. */
@@ -24,10 +28,12 @@ export type Supervision = {
 	/** The pause before the first restart, doubled for each crash still inside the window, up to `maxBackoffMs`. */
 	readonly backoffMs: number;
 	readonly maxBackoffMs: number;
+	/** Whether the repo now installs an engine other than the one this process runs. */
+	readonly hasNewEngine: () => boolean;
 	readonly stop: AbortSignal;
 };
 
-export type Ended = "stopped" | "gave-up";
+export type Ended = "stopped" | "gave-up" | "updated";
 
 const Context = z.object({
 	crashes: z.array(z.number()),
@@ -68,7 +74,8 @@ export const backoffFor = (crashes: number, { backoffMs, maxBackoffMs }: Pick<Su
 /**
  * The start script as a machine. It runs the worker and starts it again when it exits, looks at the heartbeat once
  * a tick, and stops restarting after too many crashes in the window. Giving up ends it as `gave-up`, so the
- * unit's exit code is 0 and the unit does not start the script again.
+ * unit's exit code is 0 and the unit does not start the script again. A worker that exited for an update while the
+ * repo installs another engine ends it as `updated`, since this process runs the old one.
  */
 const supervisorMachine = (o: Supervision, current: { child?: Child }) => {
 	const supervisor = setup({
@@ -110,7 +117,7 @@ const supervisorMachine = (o: Supervision, current: { child?: Child }) => {
 					onDone: ({ context, event }, enq) => {
 						const exitCode = event.output;
 
-						if (isUpdateExit(exitCode)) return { target: "running", reenter: true };
+						if (isUpdateExit(exitCode)) return o.hasNewEngine() ? { target: "updated" } : { target: "running", reenter: true };
 
 						const now = o.now();
 						const crashes = crashesInWindow(context.crashes, now, o.crashWindowMs);
@@ -127,6 +134,7 @@ const supervisorMachine = (o: Supervision, current: { child?: Child }) => {
 			backingOff: { initial: "looking", after: { backoff: { target: "running" } }, states: { looking } },
 			stopping: { entry: (_, enq) => void enq(() => current.child?.kill()), invoke: { src: "exit", onDone: { target: "stopped" } }, on: { stop: undefined } },
 			gaveUp: { type: "final", output: "gave-up" as const },
+			updated: { type: "final", output: "updated" as const },
 			stopped: { type: "final", output: "stopped" as const },
 		},
 	});

@@ -28,6 +28,7 @@ import { closingAfter, npmLatest, type OpenWorkerOptions, workerOptions } from "
 import { Worker, type WorkerOptions } from "../worker/worker.ts";
 import { DEFAULT_BASE, publisherOf } from "../worker/thin-path.ts";
 import { tallyOf } from "../worker/tally.ts";
+import { installedVersion } from "../worker/signature.ts";
 import { Gathered, inboxIntegrations, readInbox, readOutbox, workRemote, writeBaseCheck, writeInbox, writeOutboxState, writePass } from "../publish/handover.ts";
 import { checkMergesAt } from "../worker/base-check.ts";
 import { publishWake } from "../publish/wake.ts";
@@ -138,14 +139,14 @@ const spawnWorker = (cwd: string, workArgs: readonly string[]) => {
 
 /**
  * Where `hum serve` runs, chosen once at its start. A service unit starts it again only after a failure, so it may
- * exit. roundup starts its Project program again after any exit, so there it exits only when stopped, shows hum's
- * status on its row, and starts no worker while its entry differs from the one setup printed.
+ * exit. roundup starts its Project program again after any exit, so there it exits only when stopped or for an update,
+ * shows hum's status on its row, and starts no worker while its entry differs from the one setup printed.
  */
 type ServeHost = {
 	readonly differences: readonly string[];
 	/** Shows the status file's state where the host reads one, until the returned function stops it. */
 	readonly report: (statusPath: string) => () => void;
-	/** Resolves once `hum serve` may exit. */
+	/** Resolves once `hum serve` may exit, where it ended for anything but an update. */
 	readonly leave: (stop: AbortSignal) => Promise<void>;
 	readonly close: () => void;
 };
@@ -213,7 +214,7 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 	root
 		.command("serve")
 		.description(
-			"Keep `hum work` running with the arguments after `--`: start it again when it exits, and stop after too many crashes. As roundup's Project program it shows hum's status on its row, starts no worker while its entry differs from the one setup printed, and exits only when stopped.",
+			"Keep `hum work` running with the arguments after `--`: start it again when it exits, stop after too many crashes, and exit 75 once it exits for an update that installed another engine, so the host starts hum serve on the new one. As roundup's Project program it shows hum's status on its row, starts no worker while its entry differs from the one setup printed, and otherwise exits only when stopped.",
 		)
 		.argument("[work-args...]", "options of `hum work`, after `--`")
 		.action(async (workArgs: string[]) => {
@@ -223,7 +224,7 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 
 			onStop(() => abort.abort());
 
-			await alone(dir, "serve", stopOnLoss("serve", abort), async () => {
+			const ended = await alone(dir, "serve", stopOnLoss("serve", abort), async () => {
 				const state = openState(dir, { now: Date.now });
 				const host = await serveHost(io, settings.runSlots.pool);
 				const card = showProgramCard(state, host.differences, Date.now());
@@ -243,16 +244,21 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 							crashWindowMs: settings.crashWindowSeconds * SECOND_MS,
 							backoffMs: settings.restartBackoff.firstSeconds * SECOND_MS,
 							maxBackoffMs: settings.restartBackoff.maxSeconds * SECOND_MS,
+							hasNewEngine: () => installedVersion(io.cwd, ENGINE_VERSION) !== ENGINE_VERSION,
 							stop: abort.signal,
 						});
 
 				io.stderr(`hum serve: ${ended}\n`);
-				await host.leave(abort.signal);
+
+				if (ended !== "updated") await host.leave(abort.signal);
+
 				stopReport();
 				host.close();
+
+				return ended;
 			});
 
-			done(EXIT_STAY_DOWN);
+			done(ended === "updated" ? EXIT_UPDATED : EXIT_STAY_DOWN);
 		});
 
 	root
