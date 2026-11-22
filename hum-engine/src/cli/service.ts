@@ -8,6 +8,7 @@ import { z } from "zod";
 import { listPluginSkills } from "../config/load.ts";
 import { HumConfig } from "../config/schema.ts";
 import { readSettings } from "../config/settings.ts";
+import { installedCli } from "../engine.ts";
 import { commandTimeoutMs, exec, SHIPPED_COMMAND_TIMEOUT_MS, spawn } from "../exec.ts";
 import { CI_STATE_REF, CiStateRaced, restoreCiState, saveCiState } from "../service/ci-state.ts";
 import { readCiTick, recordCiTick } from "../service/ci-tick.ts";
@@ -124,9 +125,13 @@ const onStop = (stop: () => void) => {
 	for (const signal of ["SIGTERM", "SIGINT"] as const) process.once(signal, stop);
 };
 
-/** `hum work` as a child process of this one, sharing its terminal. */
+/**
+ * `hum work` as a child process of this one, sharing its terminal, from the file the Program command and the service unit
+ * name. bun hands this process its own file as a real path, which under pnpm names one version's folder, so a worker
+ * started from it after an update would run the old engine.
+ */
 const spawnWorker = (cwd: string, workArgs: readonly string[]) => {
-	const child = spawn(process.execPath, [process.argv[1] ?? "", "work", ...workArgs], { nodeOptions: { cwd, stdio: "inherit" } });
+	const child = spawn(process.execPath, [installedCli(cwd), "work", ...workArgs], { nodeOptions: { cwd, stdio: "inherit" } });
 
 	return { exited: Promise.resolve(child).then(({ exitCode }) => exitCode ?? 1), kill: () => void child.kill("SIGTERM") };
 };

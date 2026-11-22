@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { x } from "tinyexec";
 import { z } from "zod";
@@ -12,6 +12,7 @@ import { readHeartbeat, readStatus } from "../src/status/file.ts";
 import type { Status } from "../src/status/format.ts";
 import { SECOND_MS } from "../src/time.ts";
 import { installedSkills } from "./fixtures/config.ts";
+import { installEngine } from "./fixtures/owner-repo.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { ROUNDUP_APP, type Rig, SLOTS_DIR, startRig } from "./fixtures/rows-rig.ts";
 
@@ -23,9 +24,6 @@ const RIG_MS = 180_000;
 
 /** How often hum serve ticks on the rig. */
 const TICK_SECONDS = 2;
-
-/** This checkout's engine, which the rig's repo installs as a package manager does. */
-const ENGINE = join(import.meta.dir, "..");
 
 const ProgramRun = z.looseObject({ state: z.string(), terminalId: z.string().optional() });
 
@@ -115,9 +113,7 @@ beforeAll(async () => {
 
 	rig = await startRig(undefined, { slots: 0 });
 	repo = join(rig.dir, "repo");
-	mkdirSync(join(repo, "node_modules", "@moo.md"), { recursive: true });
-	symlinkSync(ENGINE, join(repo, "node_modules", "@moo.md", "hum"));
-	appendFileSync(join(repo, ".git", "info", "exclude"), "node_modules/\n");
+	installEngine(repo);
 	mkdirSync(join(repo, ".claude"), { recursive: true });
 	writeFileSync(join(repo, ".claude", "settings.json"), JSON.stringify(PROJECT_SETTINGS));
 

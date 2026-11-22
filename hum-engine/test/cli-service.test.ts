@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 import { CI_STATE_REF, restoreCiState, saveCiState } from "../src/service/ci-state.ts";
@@ -11,9 +11,10 @@ import { doneByOf, foldItem } from "../src/state/item-log.ts";
 import { openState } from "../src/state/open.ts";
 import { readStatus } from "../src/status/file.ts";
 import { DAY_MS } from "../src/time.ts";
+import { installedCli } from "../src/engine.ts";
 import { HELD_MS, HOLDING_SLOTS, writeHoldingAdapter } from "./fixtures/holding-adapter.ts";
 import { OWNER } from "./fixtures/identity.ts";
-import { MAIN, ownerRepo } from "./fixtures/owner-repo.ts";
+import { installEngine, MAIN, ownerRepo } from "./fixtures/owner-repo.ts";
 import { until } from "./fixtures/process.ts";
 import { sh } from "./fixtures/work-repo.ts";
 import { tempDir } from "./fixtures/temp.ts";
@@ -284,6 +285,9 @@ test("hum work exits once stopped, though its adapter holds the process open unt
 
 test("hum serve reads its crash limit from the config, restarts a worker that refuses the config until then, shows one card and exits 0", () => {
 	const o = owner({}, {}, (raw) => void Object.assign(raw.hum, { maxCrashes: 2, levels: [] }));
+
+	installEngine(o.repo.owner);
+
 	const run = hum(o, ["serve"]);
 	const status = readStatus(join(stateDir(o), "status.json"));
 
@@ -291,4 +295,27 @@ test("hum serve reads its crash limit from the config, restarts a worker that re
 	expect(run.err).toContain("hum serve: gave-up");
 	expect(status.ok && status.status.cards.map((c) => c.code)).toEqual(["worker-down"]);
 	expect(readdirSync(join(stateDir(o), "faults"))).toHaveLength(1);
+});
+
+/** How long hum serve may take to give up on a worker that exits at once. */
+const GIVE_UP_MS = 20_000;
+
+test("hum serve starts its worker from the engine the repo installs, the file the Program command names, whichever file serve itself runs from", async () => {
+	const o = owner({}, {}, (raw) => void Object.assign(raw.hum, { maxCrashes: 1 }));
+	const engine = tempDir("engine");
+	const started = join(engine, "started");
+	const cli = installedCli(o.repo.owner);
+
+	installEngine(o.repo.owner, engine);
+	mkdirSync(dirname(cli), { recursive: true });
+	writeFileSync(cli, `import { appendFileSync } from "node:fs";\nappendFileSync(${JSON.stringify(started)}, \`\${process.argv.slice(2).join(" ")}\\n\`);\nprocess.exit(1);\n`);
+
+	const serve = Bun.spawn({ ...humCommand(o, ["serve"]), stdout: "ignore", stderr: "ignore" });
+
+	try {
+		expect(await Promise.race([serve.exited, Bun.sleep(GIVE_UP_MS).then(() => "still serving")])).toBe(0);
+		expect(readFileSync(started, "utf8")).toBe("work\n");
+	} finally {
+		serve.kill("SIGKILL");
+	}
 });

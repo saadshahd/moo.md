@@ -1,10 +1,19 @@
+import { appendFileSync, mkdirSync, symlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { installedEngine } from "../../src/engine.ts";
 import { rawConfig, root, writeConfigDir } from "./config.ts";
 import { makeShim, type ShimSpec } from "./shim.ts";
 import { itemFile, sh, WorkRepo } from "./work-repo.ts";
 import { tempDir } from "./temp.ts";
 
 export const MAIN = join(root, "src", "cli", "main.ts");
+
+/** Installs `engine` in `repo` as pnpm does: a link in node_modules, which git leaves out. */
+export const installEngine = (repo: string, engine = root): void => {
+	mkdirSync(dirname(installedEngine(repo)), { recursive: true });
+	symlinkSync(engine, installedEngine(repo));
+	appendFileSync(join(repo, ".git", "info", "exclude"), "node_modules/\n");
+};
 
 /**
  * An owner's checkout set up for the `hum` binary: the shipped config written under `.hum/`, a bare remote as

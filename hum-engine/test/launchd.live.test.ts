@@ -2,9 +2,10 @@ import { expect, test } from "bun:test";
 import { rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
+import { serveCommand } from "../src/service/program.ts";
 import { renderUnit } from "../src/service/unit.ts";
 import { readHeartbeat, readStatus } from "../src/status/file.ts";
-import { MAIN, ownerRepo } from "./fixtures/owner-repo.ts";
+import { installEngine, ownerRepo } from "./fixtures/owner-repo.ts";
 import { sh } from "./fixtures/work-repo.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
@@ -25,6 +26,7 @@ test.skipIf(!live)("a scratch launchd unit starts the script, which runs the wor
 	const log = join(dir, "unit.log");
 	const state = join(o.repo.owner, ".git", "hum");
 
+	installEngine(o.repo.owner);
 	o.item("a");
 	// The unit's PATH is bare: the stand-in claude, bun's folder and the system folders, and nothing else.
 	writeFileSync(
@@ -32,7 +34,7 @@ test.skipIf(!live)("a scratch launchd unit starts the script, which runs the wor
 		renderUnit("launchd", {
 			label,
 			repo: o.repo.owner,
-			command: [process.execPath, MAIN, "serve", "--", "--holder", label],
+			command: [...serveCommand(o.repo.owner, process.execPath), "--", "--holder", label],
 			path: [dirname(o.shim.binary), dirname(process.execPath), "/usr/bin", "/bin"].join(":"),
 			env: { ...o.shim.env, HOME: o.home, HUM_HOPE_ROOT: o.env.HUM_HOPE_ROOT },
 			log,
