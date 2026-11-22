@@ -33,7 +33,7 @@ export type Supervision = {
 	readonly stop: AbortSignal;
 };
 
-export type Ended = "stopped" | "gave-up" | "updated";
+export type Ended = "stopped" | "updated";
 
 const Context = z.object({
 	crashes: z.array(z.number()),
@@ -73,9 +73,10 @@ export const backoffFor = (crashes: number, { backoffMs, maxBackoffMs }: Pick<Su
 
 /**
  * The start script as a machine. It runs the worker and starts it again when it exits, looks at the heartbeat once
- * a tick, and stops restarting after too many crashes in the window. Giving up ends it as `gave-up`, so the
- * unit's exit code is 0 and the unit does not start the script again. A worker that exited for an update while the
- * repo installs another engine ends it as `updated`, since this process runs the old one.
+ * a tick, and stops restarting after too many crashes in the window. Once it gave up, it starts no worker and looks
+ * at the installed engine once a tick instead, so an update that fixes the crash needs no restart by hand. A worker
+ * that exited for an update while the repo installs another engine, or another engine installed after it gave up,
+ * ends it as `updated`, since this process runs the old one; else only a stop ends it.
  */
 const supervisorMachine = (o: Supervision, current: { child?: Child }) => {
 	const supervisor = setup({
@@ -103,6 +104,8 @@ const supervisorMachine = (o: Supervision, current: { child?: Child }) => {
 			},
 		},
 	};
+
+	const gaveUp = { after: { tick: () => (o.hasNewEngine() ? { target: "updated" } : { target: "gaveUp", reenter: true }) } };
 
 	return supervisor.createMachine({
 		id: "supervisor",
@@ -133,14 +136,14 @@ const supervisorMachine = (o: Supervision, current: { child?: Child }) => {
 			},
 			backingOff: { initial: "looking", after: { backoff: { target: "running" } }, states: { looking } },
 			stopping: { entry: (_, enq) => void enq(() => current.child?.kill()), invoke: { src: "exit", onDone: { target: "stopped" } }, on: { stop: undefined } },
-			gaveUp: { type: "final", output: "gave-up" as const },
+			gaveUp,
 			updated: { type: "final", output: "updated" as const },
 			stopped: { type: "final", output: "stopped" as const },
 		},
 	});
 };
 
-/** Runs the start script until `stop` or the crash limit. */
+/** Runs the start script until `stop`, or until the repo installs another engine where the worker exited for an update or the script gave up. */
 export const supervise = (o: Supervision): Promise<Ended> => {
 	const actor = createActor(supervisorMachine(o, {})).start();
 	const halt = () => actor.send({ type: "stop" });

@@ -63,12 +63,14 @@ const hangs = (): Child => {
 	return { exited: ended.promise, kill: () => ended.resolve(0) };
 };
 
-test("a worker that exits at start is restarted until the crash limit, then one card shows and the script stops", async () => {
+test("a worker that exits at start is restarted until the crash limit, then one card shows and no worker starts while the script looks at the installed engine each tick, until another one ends it as an update", async () => {
 	let spawns = 0;
-	const u = unit({ spawn: () => (spawns++, exited(1)) });
+	let looks = 0;
+	const u = unit({ spawn: () => (spawns++, exited(1)), hasNewEngine: () => ++looks === 3 });
 
-	expect(await u.run()).toBe("gave-up");
+	expect(await u.run()).toBe("updated");
 	expect(spawns).toBe(SHIPPED_DEFAULTS.maxCrashes);
+	expect(looks).toBe(3);
 	expect(u.cardsInStatus()).toHaveLength(1);
 	expect(u.cardsInStatus()[0]).toMatchObject({ code: "worker-down" });
 	expect(u.cardsInStatus()[0]?.cause).toContain("Restarts have stopped");

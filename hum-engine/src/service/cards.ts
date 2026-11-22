@@ -17,7 +17,7 @@ export const CARD_KINDS = {
 	workerSilent: kind(CARD_CODES.workerDown, WORKER_FIX, ({ seconds, ticks }: { seconds: number; ticks: number }) => `The worker has written no heartbeat for ${seconds} seconds, ${ticks} ticks.`),
 	workerGaveUp: kind(
 		CARD_CODES.workerDown,
-		WORKER_FIX,
+		`${WORKER_FIX} An update that installs another engine starts it again too.`,
 		({ crashes, windowMinutes, exitCode }: { crashes: number; windowMinutes: number; exitCode: number }) =>
 			`The worker exited ${crashes} times in ${windowMinutes} minutes, the last with code ${exitCode}. Restarts have stopped.`,
 	),

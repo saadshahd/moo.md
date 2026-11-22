@@ -43,7 +43,7 @@ import { MEGABYTE } from "../bytes.ts";
 
 const EXIT_OK = 0;
 
-/** The start script's exit code when it gave up or was stopped: the unit restarts a script only after a failure. */
+/** The start script's exit code once stopped: the unit restarts a script only after a failure. */
 const EXIT_STAY_DOWN = EXIT_OK;
 
 const EXIT_WAKE_STOPPED = 1;
@@ -138,20 +138,18 @@ const spawnWorker = (cwd: string, workArgs: readonly string[]) => {
 };
 
 /**
- * Where `hum serve` runs, chosen once at its start. A service unit starts it again only after a failure, so it may
- * exit. roundup starts its Project program again after any exit, so there it exits only when stopped or for an update,
- * shows hum's status on its row, and starts no worker while its entry differs from the one setup printed.
+ * Where `hum serve` runs, chosen once at its start. As roundup's Project program it shows hum's status on its row and
+ * starts no worker while its entry differs from the one setup printed; roundup starts its program again after any exit,
+ * so such a hum serve waits for a stop. A service unit has no entry to differ from.
  */
 type ServeHost = {
 	readonly differences: readonly string[];
 	/** Shows the status file's state where the host reads one, until the returned function stops it. */
 	readonly report: (statusPath: string) => () => void;
-	/** Resolves once `hum serve` may exit, where it ended for anything but an update. */
-	readonly leave: (stop: AbortSignal) => Promise<void>;
 	readonly close: () => void;
 };
 
-const UNIT_HOST: ServeHost = { differences: [], report: () => () => {}, leave: async () => {}, close: () => {} };
+const UNIT_HOST: ServeHost = { differences: [], report: () => () => {}, close: () => {} };
 
 const stopped = (stop: AbortSignal): Promise<void> =>
 	new Promise((resolve) => {
@@ -167,7 +165,6 @@ const serveHost = async ({ cwd: repo, env, stdout }: Io, pool: string): Promise<
 	return {
 		differences: programDifferences(program, programEntry(repo, pool, process.execPath)),
 		report: (statusPath) => reportStatus(statusPath, stdout),
-		leave: stopped,
 		close: program.client.close,
 	};
 };
@@ -214,7 +211,7 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 	root
 		.command("serve")
 		.description(
-			"Keep `hum work` running with the arguments after `--`: start it again when it exits, stop after too many crashes, and exit 75 once it exits for an update that installed another engine, so the host starts hum serve on the new one. As roundup's Project program it shows hum's status on its row, starts no worker while its entry differs from the one setup printed, and otherwise exits only when stopped.",
+			"Keep `hum work` running with the arguments after `--`: start it again when it exits, stop starting it after too many crashes, and exit 75 once it exits for an update that installed another engine or another engine is installed after the restarts stopped, so the host starts hum serve on the new one. As roundup's Project program it shows hum's status on its row and starts no worker while its entry differs from the one setup printed. Otherwise it exits only when stopped.",
 		)
 		.argument("[work-args...]", "options of `hum work`, after `--`")
 		.action(async (workArgs: string[]) => {
@@ -250,7 +247,7 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 
 				io.stderr(`hum serve: ${ended}\n`);
 
-				if (ended !== "updated") await host.leave(abort.signal);
+				if (ended === "refused") await stopped(abort.signal);
 
 				stopReport();
 				host.close();

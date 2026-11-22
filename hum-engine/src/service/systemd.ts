@@ -21,7 +21,7 @@ const serialize = (sections: Sections): string =>
 		.map(([section, keys]) => `[${section}]\n${Object.entries(keys).map(([key, value]) => `${key}=${value}`).join("\n")}`)
 		.join("\n\n")}\n`;
 
-/** A user service that restarts after a failure only: the start script exits 0 when it gives up. */
+/** A user service that restarts after a failure only, which any exit but 0 is: the start script exits 0 only once stopped, and 75 for an update. */
 export const systemdUnit: UnitBuilder = ({ repo, command, path, env, restartDelaySeconds }) => {
 	const environment = { PATH: path, ...env };
 

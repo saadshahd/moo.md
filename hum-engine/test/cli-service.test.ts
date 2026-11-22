@@ -285,22 +285,33 @@ test("hum work exits once stopped, though its adapter holds the process open unt
 	}
 }, 3 * HELD_MS);
 
-test("hum serve reads its crash limit from the config, restarts a worker that refuses the config until then, shows one card and exits 0", () => {
+/** How long hum serve may take to exit once its worker has. */
+const SERVE_MS = 20_000;
+
+test("hum serve reads its crash limit from the config, restarts a worker that refuses the config until then, shows one card, and exits 0 once stopped", async () => {
 	const o = owner({}, {}, (raw) => void Object.assign(raw.hum, { maxCrashes: 2, levels: [] }));
+
+	const cards = () => {
+		const status = readStatus(join(stateDir(o), "status.json"));
+
+		return status.ok ? status.status.cards : [];
+	};
 
 	installEngine(o.repo.owner);
 
-	const run = hum(o, ["serve"]);
-	const status = readStatus(join(stateDir(o), "status.json"));
+	const serve = Bun.spawn({ ...humCommand(o, ["serve"]), stdout: "ignore", stderr: "ignore" });
 
-	expect(run.code).toBe(0);
-	expect(run.err).toContain("hum serve: gave-up");
-	expect(status.ok && status.status.cards.map((c) => c.code)).toEqual(["worker-down"]);
-	expect(readdirSync(join(stateDir(o), "faults"))).toHaveLength(1);
-});
+	try {
+		await until(() => cards().some(({ cause }) => cause.includes("Restarts have stopped")), SERVE_MS);
+		expect(cards().map(({ code, cause }) => ({ code, gaveUpAfter: /exited (\d+) times/u.exec(cause)?.[1] }))).toEqual([{ code: "worker-down", gaveUpAfter: "2" }]);
+		expect(readdirSync(join(stateDir(o), "faults"))).toHaveLength(1);
 
-/** How long hum serve may take to exit once its worker has. */
-const SERVE_MS = 20_000;
+		serve.kill("SIGTERM");
+		expect(await Promise.race([serve.exited, Bun.sleep(SERVE_MS).then(() => "still serving")])).toBe(0);
+	} finally {
+		serve.kill("SIGKILL");
+	}
+}, 3 * SERVE_MS);
 
 test("hum serve starts its worker from the engine the repo installs, the file the Program command names, and exits for an update once that worker exits for one and the repo installs another engine", async () => {
 	const o = owner({});
