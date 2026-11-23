@@ -41,7 +41,7 @@
     "release:surface": "bun tools/release/main.ts surface",
     "release:commit": "bun tools/release/main.ts commit",
     "lint": "oxlint src test tools/release",
-    "shrinkwrap": "d=$(mktemp -d) && cp package.json \"$d\" && (cd \"$d\" && npm install --package-lock-only --ignore-scripts --silent && npm shrinkwrap --silent) && cp \"$d/npm-shrinkwrap.json\" . && rm -rf \"$d\"",
+    "shrinkwrap": "d=$(mktemp -d) && cp package.json npm-shrinkwrap.json \"$d\" && (cd \"$d\" && npm pkg delete devDependencies && npm install --package-lock-only --ignore-scripts --silent) && cp \"$d/npm-shrinkwrap.json\" . && rm -rf \"$d\"",
     "test": "n=$(getconf _NPROCESSORS_ONLN); seq 1 $n | xargs -P $n -I{} bun test --shard={}/$n --timeout 30000 test"
   },
   "dependencies": {
