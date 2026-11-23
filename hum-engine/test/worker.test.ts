@@ -651,6 +651,30 @@ test("where the owner answers only a question, a stuck item asks once to run aga
 	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
 });
 
+test("in a CI wake, where no card reaches the owner, a stuck item asks on its thread to run again, and the answer runs it again", async () => {
+	const flag = join(tempDir("flag"), "flag");
+	const w = await workerWorld({ items: { a: { writeForItem: true } } }, { checks: [`test -f ${flag}`], settings: { maxFixRuns: 1 }, worker: { where: "ci" } });
+
+	w.item("a", "docs/a.md");
+	await w.worker.tick();
+	await w.worker.idle();
+
+	expect(w.results.at(-1)).toMatchObject({ outcome: "stuck", item: "a" });
+
+	w.clock.at += TTL + 1;
+	await w.worker.tick();
+
+	expect(w.state.questions.list().map(({ item, options, askedAt }) => ({ item, options, asked: askedAt !== undefined }))).toEqual([{ item: "a", options: [RUN_AGAIN], asked: true }]);
+
+	writeFileSync(flag, "");
+	w.clock.at += 1000;
+	await w.adapter.answers!.answer(ItemId.parse("a"), { text: "retry" });
+	await w.worker.tick();
+	await w.worker.idle();
+
+	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
+});
+
 test("where the owner answers only a question, an item waiting on review asks to approve or run again, and approve lands it with no second run", async () => {
 	const w = await workerWorld({ items: { a: { writeForItem: true } } }, { settings: { paths: [{ glob: "docs/**", level: "high" }] }, source: answersOnlyToQuestions });
 
