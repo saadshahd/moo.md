@@ -1,3 +1,5 @@
+import type { HumConfig } from "../config/schema.ts";
+import { humOptions } from "../decide/answer.ts";
 import type { PastChange } from "../decide/labels.ts";
 import { breakOf, type LabelRules } from "../decide/labels.ts";
 import { optionOf, type SettledAnswer } from "../state/saved.ts";
@@ -29,15 +31,18 @@ export const ownerNotes = (raw: readonly RawComment[], owners: readonly string[]
 			: [],
 	);
 
-/** The option that approves a plan; every other answer changed it. */
-const APPROVAL_OPTION = "approve";
+/** An answer that changed the plan: one applied, and not one picking an option hum's own questions offer. */
+export const planChangingNotes = (answers: readonly SettledAnswer[], hum: Pick<HumConfig, "kinds" | "levels">): ReviewNote[] => {
+	const steering = humOptions(hum);
 
-/** An answer that changed the plan: one applied, and not an approval. */
-export const planChangingNotes = (answers: readonly SettledAnswer[]): ReviewNote[] =>
-	answers
-		.flatMap((answer): ReviewNote[] =>
-		answer.disposition === "applied" && optionOf(answer) !== APPROVAL_OPTION ? [{ source: "plan-answer", sourceId: `${answer.item}:${answer.ordinal}`, change: answer.item, item: answer.item, hunk: "", text: answer.text, at: answer.at }] : [],
-	);
+	return answers.flatMap((answer): ReviewNote[] => {
+		const option = optionOf(answer);
+
+		return answer.disposition === "applied" && (option === undefined || !steering.has(option))
+			? [{ source: "plan-answer", sourceId: `${answer.item}:${answer.ordinal}`, change: answer.item, item: answer.item, hunk: "", text: answer.text, at: answer.at }]
+			: [];
+	});
+};
 
 /** The revert or fix commit behind each broken change, with the hunk it made. */
 export const breakNotes = (changes: readonly PastChange[], rules: LabelRules, hunkOf: (sha: string, file: string | undefined) => Promise<string>): Promise<ReviewNote[]> =>

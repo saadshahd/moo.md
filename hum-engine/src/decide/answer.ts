@@ -1,14 +1,19 @@
 import { z } from "zod";
 import type { ThreadEntry } from "../adapter-api.ts";
+import type { HumConfig } from "../config/schema.ts";
 import { OWNER_APPROVAL } from "./merge.ts";
 import { DATA_RULE, fenced } from "./prose.ts";
-import { bareWord, isOverCapStop } from "./question.ts";
+import { bareWord, isOverCapStop, OVER_CAP_OPTIONS } from "./question.ts";
 
 /** The answer option that runs a parked item again from the start. */
 export const RUN_AGAIN = "retry";
 
 /** What the owner may answer an item parked for each reason. */
 export const PARK_OPTIONS = { stuck: [RUN_AGAIN], review: [OWNER_APPROVAL, RUN_AGAIN] } as const;
+
+/** Every option hum's own questions offer: a park's actions, the token cap's, a kind and a level. Picking one steers the item; a run's question offers its own. */
+export const humOptions = ({ kinds, levels }: Pick<HumConfig, "kinds" | "levels">): ReadonlySet<string> =>
+	new Set([...Object.values(PARK_OPTIONS).flat(), ...Object.values(OVER_CAP_OPTIONS), ...kinds, ...levels.map(({ name }) => name)]);
 
 /** What the model call answers when none of the question's options fits the reply. */
 export const NONE_OF_THESE = "none of these";
