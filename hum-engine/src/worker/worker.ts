@@ -409,11 +409,15 @@ export class Worker {
 		if (spent) state.spent.put(id, { ...spent, base: spent.total });
 	}
 
-	/** Where the owner answers only a question hum asked, each park asks one, so the owner can take the item back. An item that cannot be read raises its card and asks next tick. */
+	/**
+	 * Where the owner answers only a question hum asked, or in CI, where a card is a log line with no action to answer
+	 * it, each park asks one, so the owner can take the item back from its thread. An item that cannot be read raises
+	 * its card and asks next tick.
+	 */
 	async #askParked(): Promise<void> {
-		const { state, config, adapters } = this.#o;
+		const { state, config, adapters, where } = this.#o;
 
-		if (!adapters.answers?.onlyToQuestions) return;
+		if (!adapters.answers?.onlyToQuestions && where !== "ci") return;
 
 		const isAsked = ({ item, since }: Parked): boolean => state.questions.list().some((queued) => queued.item === item && queued.queuedAt >= since);
 
