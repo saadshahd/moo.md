@@ -128,8 +128,6 @@ export class FakeProvider {
 				comment: async (id, text) => spend(() => this.#push(id, { kind: "comment", text })),
 				fileFollowUp: async (from, { title, body }) =>
 					spend(() => {
-						this.#get(from);
-
 						const known = [...this.#items.values()].find((item) => item.from === from && item.title === title);
 
 						if (known) return asRef(known);
