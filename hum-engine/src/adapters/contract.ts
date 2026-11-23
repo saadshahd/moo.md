@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { type Adapter, type Answers, ClaimResult, Failed, type Fallible, Holder, Item, ItemId, ItemRef, type Questions, type Release, Watch, type WorkSource } from "../adapter-api.ts";
 import type { ClaimMode } from "./claim.ts";
 import { eachCall } from "./each-call.ts";
@@ -162,6 +163,19 @@ const workSourceChecks = (target: ContractTarget, source: WorkSource): Check[] =
 				assert.equal(again.id, first.id);
 				assert.equal((await ready()).filter((ref) => ref.id === first.id).length, 1);
 				assert.equal((await readItem(first.id)).ready, true);
+			},
+		},
+		{
+			name: "work source: a follow-up filed from a key that names no item is listed ready, and filing it twice files it once",
+			run: async () => {
+				const from = ItemId.parse(`key-${randomUUID().slice(0, 8)}`);
+				const first = ItemRef.parse(await source.fileFollowUp(from, { title: "Follow up B", body: "Do B." }));
+				const again = ItemRef.parse(await source.fileFollowUp(from, { title: "Follow up B", body: "Do B." }));
+
+				await target.settle?.(() => isListed(first.id));
+
+				assert.equal(again.id, first.id);
+				assert.equal((await ready()).filter((ref) => ref.id === first.id).length, 1);
 			},
 		},
 	];

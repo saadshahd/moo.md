@@ -2,7 +2,7 @@ import ExpiryMap from "expiry-map";
 import hostedGitInfo from "hosted-git-info";
 import pMemoize from "p-memoize";
 import { z } from "zod";
-import { ADAPTER_API_VERSION, type AdapterContext, type Answers, type Claim, type Item, ItemId, type ItemRef, PermanentError, type Integrations, type Questions, type Release, type Watch, type WorkSource } from "../adapter-api.ts";
+import { ADAPTER_API_VERSION, type AdapterContext, type Answers, type Claim, type FollowUp, type Item, ItemId, type ItemRef, PermanentError, type Integrations, type Questions, type Release, type Watch, type WorkSource } from "../adapter-api.ts";
 import type { Json } from "../config/json.ts";
 import type { MERGE_METHODS } from "../config/schema.ts";
 import { TRUSTED_ASSOCIATIONS } from "../config/wake-job.ts";
@@ -322,6 +322,18 @@ export const githubAdapter = (options: GitHubOptions, { now, env }: AdapterConte
 		return issues.nodes.flatMap(({ number, title }) => (keep(claims.get(String(number))) ? [{ id: ItemId.parse(String(number)), title }] : []));
 	};
 
+	/** The follow-up filed from `origin` with this title: one of the newest issues whose body names `origin`, else a new one. */
+	const fileOnce = async (origin: string, { title, body }: FollowUp): Promise<ItemId> => {
+		const recent = (await query(RecentIssuesReply, RECENT_ISSUES, {})).repository.issues.nodes;
+		const found = recent.find(isFollowUpOf(origin, title))?.number;
+
+		if (found !== undefined) return ItemId.parse(String(found));
+
+		const { repository, label } = await labelled();
+
+		return ItemId.parse(String((await mutate(CreatedIssue, CREATE_ISSUE, { repository, title, body: followUpBody(body, origin), labels: [label] })).createIssue.issue.number));
+	};
+
 	const pulls = gitHubPullRequests(repo, { timeoutMs, client });
 
 	return {
@@ -349,20 +361,18 @@ export const githubAdapter = (options: GitHubOptions, { now, env }: AdapterConte
 			claim: (id, holder, ttlMs) => take("claim", parseArgument(IssueId, id), holder, ttlMs),
 			renew: (id, holder, ttlMs) => take("renew", parseArgument(IssueId, id), holder, ttlMs),
 			comment: (id, text) => comment(id, commentText(text)),
-			fileFollowUp: async (from, { title, body }) => {
-				const { issue } = await fetchItem(parseArgument(IssueNumber, from));
+			fileFollowUp: async (from, followUp) => {
+				const { title } = followUp;
+				const parent = IssueNumber.safeParse(from);
+
+				if (!parent.success) return { id: await fileOnce(from, followUp), title };
+
+				const { issue } = await fetchItem(parent.data);
 				const filed = filedFollowUp(issue.comments.nodes.map((found) => found.body), title);
 
 				if (filed !== undefined) return { id: filed, title };
 
-				const created = async () => {
-					const { repository, label } = await labelled();
-
-					return (await mutate(CreatedIssue, CREATE_ISSUE, { repository, title, body: followUpBody(body, `#${from}`), labels: [label] })).createIssue.issue.number;
-				};
-
-				const recent = (await query(RecentIssuesReply, RECENT_ISSUES, {})).repository.issues.nodes;
-				const id = ItemId.parse(String(recent.find(isFollowUpOf(`#${from}`, title))?.number ?? (await created())));
+				const id = await fileOnce(`#${from}`, followUp);
 				const note = followUpNote(title, id);
 
 				await commentMarked(from, note.marker, note.text);

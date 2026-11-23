@@ -104,7 +104,7 @@ export interface WorkSource {
 	/** Extends the holder's own claim; `won: false` when another worker holds it now. */
 	renew(id: ItemId, holder: Holder, ttlMs: number): Promise<ClaimResult>;
 	comment(id: ItemId, text: string): Promise<void>;
-	/** Files a ready item. Filing the same `title` from the same `from` twice returns the first item. */
+	/** Files a ready item. `from` is the item it came from, or a key that names no item. Filing the same `title` from the same `from` twice returns the first item. */
 	fileFollowUp(from: ItemId, followUp: FollowUp): Promise<ItemRef>;
 	/** Ends an item whose change merged, so `listReady` never lists it again. Ending an ended item changes nothing. */
 	finish(id: ItemId): Promise<void>;
