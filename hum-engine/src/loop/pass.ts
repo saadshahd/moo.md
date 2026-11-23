@@ -49,7 +49,7 @@ const unappliedCard = (state: State) => (extension: string, signals: readonly st
 const collectNotes = async ({ state, config, comments, hunkOf }: LoopPass, changes: readonly PastChange[]): Promise<ReviewNote[]> =>
 	saveNotes(state, [
 		...ownerNotes(await comments(sinceOfLastComment(state)), config.hum.ownerLogins),
-		...planChangingNotes(state.answers.list()),
+		...planChangingNotes(state.answers.list(), config.hum),
 		...(await breakNotes(changes, config.hum.changeLabels, hunkOf)),
 	]);
 

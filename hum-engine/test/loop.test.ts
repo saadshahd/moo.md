@@ -3,6 +3,8 @@ import { join } from "node:path";
 import type { FollowUp, ItemRef, WorkSource } from "../src/adapter-api.ts";
 import { modelCallOver } from "../src/adapters/model-call.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
+import { PARK_OPTIONS } from "../src/decide/answer.ts";
+import { OVER_CAP_OPTIONS } from "../src/decide/question.ts";
 import { checkNameOf, fileChecks, filedFrom } from "../src/loop/check-item.ts";
 import { groupNotes } from "../src/loop/groups.ts";
 import { parseMemory, rulesUsed, unusedEntries, useOf } from "../src/loop/memory.ts";
@@ -35,12 +37,14 @@ test("only the owner's comments and review bodies are notes: another person, a b
 	expect(notes.map(({ source, sourceId }) => `${source}:${sourceId}`)).toEqual(["review-comment:1", "review-body:4"]);
 });
 
-test("an applied answer other than an approval is a note; an approval and a dropped answer are not", () => {
+test("an applied answer is a note; a dropped one is not, nor one that picks an option hum's own questions offer", () => {
+	const { hum } = configWith();
 	const answer = (ordinal: number, over: { option?: string; disposition?: "dropped" }) => ({ item: "a", ordinal, text: "Use Plain", source: "free" as const, disposition: "applied" as const, why: "w", at: 1, ...over });
+	const humOptions = [...Object.values(PARK_OPTIONS).flat(), ...Object.values(OVER_CAP_OPTIONS), ...hum.kinds, ...hum.levels.map(({ name }) => name)];
 
-	const notes = planChangingNotes([answer(1, { option: "Plain" }), answer(2, { option: "approve" }), answer(3, { disposition: "dropped" }), answer(4, {})]);
+	const notes = planChangingNotes([answer(1, { option: "Plain" }), answer(2, { disposition: "dropped" }), answer(3, {}), ...humOptions.map((option, at) => answer(at + 4, { option }))], hum);
 
-	expect(notes.map(({ sourceId }) => sourceId)).toEqual(["a:1", "a:4"]);
+	expect(notes.map(({ sourceId }) => sourceId)).toEqual(["a:1", "a:3"]);
 });
 
 test("a revert and a fix are notes about the change they break, with the hunk they made", async () => {
