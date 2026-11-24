@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { dispose, matchOption, replyText, RUN_AGAIN } from "../src/decide/answer.ts";
+import { dispose, matchOption, replyText, RUN_AGAIN, STAGE_ACTIONS } from "../src/decide/answer.ts";
 import { type AskFacts, askDecision, composeQuestion, PLAIN_QUESTIONS, priorityOf, questionIssues, questionOrder, roomToAsk } from "../src/decide/question.ts";
 import { DAY_MS } from "../src/time.ts";
 
@@ -70,6 +70,12 @@ test("an answer picks its option by marker, else by its exact first word; free t
 	expect(matchOption({ text: "Approve, thanks" }, OPTIONS)).toEqual({ source: "first-word", option: "approve" });
 	expect(matchOption({ text: "approved." }, OPTIONS)).toBeUndefined();
 	expect(matchOption({ text: "anything" }, [])).toEqual({ source: "free" });
+});
+
+test("on a question that takes free words, the first word picks an action the stage offers, and other words stay free", () => {
+	expect(matchOption({ text: "Approve, thanks" }, [], STAGE_ACTIONS.approval)).toEqual({ source: "first-word", option: "approve" });
+	expect(matchOption({ text: "Make it softer." }, [], STAGE_ACTIONS.approval)).toEqual({ source: "free" });
+	expect(matchOption({ text: "approve" }, [], STAGE_ACTIONS.waiting)).toEqual({ source: "free" });
 });
 
 test("every answer is applied, held or dropped, and a model's pick never approves a change", () => {

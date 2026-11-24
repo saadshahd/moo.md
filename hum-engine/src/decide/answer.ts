@@ -39,21 +39,24 @@ export const RESOLUTION_SOURCES = {
 
 const firstWordOf = (text: string): string => bareWord(text.trim().split(/\s+/)[0] ?? "").toLowerCase();
 
-/** The option an answer picks by its hidden marker, else by its first word matching an option exactly. */
+/**
+ * The option an answer picks by its hidden marker, else by its first word matching an option or an action exactly.
+ * An action is an option the owner's own word picks even where the question takes free words; any other reply to such
+ * a question is free.
+ */
 export const matchOption = (
 	{ text, option }: Pick<ThreadEntry, "text" | "option">,
 	options: readonly string[],
+	actions: readonly string[] = [],
 ): Resolution | undefined => {
 	if (option !== undefined) return { source: "marker", option };
 
-	if (options.length === 0) return { source: "free" };
-
 	const word = firstWordOf(text);
-	const found = options.find((candidate) => candidate.toLowerCase() === word);
+	const found = [...options, ...actions].find((candidate) => candidate.toLowerCase() === word);
 
-	return found === undefined
-		? undefined
-		: { source: "first-word", option: found };
+	if (found !== undefined) return { source: "first-word", option: found };
+
+	return options.length === 0 ? { source: "free" } : undefined;
 };
 
 /** The cheap model call that picks one of a question's options for a reply no marker or exact word settles. */
@@ -81,6 +84,14 @@ export type Stage =
 	| "running"
 	/** It has merged, or otherwise ended. */
 	| "ended";
+
+/** The actions the owner's own word picks at each stage, whatever the question offers: approval where a change waits for it. */
+export const STAGE_ACTIONS = {
+	waiting: [],
+	approval: [OWNER_APPROVAL],
+	running: [],
+	ended: [],
+} as const satisfies Record<Stage, readonly string[]>;
 
 export const DISPOSITIONS = ["applied", "held", "dropped"] as const;
 

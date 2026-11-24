@@ -675,7 +675,10 @@ test("in a CI wake, where no card reaches the owner, a stuck item asks on its th
 	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
 });
 
-test("where the owner answers only a question, an item waiting on review asks to approve or run again, and approve lands it with no second run", async () => {
+test.each([
+	["picked", { text: "approve", option: OWNER_APPROVAL }],
+	["typed", { text: "approve" }],
+] as const)("where the owner answers only a question, an item waiting on review asks to approve or run again, and approve, %s, lands it with no second run", async (_, approval) => {
 	const w = await workerWorld({ items: { a: { writeForItem: true } } }, { settings: { paths: [{ glob: "docs/**", level: "high" }] }, source: answersOnlyToQuestions });
 
 	w.item("a", "docs/a.md");
@@ -690,7 +693,7 @@ test("where the owner answers only a question, an item waiting on review asks to
 	expect(w.state.questions.list().map(({ item, options, askedAt }) => ({ item, options, asked: askedAt !== undefined }))).toEqual([{ item: "a", options: [OWNER_APPROVAL, RUN_AGAIN], asked: true }]);
 
 	w.clock.at += TTL + 1;
-	await w.adapter.answers!.answer(ItemId.parse("a"), { text: "approve", option: OWNER_APPROVAL });
+	await w.adapter.answers!.answer(ItemId.parse("a"), approval);
 	await w.worker.tick();
 	await w.worker.idle();
 
