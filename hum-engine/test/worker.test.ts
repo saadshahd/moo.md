@@ -890,6 +890,17 @@ test("two items with no touches: line that change the same file run side by side
 	expect(w.state.questions.list()).toEqual([]);
 });
 
+test("a review-note loop pass that succeeds clears the card an earlier failed pass left, so a CI wake that restores that card no longer stops on it", async () => {
+	const w = await workerWorld({ items: {} });
+
+	w.state.faults.raise({ code: "review-loop", cause: "The review-note loop failed: ✖ a GitHub issue number is a whole number above 0", fix: "It runs again next interval; look at the cause if this card stays." });
+
+	await w.worker.tick();
+	await w.worker.idle();
+
+	expect(w.state.faults.list()).toEqual([]);
+});
+
 /** The shipped config whose review role changed after its scores were measured. */
 const reviewRoleChanged = (measuredAgain = false) =>
 	configWith((raw) => {
