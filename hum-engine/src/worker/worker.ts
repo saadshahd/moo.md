@@ -144,6 +144,9 @@ const ERROR_EXCERPT = 300;
 /** The card for a thread a tick could not read. */
 export const UNREAD_CODE = "item-unread";
 
+/** The card for a review-note loop pass that failed. */
+const LOOP_CODE = "review-loop";
+
 /** The card for scores that gate on a judge that changed since they were measured. */
 const JUDGE_CODE = "judge-changed";
 
@@ -664,7 +667,7 @@ export class Worker {
 		}
 	}
 
-	/** The review-note loop runs once an interval, off the tick, so a slow model call never holds a tick. */
+	/** The review-note loop runs once an interval, off the tick, so a slow model call never holds a tick. A pass that fails raises its card; one that succeeds clears it. */
 	#loopIfDue(t: number): void {
 		const { state, config } = this.#o;
 
@@ -672,9 +675,12 @@ export class Worker {
 
 		this.#loopAt = t;
 		this.#beside(() =>
-			this.#runLoop().catch((error: Error) => {
-				state.faults.raise({ code: "review-loop", cause: `The review-note loop failed: ${error.message}`.slice(0, ERROR_EXCERPT), fix: "It runs again next interval; look at the cause if this card stays." });
-			}),
+			this.#runLoop().then(
+				() => state.faults.clear({ code: LOOP_CODE }),
+				(error: Error) => {
+					state.faults.raise({ code: LOOP_CODE, cause: `The review-note loop failed: ${error.message}`.slice(0, ERROR_EXCERPT), fix: "It runs again next interval; look at the cause if this card stays." });
+				},
+			),
 		);
 	}
 
