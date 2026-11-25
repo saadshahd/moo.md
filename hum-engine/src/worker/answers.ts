@@ -2,7 +2,7 @@ import { ADAPTER_API_VERSION, type Item, type ThreadEntry, type WorkSource } fro
 import type { ModelCall } from "../adapters/model-call.ts";
 import { optionsIn } from "../adapters/marked.ts";
 import { onceCalls } from "../adapters/once.ts";
-import { dispose, type Disposition, matchOption, NONE_OF_THESE, replyQuestion, replyStem, replyText, type Resolution, type Stage } from "../decide/answer.ts";
+import { dispose, type Disposition, matchOption, NONE_OF_THESE, replyQuestion, replyStem, replyText, type Resolution, STAGE_ACTIONS, type Stage } from "../decide/answer.ts";
 import { visibleText } from "../adapters/marked.ts";
 import type { State } from "../state/open.ts";
 import { optionOf, type SettledAnswer } from "../state/saved.ts";
@@ -42,8 +42,8 @@ const repliesOn = (thread: readonly ThreadEntry[], afterQuestion: number): Reply
 	});
 };
 
-const resolveReply = async (ctx: AnswerContext, { itemId, question, options, reply: { entry } }: { readonly itemId: string; readonly question: string; readonly options: readonly string[]; readonly reply: Reply }): Promise<Resolution> => {
-	const matched = matchOption(entry, options);
+const resolveReply = async (ctx: AnswerContext, { itemId, question, options, stage, reply: { entry } }: { readonly itemId: string; readonly question: string; readonly options: readonly string[]; readonly stage: Stage; readonly reply: Reply }): Promise<Resolution> => {
+	const matched = matchOption(entry, options, STAGE_ACTIONS[stage]);
 
 	if (matched) return matched;
 
@@ -99,7 +99,7 @@ type Settling = { readonly ctx: AnswerContext; readonly item: Item; readonly que
 /** One reply's record: kept once final, else decided again from where the item stands now. */
 const settleOne = async ({ ctx, item, question, options, stage }: Settling, { reply, answeredBefore }: { readonly reply: Reply; readonly answeredBefore: boolean }): Promise<{ record: SettledAnswer; resolution: Resolution }> => {
 	const saved = ctx.state.answers.get(keyOf(item.id, reply.ordinal));
-	const resolution = saved ? resolutionOf(saved) : await resolveReply(ctx, { itemId: item.id, question, options, reply });
+	const resolution = saved ? resolutionOf(saved) : await resolveReply(ctx, { itemId: item.id, question, options, stage, reply });
 
 	if (saved && isFinal(saved)) return { record: saved, resolution };
 

@@ -1283,13 +1283,19 @@ test("an alignment call below the bar gates nothing: the change still lands by i
 const TO_OWNER = { event: "needs-owner", sure: true, reason: "A matter of tone.", question: "Is the tone right?" };
 const mediumDocs = () => configWith((raw) => void (raw.hum.paths = [{ glob: "docs/**", level: "medium" }]));
 
-test("a review that leaves the change to the owner asks, and the owner's approval lands it past its level's own review run", async () => {
+/** The owner's approval as a picked option, and as the word typed where a thread such as GitHub's carries no option. */
+const APPROVALS = [
+	["picked", { text: "yes", option: "approve" }],
+	["typed", { text: "Approve, thanks" }],
+] as const;
+
+test.each(APPROVALS)("a review that leaves the change to the owner asks, and the owner's approval, %s, lands it past its level's own review run", async (_, approval) => {
 	const w = await world({ script: [{}, NOTE], decisions: [READY_PLAN, TO_OWNER] }, { config: mediumDocs() });
 	const id = w.repo.seed("Write the note");
 
 	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toEqual({ outcome: "asked", item: id, detail: "Is the tone right?" });
 
-	await w.adapter.answers!.answer(id, { text: "yes", option: "approve" });
+	await w.adapter.answers!.answer(id, approval);
 
 	expect(await runThinPath(w.thinPath({ judge: featureJudge, itemId: id }))).toEqual({ outcome: "merged", item: id });
 	expect(folded(w, id).doneBy).toBe("owner");

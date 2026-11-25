@@ -12,6 +12,7 @@ import type { PullRequests } from "../adapters/pull-requests.ts";
 import type { Config } from "../config/load.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import type { State } from "../state/open.ts";
+import { withSettledAnswers } from "../worker/answers.ts";
 import { evidenceRef } from "../worker/evidence.ts";
 import { land, type LandContext, prepareLanding, unpushed } from "../worker/land.ts";
 import { settleLanding } from "../worker/merged.ts";
@@ -225,7 +226,7 @@ export const publishPass = async (p: Publisher, trust: GatherTrust, pass: PassOu
 	if (!(await p.workSource.renew(id, p.holder, claimTtlMs(p.config))).won) return { outcome: "lost", item: pass.item };
 
 	const calls = (scope: Scope) => onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource: p.workSource, questions: p.questions }, p.state.ops, scope);
-	const item = await p.workSource.read(id);
+	const item = withSettledAnswers(p.state, await p.workSource.read(id));
 	const onRunBranch = (head: string) => ({ ref: head, branch });
 
 	/** Saves the change on the run branch as the item's landing, then goes on with it. */
