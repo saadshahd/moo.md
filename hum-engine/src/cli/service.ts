@@ -19,10 +19,10 @@ import { reportStatus } from "../service/program-status.ts";
 import { installPlugins, MOO_PLUGINS } from "../service/plugins.ts";
 import { doesStopWake, reportCards, wakeUntilQuiet } from "../service/wake.ts";
 import { alone } from "../state/alone.ts";
-import { defaultStateDir, openState, type State, STATUS_FILE } from "../state/open.ts";
+import { defaultStateDir, openState, type State } from "../state/open.ts";
 import { ENGINE_VERSION } from "../state/format.ts";
 import { SECOND_MS } from "../time.ts";
-import { readStatus, writeCards } from "../status/file.ts";
+import { writeCards } from "../status/file.ts";
 import type { Card } from "../status/format.ts";
 import { closingAfter, npmLatest, type OpenWorkerOptions, workerOptions } from "../worker/open.ts";
 import { Worker, type WorkerOptions } from "../worker/worker.ts";
@@ -376,8 +376,7 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 /** Runs one job of a wake, then shows the cards its state holds; the job exits 1 when it fails or shows a card that stops the wake. */
 const wakeJob = async (io: Io, done: (code: number) => void, job: () => Promise<string>): Promise<void> => {
 	try {
-		const status = readStatus(join(await job(), STATUS_FILE));
-		const cards = status.ok ? status.status.cards : [];
+		const cards = openState(await job(), { now: Date.now }).faults.list();
 
 		await reportCards(cards, { hasStepSummary: Boolean(process.env.GITHUB_STEP_SUMMARY) });
 		done(cards.some(doesStopWake) ? EXIT_WAKE_STOPPED : EXIT_OK);

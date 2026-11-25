@@ -147,6 +147,15 @@ export const UNREAD_CODE = "item-unread";
 /** The card for a review-note loop pass that failed. */
 const LOOP_CODE = "review-loop";
 
+/** Runs one step of a longer job; a failure names the step it failed in. */
+const during = async <T>(step: string, run: () => Promise<T>): Promise<T> => {
+	try {
+		return await run();
+	} catch (error) {
+		throw new Error(`${step}: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+	}
+};
+
 /** The card for scores that gate on a judge that changed since they were measured. */
 const JUDGE_CODE = "judge-changed";
 
@@ -689,15 +698,15 @@ export class Worker {
 		const git = gitIn(repo, { timeoutMs: commandTimeoutMs(config.hum) });
 		const call = modelCallOver(runner, { model: config.hum.decisionModel, timeoutMs: config.hum.modelCallTimeoutSeconds * SECOND_MS, trusts: () => true, onSpent: (item, tokens) => tallyOf(state, item).spend(tokens) });
 
-		await git.raw(["fetch", "-q", remote, `+refs/heads/${base}:${LOOP_REF}`]);
+		await during("fetch the base", () => git.raw(["fetch", "-q", remote, `+refs/heads/${base}:${LOOP_REF}`]));
 
 		const tip = (await git.raw(["rev-parse", LOOP_REF])).trim();
 
-		if (pulls) await settleMergedPulls(state, { pulls, workSource: adapters.workSource, git, remote }, this.#now());
+		if (pulls) await during("settle merged pull requests", () => settleMergedPulls(state, { pulls, workSource: adapters.workSource, git, remote }, this.#now()));
 
-		const changes = await readHistory(git, tip, config.hum);
+		const changes = await during("read the base's history", () => readHistory(git, tip, config.hum));
 
-		await runLoopPass({
+		await during("read and pair review notes", () => runLoopPass({
 			state,
 			config,
 			workSource: adapters.workSource,
@@ -709,12 +718,12 @@ export class Worker {
 			propose: modelProposer(call),
 			trusts: (models) => doesTrustRepeats(models, config.hum),
 			memoryPath: join(repo, ".hum", "memory.md"),
-		});
+		}));
 
-		await keepMergedCases(state, changes, config.hum, {
+		await during("keep merged cases", () => keepMergedCases(state, changes, config.hum, {
 			itemText: (item) => adapters.workSource.read(ItemId.parse(item)).then(({ title, body }) => ({ title, body }), () => undefined),
 			diff: (from, to) => git.raw(["diff", ...PATCH, from, to]),
-		});
+		}));
 	}
 
 	/** Raises the judge card with this cause, in place of one that names another. */
