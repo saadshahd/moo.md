@@ -5,9 +5,11 @@ import { z } from "zod";
 import { gitIn } from "../adapters/git.ts";
 import { readHistory } from "../adapters/history.ts";
 import { type HumConfig, SHIPPED_DEFAULTS } from "../config/schema.ts";
+import { pinOf } from "../engine.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
 import { orMissing } from "../state/fs.ts";
 import {
+	ADD_EXACT,
 	CODEOWNERS_FILES,
 	COMPOSE_FILES,
 	ENV_EXAMPLE_FILES,
@@ -16,6 +18,7 @@ import {
 	ISSUE_TEMPLATE_FOLDER,
 	LOCKFILES,
 	type PackageManager,
+	type PinningManager,
 	SETUP_TARGETS,
 	TOOL_VERSION_FILES,
 	TRACKED_FILE_LIMIT,
@@ -69,11 +72,23 @@ const isRunnable = (repo: string, path: string): boolean => orMissing(() => (acc
 
 const filesIn = (repo: string, pattern: string): string[] => [...new Bun.Glob(pattern).scanSync({ cwd: repo, onlyFiles: true, dot: true })].sort();
 
-const PackageJson = z.looseObject({
-	scripts: z.record(z.string(), z.string()).default({}),
-	dependencies: z.record(z.string(), z.string()).default({}),
-	devDependencies: z.record(z.string(), z.string()).default({}),
-});
+const PackageJson = z.looseObject({ scripts: z.record(z.string(), z.string()).default({}) });
+
+/** The lockfile at the repo's root and the package manager it says, the first one `LOCKFILES` names. */
+export const lockfileIn = (repo: string): { readonly file: string; readonly manager: PackageManager } | undefined => {
+	const found = Object.entries(LOCKFILES).find(([file]) => doesExist(repo, file));
+
+	return found && { file: found[0], manager: found[1] };
+};
+
+const canPin = (manager: PackageManager): manager is PinningManager => Object.hasOwn(ADD_EXACT, manager);
+
+/** The package manager the repo's lockfile says, where it is one that pins a package at an exact version. */
+export const pinningManagerIn = (repo: string): PinningManager | undefined => {
+	const manager = lockfileIn(repo)?.manager;
+
+	return manager !== undefined && canPin(manager) ? manager : undefined;
+};
 
 /** YAML reads `1` and `true` as a number and a boolean; a workflow passes each on as text. */
 const Text = z.union([z.string(), z.number(), z.boolean()]).transform(String);
@@ -243,11 +258,10 @@ const humSchemaOf = (repo: string): number | undefined => {
 export const scanRepo = async (repo: string, base: string): Promise<RepoScan> => {
 	const manifest = PackageJson.safeParse(orMissing(() => JSON.parse(textOf(repo, "package.json") || "null"), null));
 	const scripts = manifest.success ? manifest.data.scripts : {};
-	const pinned = manifest.success ? { ...manifest.data.dependencies, ...manifest.data.devDependencies }["@moo.md/hum"] : undefined;
-	const lockfile = Object.entries(LOCKFILES).find(([file]) => doesExist(repo, file));
+	const pinned = pinOf(textOf(repo, "package.json"));
 
 	return {
-		packageManager: lockfile?.[1],
+		packageManager: lockfileIn(repo)?.manager,
 		scripts,
 		ci: ciJobsOf(repo),
 		codeowners: codeownersOf(repo),

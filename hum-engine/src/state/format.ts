@@ -37,9 +37,6 @@ export type EnvelopeMigrations = Steps<EnvelopeJson>;
 /** One entry per earlier format, from format 0 up. Empty while format 1 is the first shipped. */
 export const ENVELOPE_MIGRATIONS: EnvelopeMigrations = {};
 
-/** What the owner does about a file a newer engine wrote. */
-export const UPDATE_ENGINE = "Update the engine to that version or later: bun add --exact @moo.md/hum@latest.";
-
 /** A file's format and the engine that wrote it; a file from before engines were recorded names none. */
 type Written = { readonly format: number; readonly engineVersion?: string | undefined };
 

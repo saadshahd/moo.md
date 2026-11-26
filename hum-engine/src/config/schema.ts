@@ -228,7 +228,12 @@ const Shipped = z.object({
 	tickIntervalSeconds: seconds.describe("The time between worker ticks; each tick writes the heartbeat and renews the claims in flight."),
 	drainTimeoutSeconds: seconds.describe("How long a worker that has seen an update lets its runs finish before it stops them."),
 	claimExpirySeconds: seconds.describe("How long a claim lasts unless its holder renews it."),
-	latestVersionCacheSeconds: seconds.describe("How long the newest published engine version is kept before it is read again."),
+	latestVersionCacheSeconds: seconds.describe("How long the newest published engine version is kept before it is read again, which is also how often the Mac worker looks for an engine to update to."),
+	engineUpdates: z
+		.boolean()
+		.describe(
+			"Whether the Mac worker keeps the repo on the newest published engine. It pins that version on the base with the repo's package manager and the new engine's own setup files, from a fresh clone; then, once the base pins it, it installs it in its checkout and restarts on it. It updates only a clean checkout of the base. Off, the owner updates the engine by hand.",
+		),
 	watchCacheSeconds: seconds.describe("How long one read of what changed serves every `hum watch` in the repo before the next one reads again."),
 	watchLockSeconds: seconds.describe("How long the lock of the one `hum watch` that reads stays held before another may take it over."),
 	maxFixRuns: z.int().nonnegative().describe("Fix runs an item gets after failed checks, counted since the owner last answered, before it ends stuck."),
@@ -529,6 +534,7 @@ export const OWNER_CHANGEABLE = {
 	"drain timeout": "drainTimeoutSeconds",
 	"claim expiry": "claimExpirySeconds",
 	"latest-version cache": "latestVersionCacheSeconds",
+	"engine updates": "engineUpdates",
 	"watch cache": "watchCacheSeconds",
 	"watch lock": "watchLockSeconds",
 	"fix runs": "maxFixRuns",

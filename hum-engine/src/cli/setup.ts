@@ -13,7 +13,7 @@ import { proveSetup, type Step } from "../setup/prove.ts";
 import { scanRepo } from "../setup/scan.ts";
 import { shippedConfig } from "../setup/shipped.ts";
 import { waitsOf } from "../setup/waits.ts";
-import { readAnswers, writeSetup } from "../setup/write.ts";
+import { readAnswers, upgradeSetup, writeSetup } from "../setup/write.ts";
 import type { Io } from "./ops.ts";
 import { installedSkills } from "./service.ts";
 
@@ -82,7 +82,7 @@ const MeasureSettings = z.looseObject({ models: HumConfig.shape.models, decision
 
 const Runs = z.coerce.number().int().positive();
 
-/** `hum setup scan | write | prove | measure`: the facts and writes behind the /hum skill. */
+/** `hum setup scan | write | upgrade | prove | measure`: the facts and writes behind the /hum skill, and the one an engine update runs. */
 export const addSetupCommands = (root: Command, io: Io, done: (code: number) => void): void => {
 	const setup = root.command("setup").description("What the /hum skill calls: read the repo, write .hum/, prove it, measure the owner's models.");
 
@@ -112,6 +112,16 @@ export const addSetupCommands = (root: Command, io: Io, done: (code: number) => 
 			const result = writeSetup(io.cwd, readAnswers(answers), { installedSkills: await installedSkills(), home, gitIdentity: await readGitIdentity(setupGit(io.cwd)), isPublicRepo: await isPublicRepo(io.cwd) });
 
 			io.stdout(`${JSON.stringify(result.ok ? { written: result.written, program: result.program } : { refused: result.refusal.message }, null, "\t")}\n`);
+			done(result.ok ? EXIT_OK : EXIT_FAILED);
+		});
+
+	setup
+		.command("upgrade")
+		.description(`What an engine update runs with the engine it installed: rewrite the repo's setup files where this engine writes them otherwise, from the answers the repo already holds, and print { "written": [paths] }; or write nothing, print { "refused": "<what the owner must answer>" } and exit ${EXIT_FAILED}.`)
+		.action(async () => {
+			const result = upgradeSetup(io.cwd, { installedSkills: await installedSkills(), gitIdentity: await readGitIdentity(setupGit(io.cwd)), isPublicRepo: await isPublicRepo(io.cwd) });
+
+			io.stdout(`${JSON.stringify(result.ok ? { written: result.value } : { refused: result.refusal.message })}\n`);
 			done(result.ok ? EXIT_OK : EXIT_FAILED);
 		});
 

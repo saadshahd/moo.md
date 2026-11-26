@@ -52,6 +52,17 @@ export const Learned = z.object({ glob: name, level: name, item: name, commit: n
 
 export type Learned = z.infer<typeof Learned>;
 
+/**
+ * An engine version hum could not update to, by version: it failed, and hum tries it again only once the base moves
+ * past `base`; or its pin waits in a pull request, which lands it once merged.
+ */
+export const EngineUpdate = z.discriminatedUnion("outcome", [
+	z.object({ version: name, outcome: z.literal("failed"), cause: name, fix: name, base: name, at: time }),
+	z.object({ version: name, outcome: z.literal("opened"), pull: name, at: time }),
+]);
+
+export type EngineUpdate = z.infer<typeof EngineUpdate>;
+
 /** The model ids that answered a model-judgment call; the measured record decides later whether they count. */
 const models = z.array(name);
 

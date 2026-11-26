@@ -25,6 +25,11 @@ export const INSTALL_COMMANDS = {
 	go: "go mod download",
 } as const satisfies Record<PackageManager, string>;
 
+/** The command that pins a package at an exact version in the dependency field that already holds it, per package manager that can. */
+export const ADD_EXACT = { bun: "bun add --exact", pnpm: "pnpm add --save-exact", yarn: "yarn add --exact", npm: "npm install --save-exact" } as const satisfies Partial<Record<PackageManager, string>>;
+
+export type PinningManager = keyof typeof ADD_EXACT;
+
 /** The command that runs a package script, per package manager that has scripts. */
 export const RUN_SCRIPT = { bun: "bun run", pnpm: "pnpm run", yarn: "yarn", npm: "npm run", uv: undefined, poetry: undefined, cargo: undefined, go: undefined } as const satisfies Record<PackageManager, string | undefined>;
 

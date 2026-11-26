@@ -40,6 +40,7 @@ import { SECOND_MS } from "../time.ts";
 import { type Exit, runLifecycle, type TickResult } from "./lifecycle.ts";
 import { type Footprint, footprintOf, pick, PrefixGate, undeclaredFootprint } from "./scheduler.ts";
 import { type Signature, signatureOf } from "./signature.ts";
+import { adoptEngine, bumpEngine, type EngineHome, engineStep } from "./engine-update.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import type { SlotPool } from "../slots/pool.ts";
 import { type AnswerScope, settleAnswers } from "./answers.ts";
@@ -166,6 +167,9 @@ const during = async <T>(step: string, run: () => Promise<T>): Promise<T> => {
 /** The card for scores that gate on a judge that changed since they were measured. */
 const JUDGE_CODE = "judge-changed";
 
+/** The card for an engine update that waits on the owner or failed. */
+const ENGINE_CODE = "engine-update";
+
 const staleText = (stale: readonly StaleScore[]): string => stale.map(({ boundary, model, score }) => `${boundary} on ${model} at ${score.rate.toFixed(2)}`).join(", ");
 
 /** The stale scores, one measurement per model, of the boundaries whose judge changed for it. */
@@ -244,6 +248,11 @@ export class Worker {
 	/** Whether a measurement of changed judges runs. */
 	#measuring = false;
 	#remeasureAt = Number.NEGATIVE_INFINITY;
+	#engineAt = Number.NEGATIVE_INFINITY;
+	/** Whether a pin of a newer engine is being made on the base. */
+	#bumping = false;
+	/** The engine the base pins, and the base's commit, which the checkout takes once the runs end. */
+	#adopting: { readonly version: string; readonly base: string } | undefined;
 
 	get config(): Config {
 		return this.#o.config;
@@ -685,6 +694,98 @@ export class Worker {
 		}
 	}
 
+	/** Raises the engine card with this cause, in place of one that names another, or clears it. */
+	#showEngineCard(card: { readonly cause: string; readonly fix: string } | undefined): void {
+		const { faults } = this.#o.state;
+
+		if (faults.list().some((shown) => shown.code === ENGINE_CODE && shown.cause !== card?.cause)) faults.clear({ code: ENGINE_CODE });
+
+		if (card) faults.raise({ code: ENGINE_CODE, ...card });
+	}
+
+	get #engineHome(): EngineHome {
+		const { repo, remote, base = DEFAULT_BASE, config } = this.#o;
+
+		return { repo, remote, base, timeoutMs: commandTimeoutMs(config.hum) };
+	}
+
+	/**
+	 * Keeps the repo on the newest published engine, on the Mac where hum.json allows it, once a latestVersionCacheSeconds:
+	 * it pins a newer engine on the base beside the tick, and once the base pins an engine other than the one running,
+	 * the worker drains and its checkout takes that engine. A failure is a card, kept per version until the base moves.
+	 */
+	async #lookAtEngine(t: number): Promise<void> {
+		const { state, config, latestVersion, ciJob, pulls, commits } = this.#o;
+
+		if (latestVersion === undefined || ciJob !== undefined || !config.hum.engineUpdates || this.#bumping || this.#adopting !== undefined) return;
+
+		if (t - this.#engineAt < config.hum.latestVersionCacheSeconds * SECOND_MS) return;
+
+		this.#engineAt = t;
+
+		const home = this.#engineHome;
+
+		const step = await engineStep(home, { running: this.#version, latest: await this.#latest(), tried: (version) => state.engineUpdates.get(version) }).catch((error: Error) => ({
+			kind: "held" as const,
+			cause: `Looking for a newer hum failed: ${error.message}`.slice(0, ERROR_EXCERPT),
+			fix: "hum looks again after latestVersionCacheSeconds.",
+		}));
+
+		this.#showEngineCard(step.kind === "held" ? step : undefined);
+
+		if (step.kind === "adopt") this.#adopting = step;
+
+		if (step.kind !== "bump") return;
+
+		const { version, base } = step;
+
+		const failed = (cause: string, fix: string) => {
+			state.engineUpdates.put(version, { version, outcome: "failed", cause, fix, base, at: this.#now() });
+			this.#showEngineCard({ cause, fix });
+		};
+
+		this.#bumping = true;
+		this.#beside(async () => {
+			try {
+				const bumped = await bumpEngine({ ...home, version, running: this.#version, hum: config.hum, pulls, commits });
+
+				if (bumped.kind === "failed") return failed(bumped.cause, bumped.fix);
+
+				if (bumped.kind === "opened") {
+					state.engineUpdates.put(version, { version, outcome: "opened", pull: bumped.pull, at: this.#now() });
+
+					return this.#showEngineCard({ cause: `The pin of hum ${version} waits in ${bumped.pull}.`, fix: `Merge it; hum installs ${version} once ${home.base} pins it.` });
+				}
+
+				this.#engineAt = Number.NEGATIVE_INFINITY;
+			} catch (error) {
+				failed(`Updating hum to ${version} failed: ${error instanceof Error ? error.message : String(error)}`.slice(0, ERROR_EXCERPT), `hum tries ${version} again once ${home.base} moves.`);
+			} finally {
+				this.#bumping = false;
+				this.wake();
+			}
+		});
+	}
+
+	/** Installs the engine the base pins in the checkout, now that nothing runs; says whether it did. A failure leaves the engine it runs installed, and a card. */
+	async #adopt(): Promise<boolean> {
+		const adopting = this.#adopting;
+
+		if (adopting === undefined) return true;
+
+		this.#adopting = undefined;
+
+		const { version, base } = adopting;
+		const adopted = await adoptEngine(this.#engineHome, { version, running: this.#version });
+
+		if (adopted.ok) return true;
+
+		this.#o.state.engineUpdates.put(version, { version, outcome: "failed", cause: adopted.cause, fix: adopted.fix, base, at: this.#now() });
+		this.#showEngineCard(adopted);
+
+		return false;
+	}
+
 	/** The review-note loop runs once an interval, off the tick, so a slow model call never holds a tick. A pass that fails raises its card; one that succeeds clears it. */
 	#loopIfDue(t: number): void {
 		const { state, config } = this.#o;
@@ -956,7 +1057,11 @@ export class Worker {
 		if (config.hum.ciToken) checkTokenAge(state.faults, { setUp: config.hum.ciToken.setUp, now: t, warnDays: config.hum.tokenWarnDays });
 
 		const signature = signatureOf({ repo: this.#o.repo, fallbackVersion: this.#version, itemsDir: this.#o.config.hum.itemsDir });
-		const update = this.#updateSeen(signature);
+		const seen = this.#updateSeen(signature);
+
+		if (seen === undefined) await this.#lookAtEngine(t);
+
+		const update = seen ?? (this.#adopting === undefined ? undefined : `the base pins hum ${this.#adopting.version}`);
 
 		this.#updating = update;
 		const sleeping = state.items.saved().filter((s) => this.#isAsleep(s));
@@ -968,7 +1073,9 @@ export class Worker {
 		if (update !== undefined) {
 			await this.#publish(t, update);
 
-			return this.#inFlight.size === 0 && !this.#measuring ? { kind: "exit", reason: update } : { kind: "draining", reason: update };
+			if (this.#inFlight.size > 0 || this.#measuring || this.#bumping) return { kind: "draining", reason: update };
+
+			return (await this.#adopt()) ? { kind: "exit", reason: update } : { kind: "ran", started: [] };
 		}
 
 		const sources = await this.#readSources();

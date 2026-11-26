@@ -5,7 +5,8 @@ import { Json } from "../config/json.ts";
 import { climb, type Steps } from "../config/migrate.ts";
 import { DONE_BY } from "../decide/merge.ts";
 import type { Faults, Outcome } from "./faults.ts";
-import { ENGINE_VERSION, isNewerThan, UPDATE_ENGINE } from "./format.ts";
+import { updateEngineStep } from "../engine.ts";
+import { ENGINE_VERSION, isNewerThan } from "./format.ts";
 import { createOnce, listRecords, readJson, slug } from "./fs.ts";
 import { SNAPSHOT_CARDS } from "./items.ts";
 
@@ -209,7 +210,7 @@ export class EventLog {
 		const found = this.#records(itemId);
 		const refusal = found.map((each) => this.#refusal(each)).find((cause) => cause !== undefined);
 
-		if (refusal !== undefined) return { ok: false, fault: this.#faults.raise({ code: SNAPSHOT_CARDS.newerEngine, item: itemId, cause: refusal, fix: UPDATE_ENGINE }) };
+		if (refusal !== undefined) return { ok: false, fault: this.#faults.raise({ code: SNAPSHOT_CARDS.newerEngine, item: itemId, cause: refusal, fix: updateEngineStep() }) };
 
 		const events: SavedEvent[] = [];
 

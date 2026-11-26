@@ -19,8 +19,8 @@ import {
 	Header,
 	isNewerThan,
 	SavedHeader,
-	UPDATE_ENGINE,
 } from "./format.ts";
+import { updateEngineStep } from "../engine.ts";
 
 type ActorClock = NonNullable<Parameters<typeof restoreActor>[2]>["clock"];
 
@@ -167,7 +167,7 @@ export class Items {
 		if (!header.success) return unreadable("it has no format or engine version");
 
 		if (isNewerThan(header.data, { format: this.#format, engineVersion: this.#engineVersion })) {
-			return this.#fault({ itemId, code: SNAPSHOT_CARDS.newerEngine, cause: `The saved state of ${itemId} was written by hum ${header.data.engineVersion}, which is newer than the running ${this.#engineVersion}.`, fix: UPDATE_ENGINE });
+			return this.#fault({ itemId, code: SNAPSHOT_CARDS.newerEngine, cause: `The saved state of ${itemId} was written by hum ${header.data.engineVersion}, which is newer than the running ${this.#engineVersion}.`, fix: updateEngineStep() });
 		}
 
 		let envelope: ReturnType<typeof Envelope.safeParse>;

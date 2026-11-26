@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { homedir } from "node:os";
 import { z } from "zod";
 import type { GitIdentityRead } from "../adapters/git.ts";
@@ -15,8 +15,11 @@ import { which } from "../exec.ts";
 import { ciWorkflows } from "../service/workflows.ts";
 import { type ProgramStep, programEntry, programStep, serveCommand } from "../service/program.ts";
 import { renderUnit, type UnitKind } from "../service/unit.ts";
-import { atomicWrite } from "../state/fs.ts";
+import { atomicWrite, orMissing } from "../state/fs.ts";
+import { updateEngineStep } from "../engine.ts";
+import { pinningManagerIn } from "./scan.ts";
 import { shippedRaw } from "./shipped.ts";
+import type { PinningManager } from "./tables.ts";
 import { withTimeouts } from "./waits.ts";
 
 const WORKFLOW_FOLDER = join(".github", "workflows");
@@ -61,17 +64,15 @@ export type SetupResult =
 	  }
 	| { readonly ok: false; readonly refusal: Refusal };
 
-const UPDATE_ENGINE = "Update the engine: bun add --exact @moo.md/hum@latest.";
-
 /** Refuses answers written for a schema the installed engine does not read. */
-const targetRefusal = (target: number): Refusal | undefined =>
+const targetRefusal = (target: number, manager: PinningManager | undefined): Refusal | undefined =>
 	READABLE_SCHEMA_VERSIONS.includes(target)
 		? undefined
 		: {
 				code: "unknown-schema-version",
 				found: target,
 				readable: READABLE_SCHEMA_VERSIONS,
-				message: `Setup would write hum.json schemaVersion ${target}, and this engine reads ${READABLE_SCHEMA_VERSIONS.join(", ")}. ${UPDATE_ENGINE} Nothing was written.`,
+				message: `Setup would write hum.json schemaVersion ${target}, and this engine reads ${READABLE_SCHEMA_VERSIONS.join(", ")}. ${updateEngineStep(manager)} Nothing was written.`,
 			};
 
 /**
@@ -140,14 +141,17 @@ const STRUCTURAL = new Set<string>(STRUCTURE);
 const ownerKeys = (hum: Readonly<Record<string, Json>>, shipped: Readonly<Record<string, Json>>): Record<string, Json> =>
 	Object.fromEntries(Object.entries(hum).filter(([key, value]) => STRUCTURAL.has(key) || hashJson(value) !== hashJson(shipped[key] ?? null)));
 
+/** The config the owner's answers make, and every file of the repo it writes; the machine's own start is not among them. */
+type RepoSetup = { readonly config: Config; readonly files: readonly FileToWrite[] };
+
 /**
- * Writes `.hum/` and the service files from the owner's answers, or writes nothing: the config must pass every check
- * with every wait timed out, and must be a schema the installed engine reads (and the one already in the repo).
+ * The repo's setup from the owner's answers, or the refusal that says why there is none: the config must pass every
+ * check with every wait timed out, and must be a schema the installed engine reads (and the one already in the repo).
  */
-export const writeSetup = (repo: string, answers: SetupAnswers, env: SetupEnv): SetupResult => {
+const repoSetup = (repo: string, answers: SetupAnswers, env: SetupEnv): Result<RepoSetup> => {
 	const existing = readExisting(repo);
 	const target = answers.schemaVersion ?? SCHEMA_VERSION;
-	const refused = targetRefusal(target);
+	const refused = targetRefusal(target, pinningManagerIn(repo));
 
 	if (refused) return { ok: false, refusal: refused };
 
@@ -175,37 +179,61 @@ export const writeSetup = (repo: string, answers: SetupAnswers, env: SetupEnv): 
 
 	if (!loaded.ok) return { ok: false, refusal: loaded.refusal };
 
-	const ownRunner = ownRunnerRefusal(loaded.value.hum, answers, env.isPublicRepo);
+	const refusal = ownRunnerRefusal(loaded.value.hum, answers, env.isPublicRepo) ?? roundupInCiRefusal(loaded.value.hum) ?? roundupWithoutSlotsRefusal(loaded.value.hum);
 
-	if (ownRunner) return { ok: false, refusal: ownRunner };
+	if (refusal) return { ok: false, refusal };
 
-	const inCi = roundupInCiRefusal(loaded.value.hum);
+	return {
+		ok: true,
+		value: {
+			config: loaded.value,
+			files: [
+				{ path: join(repo, ".hum", "hum.json"), text: jsonText(ownerKeys(hum, shippedHum)) },
+				...Object.entries(kinds).map(([name, kind]) => ({ path: join(repo, ".hum", "kinds", `${name}.json`), text: jsonText(kind) })),
+				...Object.entries(roles).map(([file, text]) => ({ path: join(repo, ".hum", file), text })),
+				...(existsSync(join(repo, ".hum", "memory.md")) ? [] : [{ path: join(repo, ".hum", "memory.md"), text: "" }]),
+				...(existsSync(join(repo, loaded.value.hum.itemsDir, ".gitkeep")) ? [] : [{ path: join(repo, loaded.value.hum.itemsDir, ".gitkeep"), text: "" }]),
+				...(loaded.value.hum.runPlaces.includes("ci") ? ciWorkflows(loaded.value.hum).map(({ file, text }) => ({ path: join(repo, WORKFLOW_FOLDER, file), text })) : []),
+			],
+		},
+	};
+};
 
-	if (inCi) return { ok: false, refusal: inCi };
+/** Writes `.hum/` and the service files from the owner's answers, or writes nothing and says why. */
+export const writeSetup = (repo: string, answers: SetupAnswers, env: SetupEnv): SetupResult => {
+	const setup = repoSetup(repo, answers, env);
 
-	const withoutSlots = roundupWithoutSlotsRefusal(loaded.value.hum);
+	if (!setup.ok) return setup;
 
-	if (withoutSlots) return { ok: false, refusal: withoutSlots };
-
-	const mac = loaded.value.hum.runPlaces.includes("mac") ? macStart(repo, loaded.value, env) : undefined;
-
-	const files = [
-		{ path: join(repo, ".hum", "hum.json"), text: jsonText(ownerKeys(hum, shippedHum)) },
-		...Object.entries(kinds).map(([name, kind]) => ({ path: join(repo, ".hum", "kinds", `${name}.json`), text: jsonText(kind) })),
-		...Object.entries(roles).map(([file, text]) => ({ path: join(repo, ".hum", file), text })),
-		...(existsSync(join(repo, ".hum", "memory.md")) ? [] : [{ path: join(repo, ".hum", "memory.md"), text: "" }]),
-		...(existsSync(join(repo, loaded.value.hum.itemsDir, ".gitkeep")) ? [] : [{ path: join(repo, loaded.value.hum.itemsDir, ".gitkeep"), text: "" }]),
-		...(loaded.value.hum.runPlaces.includes("ci") ? ciWorkflows(loaded.value.hum).map(({ file, text }) => ({ path: join(repo, WORKFLOW_FOLDER, file), text })) : []),
-		...(mac?.kind === "unit" ? [mac.file] : []),
-	];
+	const { config } = setup.value;
+	const mac = config.hum.runPlaces.includes("mac") ? macStart(repo, config, env) : undefined;
+	const files = [...setup.value.files, ...(mac?.kind === "unit" ? [mac.file] : [])];
 
 	for (const { path, text } of files) atomicWrite(path, text);
 
 	if (mac?.kind === "program") mkdirSync(mac.slotFolder, { recursive: true });
 
-	const done = { ok: true, written: files.map(({ path }) => path), config: loaded.value } as const;
+	const done = { ok: true, written: files.map(({ path }) => path), config } as const;
 
 	return mac?.kind === "program" ? { ...done, program: mac.step } : done;
+};
+
+/**
+ * Brings the repo's setup to this engine, as an update that installed it asks: the files setup writes from the answers
+ * already in the repo, each only where its text changed, and none of this machine's own. It writes nothing where those
+ * answers no longer make a config this engine takes, and says what the owner must answer instead. The written paths
+ * are relative to the repo.
+ */
+export const upgradeSetup = (repo: string, env: SetupEnv): Result<readonly string[]> => {
+	const setup = repoSetup(repo, SetupAnswers.parse({}), env);
+
+	if (!setup.ok) return setup;
+
+	const changed = setup.value.files.filter(({ path, text }) => orMissing(() => readFileSync(path, "utf8"), undefined) !== text);
+
+	for (const { path, text } of changed) atomicWrite(path, text);
+
+	return { ok: true, value: changed.map(({ path }) => relative(repo, path)) };
 };
 
 /** The kind files that parse. One that does not stays as it is, so the config check refuses it by name. */
