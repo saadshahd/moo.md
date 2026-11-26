@@ -1,10 +1,12 @@
 import { expect, test } from "bun:test";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { markdownAdapter } from "../src/adapters/markdown.ts";
 import { openState } from "../src/state/open.ts";
 import { HOUR_MS } from "../src/time.ts";
 import { queueQuestion, releaseQuestions } from "../src/worker/questions.ts";
 import { configWith } from "./fixtures/config.ts";
-import { workerWorld, type WorkerWorld } from "./fixtures/worker-world.ts";
+import { TTL, workerWorld, type WorkerWorld } from "./fixtures/worker-world.ts";
 import { itemFile, markdownSettings, sh } from "./fixtures/work-repo.ts";
 import { tempDir } from "./fixtures/temp.ts";
 import { ItemId } from "../src/adapter-api.ts";
@@ -97,6 +99,48 @@ test("an answer pushed from another clone after a quiet tick starts the run on t
 	await w.worker.idle();
 
 	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
+});
+
+test("an item that waits on a question still held back takes no earlier answer as its own: the retry that ran it again leaves it waiting, and the answer to its own question runs it on", async () => {
+	const flag = join(tempDir("flag"), "flag");
+	const which = { status: "needs-owner", question: "Which title?", plan: "Plan A" };
+	const w = await workerWorld({ script: [{ writeForItem: true }, { writeForItem: true }, { structured: which }, { writeForItem: true }] }, { checks: [`test -f ${flag}`], settings: { maxFixRuns: 1, dailyQuestionCap: 1 }, worker: { where: "ci" } });
+
+	const pass = async () => {
+		await w.worker.tick();
+		await w.worker.idle();
+	};
+
+	w.item("a", "docs/a.md");
+	await pass();
+	expect(w.results.at(-1)).toMatchObject({ outcome: "stuck", item: "a" });
+
+	w.clock.at += TTL + 1;
+	await w.worker.tick();
+	writeFileSync(flag, "");
+	w.clock.at += 1000;
+	await w.adapter.answers!.answer(ItemId.parse("a"), { text: "retry" });
+	w.clock.at += 1000;
+	await pass();
+	expect(w.results.at(-1)).toMatchObject({ outcome: "asked", item: "a" });
+
+	w.clock.at += 1000;
+	await pass();
+
+	expect(w.shim.calls()).toHaveLength(3);
+	expect(w.state.items.savedOf("a")).toMatchObject({ state: "asking" });
+	expect((await questionsOn(w, "a")).map(({ text }) => text)).not.toContainEqual(expect.stringContaining("Which title?"));
+
+	w.clock.at += 25 * HOUR_MS;
+	await w.worker.tick();
+	expect((await questionsOn(w, "a")).map(({ text }) => text)).toContainEqual(expect.stringContaining("Which title?"));
+
+	w.clock.at += 1000;
+	await w.adapter.answers!.answer(ItemId.parse("a"), { text: "Use Plain" });
+	await pass();
+
+	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
+	expect(w.shim.calls()).toHaveLength(4);
 });
 
 test("a CI run with an empty state reads the question's age from the thread: it waits inside the deadline and parks stuck past it, asking nothing twice", async () => {

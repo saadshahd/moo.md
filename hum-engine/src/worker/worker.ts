@@ -516,9 +516,9 @@ export class Worker {
 						return;
 					}
 
-					const hasNewAnswer = waiting.has(id) && answerTo(item) !== undefined && lastAnswerAt !== undefined;
+					const wait = asleep.get(id);
 
-					if (hasNewAnswer) this.#answered.add(id);
+					if (wait && answerTo(item, wait.savedAt)) this.#answered.add(id);
 				}),
 			),
 		);
