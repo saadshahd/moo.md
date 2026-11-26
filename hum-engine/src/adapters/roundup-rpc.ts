@@ -11,15 +11,24 @@ import { Json } from "../config/json.ts";
  */
 export const HUM_EXT = "ext:hum";
 
-/** A call roundup answered with an error: its JSON-RPC code and its message, which names what it refused. */
+/** The word roundup opens a refusal with, as `worktree_in_use` opens "worktree_in_use: <folder>". */
+const REASON = /^([a-z]+(?:_[a-z]+)+): /u;
+
+/**
+ * A call roundup answered with an error: its JSON-RPC code, its message, which names the method and what roundup
+ * refused, and the word roundup names that refusal by, where its words open with one.
+ */
 export class RoundupRefusal extends Error {
 	override name = "RoundupRefusal";
+	readonly reason: string | undefined;
 
 	constructor(
 		readonly code: number,
-		message: string,
+		method: string,
+		said: string,
 	) {
-		super(message);
+		super(`${method}: ${said}`);
+		this.reason = REASON.exec(said)?.[1];
 	}
 }
 
@@ -135,7 +144,7 @@ export const roundupRpc = (socket: string, ext: string | null = HUM_EXT, follow?
 		try {
 			return Json.parse((await peer.request(method, params ?? null, undefined)) ?? null);
 		} catch (error) {
-			if (error instanceof JSONRPCErrorException) throw new RoundupRefusal(error.code, `${method}: ${error.message}`);
+			if (error instanceof JSONRPCErrorException) throw new RoundupRefusal(error.code, method, error.message);
 
 			throw error;
 		}

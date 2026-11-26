@@ -38,9 +38,9 @@ const roundupOn = (state: string, context: AdapterContext, workstream = SHIPPED_
 
 const adapterOn = (state: string) => roundupOn(state, { report: () => {}, now, env: process.env });
 
-/** Asks the question item's question as a row, and reads its thread until an answer is on it. */
-const question = async (): Promise<object> => {
-	const adapter = adapterOn("state-question");
+/** Asks the question item's question as a row, with hum's state in `state`, and reads its thread until an answer is on it. */
+const questionIn = (state: string) => async (): Promise<object> => {
+	const adapter = adapterOn(state);
 	const item = (await adapter.workSource.listReady()).find(({ title }) => title === "question item");
 
 	if (!item) return { error: "no ready Todo named question item" };
@@ -196,9 +196,9 @@ const talkWorld = async (workstream: string, slot: string) => {
 	return { seed, passesOf, rowsToPlan, source };
 };
 
-/** A feature item's talk rows, then its plan row. */
-const talk = async (): Promise<object> => {
-	const world = await talkWorld("hum talk", "s1");
+/** A feature item's talk rows, then its plan row, in the Workstream and slot of the scenario's own. */
+const talkIn = (workstream: string, slot: string) => async (): Promise<object> => {
+	const world = await talkWorld(workstream, slot);
 
 	return world.rowsToPlan(await world.seed("talk item", "Kind: feature\n\nWrite the note."));
 };
@@ -240,7 +240,7 @@ const contract = async (): Promise<object> => {
 	return { results };
 };
 
-const SCENARIOS = new Map(Object.entries({ question, park, contract, talk, split }));
+const SCENARIOS = new Map(Object.entries({ question: questionIn("state-question"), "question-worktrees": questionIn("state-question-worktrees"), park, contract, talk: talkIn("hum talk", "s1"), "talk-worktrees": talkIn("hum talk worktrees", "s3"), split }));
 
 const result = JSON.stringify(await (SCENARIOS.get(scenario) ?? (async () => ({ error: `no scenario ${scenario}` })))().catch((error: Error) => ({ error: error.stack ?? error.message })));
 

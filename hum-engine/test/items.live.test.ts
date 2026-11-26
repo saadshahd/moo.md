@@ -6,6 +6,7 @@ import { Holder, ItemId } from "../src/adapter-api.ts";
 import { itemWorkstreamName } from "../src/adapters/rail.ts";
 import { roundupAdapter } from "../src/adapters/roundup.ts";
 import { HUM_EXT } from "../src/adapters/roundup-rpc.ts";
+import { Json } from "../src/config/json.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { RUN_AGAIN } from "../src/decide/answer.ts";
 import { INBOX_DIR } from "../src/state/open.ts";
@@ -33,7 +34,7 @@ const Result = z.looseObject({
 	outcomes: z.array(z.string()).optional(),
 	asked: z.array(z.array(z.string()).optional()).optional(),
 	runs: z.array(z.int()).optional(),
-	rows: z.array(Node.extend({ visibility: z.string().optional() }).loose()).optional(),
+	rows: z.array(Node.extend({ visibility: z.string().optional(), worktree: z.looseObject({ path: z.string(), adopted: z.boolean() }).nullish() }).loose()).optional(),
 	parent: z.looseObject({ outcome: z.string().optional() }).optional(),
 	talk: z.looseObject({}).optional(),
 	passes: z.looseObject({ outcomes: z.array(z.string()) }).optional(),
@@ -128,14 +129,32 @@ test.skipIf(!live)("a landed item's Todo is completed and back in the hum Workst
 	expect((await workstreams()).some(({ name }) => name.startsWith(`#${claimed} `))).toBe(false);
 }, RIG_MS);
 
-test.skipIf(!live)("a question row's answer counts only once roundup showed the row waiting on the owner, and an answer through hum is refused with the row's link", async () => {
+/** Runs `check` with the Project's Worktrees on, and puts the setting back after. */
+const withWorktreesOn = async (check: () => Promise<void>): Promise<void> => {
+	const { worktrees } = z.looseObject({ worktrees: z.record(z.string(), Json) }).parse(await rig.user.call("project.get"));
+
+	await rig.user.call("project.setWorktrees", { on: true, check: "true" });
+
+	try {
+		await check();
+	} finally {
+		await rig.user.call("project.setWorktrees", worktrees);
+	}
+};
+
+/** Runs a question scenario on a new question item: its answer counts only once its row asked the owner, and one through hum is refused. */
+const expectQuestion = async (scenario: string): Promise<void> => {
 	await todoIn("question item", hum);
 
-	const { thread = [], refusal } = await run("question");
+	const { thread = [], refusal } = await run(scenario);
 
 	expect(thread.filter(({ kind }) => kind === "answer")).toEqual([expect.objectContaining({ text: "after", option: "b" })]);
 	expect(refusal).toMatch(/roundup:\/\/agent\/\d+\?project=/u);
-}, RIG_MS);
+};
+
+test.skipIf(!live)("a question row's answer counts only once roundup showed the row waiting on the owner, and an answer through hum is refused with the row's link", () => expectQuestion("question"), RIG_MS);
+
+test.skipIf(!live)("with the Project's Worktrees on, a question row still starts in the Project's folder and its answer counts", () => withWorktreesOn(() => expectQuestion("question-worktrees")), RIG_MS);
 
 test.skipIf(!live)("a parked item asks a row with the owner's park actions, and the row's Run it again runs the item again", async () => {
 	const { outcomes = [], asked = [], runs = [] } = await run("park");
@@ -157,8 +176,22 @@ test.skipIf(!live)("the roundup adapter keeps the adapter contract as the Projec
 const stepsOf = (rows: readonly { readonly id: string; readonly name: string; readonly visibility?: string }[]) =>
 	rows.toSorted((one, other) => Number(one.id) - Number(other.id)).map(({ name, visibility }) => [name.replace(/^hum \S+ /u, "").replace(/ #\d+$/u, ""), visibility]);
 
-test.skipIf(!live)("a feature item shows its ideate row, then its shape row and a row for each open choice, all shown, each in the item's talk copy; each takes only the answer saved once it asked the owner and gets no note, a pass ends while one waits on the owner and the next runs once the talk watch wakes it, and planning starts once every choice carries a pick", async () => {
-	const { rows = [], talk, passes, prepareMs = [] } = await run("talk");
+const TalkMark = z.strictObject({ run: z.string(), moment: z.enum(["started", "answered"]), at: z.number(), prepared: z.boolean() });
+
+/** When each row the owner talks to started and answered, and whether its folder held the prepare's mark as it started, by the row's run. */
+const talkMarks = () =>
+	readFileSync(join(rig.dir, "talk-rows.jsonl"), "utf8")
+		.split("\n")
+		.filter(Boolean)
+		.map((line) => TalkMark.parse(JSON.parse(line)));
+
+/**
+ * Runs a talk scenario and checks what both of roundup's Worktrees settings must show: the rows in order and shown, the
+ * talk kept, the passes that wait, each talk row adopting a talk copy of its own and the pick rows running at once, the
+ * prepare run only where the role asks for it, and no note to a row the owner talks to.
+ */
+const expectTalk = async (scenario: string): Promise<void> => {
+	const { rows = [], talk, passes, prepareMs = [] } = await run(scenario);
 	const steps = stepsOf(rows);
 
 	expect(steps.slice(0, 2)).toEqual([
@@ -173,16 +206,30 @@ test.skipIf(!live)("a feature item shows its ideate row, then its shape row and 
 	expect(steps.slice(5)).toEqual([["plan-after-talk", "internal"]]);
 	expect(talk).toMatchObject({ order: { title: "Write the note" }, choices: [{ pick: "the first" }, { pick: "the first" }, { pick: "the first" }, { pick: "plain" }] });
 	expect(JSON.stringify(talk)).not.toContain("early");
-
 	expect(passes?.outcomes.filter((outcome) => outcome === "waiting").length).toBeGreaterThanOrEqual(3);
-	expect(readFileSync(join(rig.dir, "cwd-ideate.txt"), "utf8")).toContain(`${SLOTS_DIR}/repo-talk-`);
-	expect(["ideate", "spike"].map((step) => readFileSync(join(rig.dir, `prepared-${step}.txt`), "utf8"))).toEqual(["no", "yes"]);
+
+	const talked = rows.toSorted((one, other) => Number(one.id) - Number(other.id)).slice(0, 5);
+	const folders = talked.map(({ worktree }) => worktree);
+
+	expect(folders.every((folder) => folder?.adopted === true && folder.path.includes(`${SLOTS_DIR}/repo-talk-`))).toBe(true);
+	expect(new Set(folders.map((folder) => folder?.path)).size).toBe(talked.length);
+
+	const marks = talkMarks();
+	const at = (row: { readonly name: string }, moment: "started" | "answered") => marks.find(({ run, moment: was }) => run === row.name && was === moment);
+	const picks = talked.slice(2);
+
+	expect(Math.max(...picks.map((row) => at(row, "started")?.at ?? Infinity))).toBeLessThan(Math.min(...picks.map((row) => at(row, "answered")?.at ?? -Infinity)));
+	expect(talked.map((row) => [stepsOf([row])[0]?.[0], at(row, "started")?.prepared]).filter(([, prepared]) => prepared !== false)).toEqual([["spike 2", true]]);
 	console.log(`the rig's prepare (${PREPARE_STEP}) took ${prepareMs.join(", ")} ms`);
 
-	const talked = new Set(rows.slice(0, 5).map(({ id }) => id));
+	const ids = new Set(talked.map(({ id }) => id));
 
-	expect((await rig.events()).filter(({ name, data }) => name === "message.sent" && talked.has(String(data?.to)) && JSON.stringify(data).includes(HUM_EXT))).toEqual([]);
-}, RIG_MS);
+	expect((await rig.events()).filter(({ name, data }) => name === "message.sent" && ids.has(String(data?.to)) && JSON.stringify(data).includes(HUM_EXT))).toEqual([]);
+};
+
+test.skipIf(!live)("a feature item shows its ideate row, then its shape row and a row for each open choice, all shown, each adopting a talk copy of its own; each takes only the answer saved once it asked the owner and gets no note, a pass ends while one waits on the owner and the next runs once the talk watch wakes it, the choice rows run at once, and planning starts once every choice carries a pick", () => expectTalk("talk"), RIG_MS);
+
+test.skipIf(!live)("with the Project's Worktrees on, the same feature item's talk rows each adopt a talk copy of their own, and its choice rows run at once", () => withWorktreesOn(() => expectTalk("talk-worktrees")), RIG_MS);
 
 test.skipIf(!live)("a part split from a talked feature item keeps the owner's work order and picks, so its pass starts only its plan row", async () => {
 	const { parent, rows = [], talk } = await run("split");

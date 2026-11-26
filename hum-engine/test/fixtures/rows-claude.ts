@@ -114,12 +114,15 @@ const EARLY = {
 	pick: { pick: "early", found: "early" },
 };
 
+/** Marks a moment of a row the owner talks to, by its run's name, in the rig's `talk-rows.jsonl`. */
+const mark = (moment: "started" | "answered"): void => appendFileSync(join(rig, "talk-rows.jsonl"), `${JSON.stringify({ run: env.HUM_RUN, moment, at: Date.now(), prepared: existsSync(".hum-prepared") })}\n`);
+
 /**
  * A row the owner talks to: its first turn ends with no answer, as a turn that waits for the owner's words does. Its
  * second saves its early answer before it asks, then asks with Claude Code's question and hands over what its step says.
  */
 const talkRow = (step: keyof typeof TALKED) => async (): Promise<void> => {
-	writeFileSync(join(rig, `prepared-${scenario}.txt`), existsSync(".hum-prepared") ? "yes" : "no");
+	mark("started");
 	await turn(() => undefined);
 	await Bun.sleep(1500);
 	await turn(async () => {
@@ -129,6 +132,7 @@ const talkRow = (step: keyof typeof TALKED) => async (): Promise<void> => {
 		await Bun.sleep(1000);
 		answer(JSON.stringify(TALKED[step]));
 	});
+	mark("answered");
 };
 
 const SCENARIOS = new Map<string, () => Promise<void>>(Object.entries({

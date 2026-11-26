@@ -881,23 +881,24 @@ const talkingRunner = (rest: Runner, talks: Talks) => {
 	return { runner, asked, names: () => asked.map(runName) };
 };
 
-/** An item's talk copy in `folder`, with each ask of it. */
-const talkCopyIn = (folder: string) => {
+/** A talk copy of each run's own under `root`, with each ask of them. */
+const talkCopiesIn = (root: string) => {
 	const asked: Parameters<TalkCopy>[0][] = [];
-	const talkCopy: TalkCopy = async (request) => (asked.push(request), { folder, env: {} });
+	const folderOf = (run: string): string => join(root, run);
+	const talkCopy: TalkCopy = async (request) => (asked.push(request), { folder: folderOf(request.run), env: {} });
 
-	return { folder, asked, talkCopy };
+	return { folderOf, asked, talkCopy };
 };
 
 /** The skills a run's prompt names. */
 const skillsIn = (prompt: string): string | undefined => /Use these skills with the Skill tool where they apply: (.+)\./.exec(prompt)?.[1];
 
-test("where runs talk with the owner, a feature opens with ideate and shape, whose open choices each run a row of their role side by side in the item's talk copy; a pass ends while a row waits on the owner, and the next takes that same row's pick, then plans from the order and the picks", async () => {
+test("where runs talk with the owner, a feature opens with ideate and shape, whose open choices each run a row of their role side by side, each in a talk copy of its own; a pass ends while a row waits on the owner, and the next takes that same row's pick, then plans from the order and the picks", async () => {
 	let draft: RunOutcome = { kind: "waiting" };
 	const w = await world({ script: [{}, NOTE], decisions: [READY_PLAN] });
 	const id = w.repo.seed("Write the note");
 	const talk = talkingRunner(w.thinPath().runner, { ...SETTLED, "draft 3": async () => draft });
-	const copy = talkCopyIn(tempDir("talk"));
+	const copy = talkCopiesIn(tempDir("talk"));
 	const pass = () => runThinPath(w.thinPath({ judge: featureJudge, runner: talk.runner, talkCopy: copy.talkCopy, itemId: id }));
 
 	expect(await pass()).toEqual({ outcome: "waiting", item: id });
@@ -914,7 +915,7 @@ test("where runs talk with the owner, a feature opens with ideate and shape, who
 	const drafts = talk.asked.filter((request) => runName(request) === "draft 3").map(({ name }) => name);
 
 	expect(drafts).toEqual([drafts[0], drafts[0]]);
-	expect(talk.asked.every((request) => request.talk === true && request.cwd === copy.folder)).toBe(true);
+	expect(talk.asked.every((request) => request.talk === true && request.cwd === copy.folderOf(runName(request) ?? ""))).toBe(true);
 	expect(copy.asked.filter(({ prepared }) => prepared)).toHaveLength(1);
 	expect(Object.fromEntries(talk.asked.map((request) => [runName(request), skillsIn(request.prompt)]))).toEqual({ ideate: "hope:intent", "shape": "hope:shape", "find 1": "sound:find", "spike 2": undefined, "draft 3": "hope:freeze, hope:draft" });
 
@@ -933,7 +934,7 @@ test("a pick row that fails parks its item stuck, naming the row, and leaves its
 	const id = w.repo.seed("Write the note");
 	const waits = async (): Promise<RunOutcome> => ({ kind: "waiting" });
 	const talk = talkingRunner(w.thinPath().runner, { ...SETTLED, "find 1": async () => find, "spike 2": waits, "draft 3": waits });
-	const copy = talkCopyIn(tempDir("talk"));
+	const copy = talkCopiesIn(tempDir("talk"));
 	const pass = () => runThinPath(w.thinPath({ judge: featureJudge, runner: talk.runner, talkCopy: copy.talkCopy, itemId: id }));
 
 	const asks = (run: string) => {
@@ -968,7 +969,7 @@ test("a part split from an item the owner talked through keeps the work order an
 	const id = w.repo.seed("Write two parts");
 	const talk = talkingRunner(w.thinPath().runner, SETTLED);
 
-	expect(await runThinPath(w.thinPath({ judge: featureJudge, runner: talk.runner, talkCopy: talkCopyIn(tempDir("talk")).talkCopy }))).toEqual({ outcome: "merged", item: id });
+	expect(await runThinPath(w.thinPath({ judge: featureJudge, runner: talk.runner, talkCopy: talkCopiesIn(tempDir("talk")).talkCopy }))).toEqual({ outcome: "merged", item: id });
 
 	const settled = w.state.talks.get(id);
 	const filed = await w.adapter.workSource!.listReady();

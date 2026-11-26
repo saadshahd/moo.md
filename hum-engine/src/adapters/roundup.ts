@@ -336,7 +336,7 @@ export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterCon
 
 		await stopOpen(id);
 
-		const row = await startRow(call, { repo: options.repo, stateDir: options.stateDir, config: options.config }, { name, folder, request, workstream: await itemWorkstream(call, { id, title: todo.title }), adopt: false });
+		const row = await startRow(call, { repo: options.repo, stateDir: options.stateDir, config: options.config }, { name, folder, request, workstream: await itemWorkstream(call, { id, title: todo.title }) });
 
 		/* Asked when roundup started the row, on the clock its comments carry, so the thread keeps their order. */
 		atomicWrite(join(root, "question.json"), JSON.stringify({ item: id, name, text: questionText(question), at: row.status?.since ?? now() }));

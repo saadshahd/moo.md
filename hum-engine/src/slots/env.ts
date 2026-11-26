@@ -1,4 +1,5 @@
 import { basename, join, resolve } from "node:path";
+import slugify from "@sindresorhus/slugify";
 import type { HumConfig } from "../config/schema.ts";
 
 /** The variables a slot's recipe commands, repo checks and runs read. The recipe is written against these names. */
@@ -19,8 +20,18 @@ const NOT_NAME_CHARACTER = /[^A-Za-z0-9]+/g;
 /** The name of the slot at this position among the slots. */
 export const slotName = (index: number): string => `slot-${index + 1}`;
 
-/** The name of an item's talk copy, which lies in the pool folder beside the slots. */
-export const talkCopyName = (item: string): string => `talk-${item}`;
+/** The branches talk copies are on, each under its item's id, so an item reads back from a copy's branch alone. */
+const TALK_BRANCHES = "hum-talk/";
+
+/** The name and branch of the talk copy of an item's run the owner talks to: the copy lies in the pool folder beside the slots. */
+export const talkCopyNaming = (item: string, run: string) => {
+	const runPart = slugify(run);
+
+	return { name: `talk-${item}-${runPart}`, branch: `${TALK_BRANCHES}${item}/${runPart}` };
+};
+
+/** The item whose run the talk copy on `branch` serves; none for a branch no talk copy is on. */
+export const talkCopyItem = (branch: string): string | undefined => (branch.startsWith(TALK_BRANCHES) ? branch.slice(TALK_BRANCHES.length).split("/")[0] : undefined);
 
 /** Where a slot's worktree is: in the pool folder, named for the checkout it belongs to and the slot. */
 export const slotFolder = (repo: string, pool: string, name: string): string => join(resolve(repo, pool), `${basename(repo)}-${name}`);
