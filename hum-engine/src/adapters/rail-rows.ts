@@ -362,10 +362,15 @@ export const railRunner = ({ call, repo, state, config, fallback, now, signal }:
 	/**
 	 * Each kept run the owner talks to, with whether its row waits on them, from one read of the Rail. The runs are read
 	 * from their folders after the Rail, so a run begun meanwhile counts. One whose row is not recorded needs a pass to
-	 * start or find it; a read that fails raises one card and finds every recorded row waiting, so none wakes on it.
+	 * start or find it; a read that fails raises one card and finds every recorded row waiting, so none wakes on it. With
+	 * no such run kept, nothing is left to watch, and that card clears.
 	 */
 	const talkReadings = async (): Promise<{ readonly item: string; readonly folder: RunFolder; readonly waits: boolean }[]> => {
-		if (keptTalks().length === 0) return [];
+		if (keptTalks().length === 0) {
+			state.faults.clear({ code: TALK_WATCH_CODE });
+
+			return [];
+		}
 
 		const nodes = await tree().then(
 			(read) => {

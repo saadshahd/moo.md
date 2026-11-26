@@ -5,7 +5,7 @@ import { x } from "tinyexec";
 import { gitIn } from "../src/adapters/git.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { SLOT_ENV, slotEnv, slotFolder, slotName } from "../src/slots/env.ts";
-import { SLOT_KEPT_CODE, SLOT_OUT_CODE } from "../src/slots/pool.ts";
+import { SLOT_KEPT_CODE, SLOT_MAINTENANCE_CODE, SLOT_OUT_CODE } from "../src/slots/pool.ts";
 import type { Slot } from "../src/state/saved.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { sh } from "./fixtures/work-repo.ts";
@@ -104,6 +104,16 @@ test.each<[string, ReadonlySet<string>, Slot["status"]]>([
 	await restarted.maintain();
 
 	expect(restarted.list().map(({ status }) => status)).toEqual([expected]);
+});
+
+test("an upkeep pass whose reclaim and talk-copy steps succeed clears the cards an earlier failed pass left for those steps", async () => {
+	const w = world({ runners: 1 });
+
+	for (const step of ["reclaim", "talk copies"]) w.state.faults.raise({ code: SLOT_MAINTENANCE_CODE, item: step, cause: `Run slot upkeep for ${step} failed: git worktree list timed out`, fix: "hum tries again at its next tick." });
+
+	await w.slots.maintain();
+
+	expect(w.state.faults.list()).toEqual([]);
 });
 
 test("a pass that ends with a commit the remote lacks keeps its slot taken, with one card naming the branch, and the commit survives", async () => {

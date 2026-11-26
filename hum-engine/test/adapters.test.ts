@@ -172,6 +172,25 @@ describe("provider failures and empty lists", () => {
 		expect(state.faults.list().map(({ code, cause }) => ({ code, cause }))).toEqual([{ code: "provider-failed", cause: expect.stringContaining("the item was deleted") }]);
 	});
 
+	test("the card of a call the adapter answered failed now stays while other calls complete, and clears once a restarted hum completes that call", async () => {
+		const provider = new FakeProvider();
+		const state = stateIn(provider.now);
+		const id = provider.seed("one");
+		const guard = { provider: "fake", timeoutMs: 10_000, backoffMs: { first: 5, max: 5 } };
+		const { adapter } = answering(provider, [{ failed: "now", why: "the item was deleted" }]);
+
+		await expect(guarded(adapter, { ...guard, faults: state.faults }).workSource?.read(id)).rejects.toThrow("the item was deleted");
+
+		const restored = openState(state.dir, { now: provider.now });
+		const restarted = guarded(adapter, { ...guard, faults: restored.faults });
+
+		await restarted.workSource?.listReady();
+		expect(restored.faults.list().map(({ code }) => code)).toEqual(["provider-failed"]);
+
+		await restarted.workSource?.read(id);
+		expect(restored.faults.list()).toEqual([]);
+	});
+
 	test("a read the adapter answers failed retry is tried again, and the answer after it stands", async () => {
 		const provider = new FakeProvider();
 		const state = stateIn(provider.now);

@@ -42,11 +42,13 @@ const abortIfPermanent = (cause: unknown): never => {
  * - A transient failure is retried inside the timeout; one that outlasts it raises one card and throws.
  * - An empty ready list that contradicts the last read is a fault, not "no work".
  * - A call that would double on a retry (`comment`, `ask`, `decide`, `answer`) runs once; its caller retries it under an op key.
- * - An answer of `failed: "now"` raises one card and throws at once; `failed: "retry"` is a transient failure like any other.
+ * - An answer of `failed: "now"` raises one card naming the call and throws at once; that call completing later clears it. `failed: "retry"` is a transient failure like any other.
  */
 export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoffMs = SHIPPED_BACKOFF_MS, lastReady: remembered }: GuardOptions): Integrations => {
 	const unavailable = { code: "provider-unavailable", item: provider };
 	const contradicted = { code: "empty-list", item: provider };
+	const failedNow = { code: "provider-failed", item: provider };
+	const failedNowCause = (call: string): string => `${provider} could not complete ${call}:`;
 
 	const refuseChangedReply = (error: z.ZodError): never => {
 		const [issue] = error.issues;
@@ -72,25 +74,34 @@ export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoff
 		});
 	};
 
-	const failNow = ({ why }: Failed): never => {
-		faults.raise({ code: "provider-failed", item: provider, cause: `${provider} could not complete a call: ${why}`, fix: `Fix what ${provider} names, or update its adapter; hum calls it again on its next tick.` });
+	const failNow = (name: string, { why }: Failed): never => {
+		faults.raise({ ...failedNow, cause: `${failedNowCause(name)} ${why}`, fix: `Fix what ${provider} names, or update its adapter; hum calls it again on its next tick.` });
 
 		throw new PermanentError(`${provider}: ${why}`);
 	};
 
-	const once = async <T>(call: () => Promise<T | Failed>, schema: z.ZodType<T>): Promise<T> => {
+	/** The card a `failed: "now"` answer raised clears only when the call it names completes, so a read never clears a refused write. */
+	const clearFailedNow = (name: string): void => {
+		if (faults.list().some(({ code, item, cause }) => code === failedNow.code && item === provider && cause.startsWith(failedNowCause(name)))) faults.clear(failedNow);
+	};
+
+	const once = async <T>(name: string, call: () => Promise<T | Failed>, schema: z.ZodType<T>): Promise<T> => {
 		const reply = await call();
 		const failed = Failed.safeParse(reply);
 
-		if (failed.success) return failed.data.failed === "now" ? failNow(failed.data) : Promise.reject(new Error(`${provider}: ${failed.data.why}`));
+		if (failed.success) return failed.data.failed === "now" ? failNow(name, failed.data) : Promise.reject(new Error(`${provider}: ${failed.data.why}`));
 
 		const parsed = schema.safeParse(reply);
 
-		return parsed.success ? parsed.data : refuseChangedReply(parsed.error);
+		if (!parsed.success) return refuseChangedReply(parsed.error);
+
+		clearFailedNow(name);
+
+		return parsed.data;
 	};
 
-	const retried = async <T>(call: () => Promise<T | Failed>, schema: z.ZodType<T>): Promise<T> => {
-		const value = await pRetry(() => once(call, schema).catch(abortIfPermanent), {
+	const retried = async <T>(name: string, call: () => Promise<T | Failed>, schema: z.ZodType<T>): Promise<T> => {
+		const value = await pRetry(() => once(name, call, schema).catch(abortIfPermanent), {
 			retries: Number.POSITIVE_INFINITY,
 			maxRetryTime: timeoutMs,
 			minTimeout: backoffMs.first,
@@ -107,7 +118,7 @@ export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoff
 	let lastReadyIds: ItemId[] = (remembered?.load() ?? []).flatMap((id) => ItemId.safeParse(id).data ?? []);
 
 	const firstStillReady = async (source: Fallible<WorkSource>, ids: readonly ItemId[]): Promise<ItemId | undefined> => {
-		for (const id of ids) if ((await retried(() => source.read(id), Item)).ready) return id;
+		for (const id of ids) if ((await retried("read", () => source.read(id), Item)).ready) return id;
 
 		return undefined;
 	};
@@ -131,7 +142,7 @@ export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoff
 		apiVersion: adapter.apiVersion,
 		workSource: workSource && {
 			listReady: async () => {
-				const list = await retried(() => workSource.listReady(), ItemRef.array());
+				const list = await retried("listReady", () => workSource.listReady(), ItemRef.array());
 
 				if (list.length === 0) await refuseContradictingEmptyList(workSource);
 
@@ -141,26 +152,26 @@ export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoff
 
 				return list;
 			},
-			listClaimed: (holder) => retried(() => workSource.listClaimed(holder), ItemRef.array()),
-			read: (id) => retried(() => workSource.read(id), Item),
-			claim: (id, holder, ttlMs) => retried(() => workSource.claim(id, holder, ttlMs), ClaimResult),
-			renew: (id, holder, ttlMs) => retried(() => workSource.renew(id, holder, ttlMs), ClaimResult),
-			comment: (id, text) => once(() => workSource.comment(id, text), none),
-			fileFollowUp: (from, followUp) => retried(() => workSource.fileFollowUp(from, followUp), ItemRef),
-			finish: (id) => retried(() => workSource.finish(id), none),
+			listClaimed: (holder) => retried("listClaimed", () => workSource.listClaimed(holder), ItemRef.array()),
+			read: (id) => retried("read", () => workSource.read(id), Item),
+			claim: (id, holder, ttlMs) => retried("claim", () => workSource.claim(id, holder, ttlMs), ClaimResult),
+			renew: (id, holder, ttlMs) => retried("renew", () => workSource.renew(id, holder, ttlMs), ClaimResult),
+			comment: (id, text) => once("comment", () => workSource.comment(id, text), none),
+			fileFollowUp: (from, followUp) => retried("fileFollowUp", () => workSource.fileFollowUp(from, followUp), ItemRef),
+			finish: (id) => retried("finish", () => workSource.finish(id), none),
 		},
 		questions: questions && {
-			ask: (id, question) => once(() => questions.ask(id, question), none),
-			decide: (id, text) => once(() => questions.decide(id, text), none),
+			ask: (id, question) => once("ask", () => questions.ask(id, question), none),
+			decide: (id, text) => once("decide", () => questions.decide(id, text), none),
 		},
 		answers: answers && {
 			...answers,
-			answer: (id, answer) => once(() => answers.answer(id, answer), none),
-			watch: (since) => retried(() => answers.watch(since), Watch),
+			answer: (id, answer) => once("answer", () => answers.answer(id, answer), none),
+			watch: (since) => retried("watch", () => answers.watch(since), Watch),
 		},
 		release: release && {
-			publish: (id, ref) => retried(() => release.publish(id, ref), none),
-			release: (id, ref) => retried(() => release.release(id, ref), none),
+			publish: (id, ref) => retried("publish", () => release.publish(id, ref), none),
+			release: (id, ref) => retried("release", () => release.release(id, ref), none),
 		},
 	};
 };

@@ -902,6 +902,30 @@ test("a review-note loop pass that succeeds clears the card an earlier failed pa
 	expect(w.state.faults.list()).toEqual([]);
 });
 
+test("a question release that succeeds clears the card an earlier failed release left, so a CI wake that restores that card no longer stops on it", async () => {
+	const w = await workerWorld({ items: {} });
+
+	w.state.faults.raise({ code: "question-release", cause: "Queued questions could not be asked: 502 Bad Gateway", fix: "hum asks them again on the next tick." });
+
+	await w.worker.tick();
+	await w.worker.idle();
+
+	expect(w.state.faults.list()).toEqual([]);
+});
+
+test("an item's pass that ends clears the run-error card an earlier failed pass left for that item, and only that item's", async () => {
+	const w = await workerWorld({ items: { a: { writeForItem: true } } });
+
+	for (const item of ["a", "b"]) w.state.faults.raise({ code: "run-error", item, cause: `The run for ${item} failed: spawn claude ENOENT`, fix: "hum tries the item again when its claim lapses; look at the cause if this card stays." });
+	w.item("a", "docs/a.md");
+
+	await w.worker.tick();
+	await w.worker.idle();
+
+	expect(merged(w)).toEqual(["a"]);
+	expect(w.state.faults.list().map(({ code, item }) => ({ code, item }))).toEqual([{ code: "run-error", item: "b" }]);
+});
+
 test("a review-note loop pass that fails raises a card naming the step it failed in and the value it refused", async () => {
 	const issueNumber = ItemId.refine((id) => /^[1-9]\d*$/.test(id), "a GitHub issue number is a whole number above 0");
 
