@@ -161,6 +161,7 @@
 	"drainTimeoutSeconds": 300,
 	"claimExpirySeconds": 900,
 	"latestVersionCacheSeconds": 21600,
+	"engineUpdates": true,
 	"watchCacheSeconds": 10,
 	"watchLockSeconds": 30,
 	"maxFixRuns": 3,

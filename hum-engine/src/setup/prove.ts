@@ -1,18 +1,18 @@
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { z } from "zod";
 import { type AdapterContext, Holder, ItemId } from "../adapter-api.ts";
 import { runContract } from "../adapters/contract.ts";
 import { markdownAdapter } from "../adapters/markdown.ts";
 import { type Config, loadConfig, readConfigDir } from "../config/load.ts";
 import { commandTimeoutMs, type Env, exec, SHIPPED_COMMAND_TIMEOUT_MS, which } from "../exec.ts";
 import { SlotPool } from "../slots/pool.ts";
-import { orMissing } from "../state/fs.ts";
 import { openState } from "../state/open.ts";
 import { checkLimits, runChecks } from "../worker/checks.ts";
 import { closingAfter, workerOptions } from "../worker/open.ts";
 import { Worker } from "../worker/worker.ts";
+import { addEngineCommand, ENGINE_NAME, LOCAL_PIN, pinIn } from "../engine.ts";
+import { pinningManagerIn } from "./scan.ts";
 import { Scratch } from "./scratch.ts";
 
 type StepStatus = "passed" | "failed" | "skipped";
@@ -49,31 +49,15 @@ export type ProveEnv = {
 	readonly published?: (pin: string) => Promise<"found" | "missing-version" | "unpublished">;
 };
 
-const Manifest = z.looseObject({
-	dependencies: z.record(z.string(), z.string()).default({}),
-	devDependencies: z.record(z.string(), z.string()).default({}),
-});
-
-const ENGINE = "@moo.md/hum";
-
-/** A pin that is a folder or tarball on disk rather than a registry version. */
-const LOCAL_PIN = /^(file|link):/;
-
 /** What the registry says about the pinned version: found, or the package exists without it, or the package is not published. */
 const npmPublished = async (pin: string): Promise<"found" | "missing-version" | "unpublished"> => {
-	const viewed = await exec("npm", ["view", `${ENGINE}@${pin}`, "version"], { throwOnError: false, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
+	const viewed = await exec("npm", ["view", `${ENGINE_NAME}@${pin}`, "version"], { throwOnError: false, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 
 	if (viewed.exitCode === 0) return "found";
 
-	const package_ = await exec("npm", ["view", ENGINE, "name"], { throwOnError: false, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
+	const package_ = await exec("npm", ["view", ENGINE_NAME, "name"], { throwOnError: false, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 
 	return package_.exitCode === 0 ? "missing-version" : "unpublished";
-};
-
-const pinOf = (repo: string): string | undefined => {
-	const manifest = Manifest.parse(orMissing(() => JSON.parse(readFileSync(join(repo, "package.json"), "utf8")), {}));
-
-	return { ...manifest.dependencies, ...manifest.devDependencies }[ENGINE];
 };
 
 const configStep = (repo: string, env: ProveEnv): Outcome & { readonly config?: Config } => {
@@ -127,17 +111,17 @@ const contractStep = async (config: Config, scratch: Scratch, { base, now, proce
 };
 
 const pinStep = async (repo: string, env: ProveEnv): Promise<Outcome> => {
-	const pin = pinOf(repo);
+	const pin = pinIn(repo);
 
-	if (pin === undefined) return failed(`package.json pins no ${ENGINE}: run bun add --exact ${ENGINE}@<version>`);
+	if (pin === undefined) return failed(`package.json pins no ${ENGINE_NAME}: run ${addEngineCommand(pinningManagerIn(repo), "<version>")}`);
 
-	if (LOCAL_PIN.test(pin)) return passed(`${ENGINE} is pinned to ${pin}, a path on this machine`);
+	if (LOCAL_PIN.test(pin)) return passed(`${ENGINE_NAME} is pinned to ${pin}, a path on this machine`);
 
 	const found = await (env.published ?? npmPublished)(pin);
 
-	if (found === "found") return passed(`${ENGINE}@${pin} is on the registry, so each runner installs it`);
+	if (found === "found") return passed(`${ENGINE_NAME}@${pin} is on the registry, so each runner installs it`);
 
-	return found === "unpublished" ? skipped(`${ENGINE} is not published yet, so no runner can install it; run this step again after the first publish`) : failed(`${ENGINE}@${pin} is not on the registry`);
+	return found === "unpublished" ? skipped(`${ENGINE_NAME} is not published yet, so no runner can install it; run this step again after the first publish`) : failed(`${ENGINE_NAME}@${pin} is not on the registry`);
 };
 
 const slotStep = async (config: Config, scratch: Scratch, env: ProveEnv): Promise<Outcome> => {

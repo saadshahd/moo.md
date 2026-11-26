@@ -11,7 +11,7 @@ import { MergedCase } from "../measure/cases.ts";
 import { OpKeys } from "./ops.ts";
 import { Records } from "./records.ts";
 import { RunRecords } from "./runs.ts";
-import { FiledFollowUp, FiledPart, ItemKind, Landing, Learned, Limit, Parked, PullRequestText, QueuedQuestion, ReadyList, SavedPlan, SavedRepro, SavedTalk, SettledAnswer, Slot, Spent, Verdict } from "./saved.ts";
+import { EngineUpdate, FiledFollowUp, FiledPart, ItemKind, Landing, Learned, Limit, Parked, PullRequestText, QueuedQuestion, ReadyList, SavedPlan, SavedRepro, SavedTalk, SettledAnswer, Slot, Spent, Verdict } from "./saved.ts";
 
 /** Names under the state folder that other modules address by name. */
 export const STATUS_FILE = "status.json";
@@ -97,6 +97,8 @@ export const openState = (dir: string, { now, ...codec }: StateOptions) => {
 		labels: new Records(join(dir, "labels"), BrokenCommit),
 		/** What proving a check item cost, by item. */
 		proofs: new Records(join(dir, "proofs"), Proof),
+		/** Engine versions hum could not update to yet, by version. */
+		engineUpdates: new Records(join(dir, "engine-updates"), EngineUpdate),
 		/** The labelled case each merged item gives the judges its change was put to, by item. */
 		cases: new Records(join(dir, "cases"), MergedCase),
 	};

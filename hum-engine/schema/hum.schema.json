@@ -378,7 +378,12 @@
 			"type": "integer",
 			"exclusiveMinimum": 0,
 			"maximum": 9007199254740991,
-			"description": "How long the newest published engine version is kept before it is read again."
+			"description": "How long the newest published engine version is kept before it is read again, which is also how often the Mac worker looks for an engine to update to."
+		},
+		"engineUpdates": {
+			"default": true,
+			"type": "boolean",
+			"description": "Whether the Mac worker keeps the repo on the newest published engine. It pins that version on the base with the repo's package manager and the new engine's own setup files, from a fresh clone; then, once the base pins it, it installs it in its checkout and restarts on it. It updates only a clean checkout of the base. Off, the owner updates the engine by hand."
 		},
 		"watchCacheSeconds": {
 			"default": 10,

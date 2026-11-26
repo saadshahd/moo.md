@@ -10,7 +10,7 @@ import { proveSetup } from "../src/setup/prove.ts";
 import { scanRepo } from "../src/setup/scan.ts";
 import { shippedConfig, shippedSettingsAs } from "../src/setup/shipped.ts";
 import { waitsOf, withTimeouts } from "../src/setup/waits.ts";
-import { readAnswers, SetupAnswers, writeSetup } from "../src/setup/write.ts";
+import { readAnswers, SetupAnswers, upgradeSetup, writeSetup } from "../src/setup/write.ts";
 import { installedSkills } from "./fixtures/config.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { MAIN } from "./fixtures/owner-repo.ts";
@@ -554,4 +554,16 @@ test.each([
 	const result = writeSetup(repo, answers, env);
 
 	expect(!result.ok && result.refusal.code).toBe(code);
+});
+
+test("an engine update's setup upgrade on a repo the same engine set up rewrites nothing, so the owner's settings and wait hours stay as they answered them", () => {
+	const repo = repoWith(PROJECT);
+	const waitHours = Object.fromEntries(waitsOf(shipped.kinds).map(({ kind, state }, at) => [`${kind}/${state}`, at + 7]));
+	const env = { installedSkills: installedSkills(), home: join(repo, "home"), gitIdentity: OWNER_GIT };
+
+	expect(writeSetup(repo, SetupAnswers.parse({ hum: { checks: ["true"], runPlaces: ["mac", "ci"], tickIntervalSeconds: 45, alwaysPullRequest: true }, waitHours }), env).ok).toBe(true);
+	commitFiles(repo, {}, "set up hum");
+
+	expect(upgradeSetup(repo, env)).toEqual({ ok: true, value: [] });
+	expect(sh(repo, ["status", "--porcelain"])).toBe("");
 });

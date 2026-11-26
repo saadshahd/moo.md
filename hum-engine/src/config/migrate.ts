@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { updateEngineStep } from "../engine.ts";
 import { Json } from "./json.ts";
 import { READABLE_SCHEMA_VERSIONS, SCHEMA_VERSION } from "./schema.ts";
 import type { Result } from "./refusal.ts";
@@ -55,10 +56,7 @@ export const migrateConfig = (
 	const found = version?.success ? version.data : undefined;
 
 	if (!parsed.success || found === undefined || !readable.includes(found)) {
-		const step =
-			found !== undefined && found > current
-				? "Update the engine: bun add --exact @moo.md/hum@latest."
-				: "Run /hum to rewrite it.";
+		const step = found !== undefined && found > current ? updateEngineStep() : "Run /hum to rewrite it.";
 
 		return {
 			ok: false,
