@@ -21,6 +21,8 @@ const addressOf = (press: Press): string => {
 			return `fold:${press.id}`;
 		case "open":
 			return "open";
+		case "dismiss":
+			return `dismiss:${press.cards.map(({ key }) => key).join(",")}`;
 	}
 };
 

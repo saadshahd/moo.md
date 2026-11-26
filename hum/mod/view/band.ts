@@ -38,9 +38,9 @@ const statusPart = (input: BandInput): Span => {
 
 	if (reported !== undefined) return span(`work source unread ${sinceText(reported.since, now)}`, "amber");
 
-	if (read.kind !== "status") return span(statusWords(read), "amber");
+	if (read.kind !== "status") return span(statusWords(read, input.dismissed), "amber");
 
-	return span(statusWords(read), read.status.questions.length > 0 ? "strong" : "plain");
+	return span(statusWords(read, input.dismissed), read.status.questions.length > 0 ? "strong" : "plain");
 };
 
 const partsOf = (input: BandInput): Parts => {

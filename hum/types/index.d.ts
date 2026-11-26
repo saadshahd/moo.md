@@ -44,6 +44,12 @@ export type AnswerSnapshot =
 
 export type AnswerState = AnswerSnapshot["value"];
 
+/** A fault card the owner dismissed: its key and when it was raised, so a card raised again shows again. */
+export type Dismissal = { readonly key: string; readonly since: number };
+
+/** The fault cards dismissed in any pane on the repo this session serves, and the file every such pane shares them in. */
+export type Dismissed = { readonly path: string; readonly cards: readonly Dismissal[] };
+
 /** A read of what changed that keeps failing: its cause and when the failures began. */
 export type Unread = { readonly cause: string; readonly since: number };
 
@@ -54,6 +60,7 @@ declare module "claude-code" {
 			unfolded: Shaped<string[]>;
 			answerMode: Shaped<AnswerSnapshot>;
 			unread: Shaped<Unread | null>;
+			dismissed: Shaped<Dismissed | null>;
 		};
 	}
 }

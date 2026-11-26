@@ -4,6 +4,7 @@ import { agesShown } from "../../../hum/mod/view/ages.ts";
 import { bandRow } from "../../../hum/mod/view/band.ts";
 import { button, buttonRows } from "../../../hum/mod/view/buttons.ts";
 import {
+	faultCardRows,
 	noticeCardRows,
 	questionCardRows,
 } from "../../../hum/mod/view/cards.ts";
@@ -64,6 +65,7 @@ const inputOf = (read: ViewRead, width: number) => ({
 	read,
 	now: NOW,
 	amberAfterSeconds: AMBER_AFTER,
+	dismissed: [],
 	width,
 });
 
@@ -155,7 +157,7 @@ test("a question is never cut: every character comes back at every width", () =>
 
 test("a card's title loses parts from the end and keeps its item", () => {
 	const card = fullStatus.cards[0];
-	const title = (width: number) => textOf(card === undefined ? [] : (noticeCardRows(card, { now: NOW, width })[0] ?? []));
+	const title = (width: number) => textOf(card === undefined ? [] : (faultCardRows([card], { now: NOW, width })[0] ?? []));
 
 	expect(title(60)).toContain("71 · fault · 5 m");
 	expect(title(20)).toContain("71 · fault");

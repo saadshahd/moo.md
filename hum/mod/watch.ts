@@ -1,14 +1,14 @@
 import type { EngineInterface, FsStat } from "claude-code";
 import type { ServedSource, ViewSource } from "../types";
 import { agesShown } from "./view/ages.ts";
-import { readOf, statusPathOf, type ViewRead } from "./view/read.ts";
+import { dismissedPathOf, readOf, statusPathOf, type ViewRead } from "./view/read.ts";
 import { engineAt, runHum } from "./hum.ts";
 import { failureOf } from "./says.ts";
 
 type Engine = EngineInterface;
 
-/** Where a repo keeps what the mod reads and runs: its root, which holds hum's config and pinned engine, and the status file hum's worker writes. */
-export type Place = { readonly root: string; readonly statusPath: string };
+/** Where a repo keeps what the mod reads and runs: its root, which holds hum's config and pinned engine, the status file hum's worker writes, and the pane's dismissals beside it. */
+export type Place = { readonly root: string; readonly statusPath: string; readonly dismissedPath: string };
 
 /** The config a repo where hum is set up holds, under its root. */
 const CONFIG = ".hum/hum.json";
@@ -30,7 +30,7 @@ export type Look = { readonly found?: ViewSource; readonly seen: Seen };
 const NEVER = -1;
 
 /** The engine rejects a missing path with the code at the end of the message, not on a `code` field. */
-const isMissing = (error: Error): boolean => error.message.endsWith("ENOENT");
+export const isMissing = (error: Error): boolean => error.message.endsWith("ENOENT");
 
 const sourceOf = (found: string | Error): ServedSource => (found instanceof Error ? { kind: "failed", message: found.message } : { kind: "text", text: found });
 
@@ -45,7 +45,7 @@ export async function locate($: Engine, cwd: string): Promise<Place | undefined>
 
 	const [root = "", commonDir = ""] = found.stdout.trim().split("\n");
 
-	return { root, statusPath: statusPathOf({ cwd, commonDir }) };
+	return { root, statusPath: statusPathOf({ cwd, commonDir }), dismissedPath: dismissedPathOf({ cwd, commonDir }) };
 }
 
 /** Whether hum is set up at the root: its config and its pinned engine are there. */

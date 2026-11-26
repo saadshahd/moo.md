@@ -1,57 +1,9 @@
-import type { On } from "claude-code";
-import { type Engine, expect, mock, test } from "claude-code/testing";
-import type { Status } from "../../hum-engine/src/status/format.ts";
+import { type Engine, expect, test } from "claude-code/testing";
+import { BAND, CONFIG, type Disk, ENGINE, PANE, engineWith, served, start } from "../fixtures/engine.tsx";
 import { NOW, fullStatus } from "../fixtures/status.ts";
 import { openingRows } from "./view/pane.ts";
 
-const COLUMNS = 45;
 const WIDE = 80;
-const ROWS = 24;
-const REPO = "/repo";
-const CONFIG = `${REPO}/.hum/hum.json`;
-const ENGINE = `${REPO}/node_modules/.bin/hum`;
-const GIT_PLACES = `${REPO}\n${REPO}/.git\n`;
-
-const PANE = { plugin: "hum", component: "Pane", requestId: "hum", props: { title: "hum", isFocused: false, bodyColumns: COLUMNS, placement: "inline", scroll: { offset: 0, bodyRows: ROWS }, view: {} } } as const;
-const BAND = { plugin: "hum", component: "AbovePrompt", props: { hasSurvey: false, isCollapsed: false, isWorking: false, maxRows: 5, bodyColumns: COLUMNS, scroll: { offset: 0, bodyRows: 5 }, view: {} } } as const;
-
-/** The folder the session starts in: whether git finds a repo there, the hum files it holds, and the status file hum's worker wrote. */
-type Disk = { isRepo: boolean; humFiles: readonly string[]; status: string | undefined; modified: number };
-
-const ran = (exitCode: number, stdout: string) => ({ exitCode, stdout, stderr: "", isStdoutTruncated: false, isStderrTruncated: false });
-
-/** What the engine does when the mod runs the repo's hum. */
-type Hum = (argv: readonly string[]) => Promise<void> | void;
-
-/** The engine beneath the plugin: git, a disk the test changes, the repo's hum, and the clock that moves it on. */
-const engineWith = (on: On, disk: Disk, hum: Hum = () => undefined) => {
-	const clock = mock.clock(on, { now: NOW });
-
-	on("process.run", async (_, e) => {
-		if (e.argv[0] === "git") return { value: disk.isRepo ? ran(0, GIT_PLACES) : ran(128, "") };
-
-		await hum(e.argv);
-
-		return { value: ran(0, "") };
-	});
-	on("session.start", (_, e) => ({ cwd: e.cwd }));
-	on("fs.exists", (_, e) => ({ value: disk.humFiles.includes(e.path) }));
-	on("fs.stat", () => (disk.status === undefined ? { deny: "ENOENT" } : { value: { kind: "file", size: disk.status.length, mtimeMs: disk.modified, isLink: false } }));
-	on("fs.read", () => ({ value: disk.status ?? "" }));
-	on("ui.render", ($, e) => {
-		const { Text } = $.ui.resolve(e);
-
-		return <Text>other plugin's band</Text>;
-	});
-
-	return clock;
-};
-
-const start = async ($: Engine): Promise<void> => {
-	await $.session.start({ cwd: REPO, surface: "terminal", isInteractive: true });
-};
-
-const served = (status: Status): Disk => ({ isRepo: true, humFiles: [CONFIG, ENGINE], status: JSON.stringify(status), modified: 1 });
 
 test("the pane at 45 by 24 shows the header and the first card whole", async ($, on) => {
 	engineWith(on, SERVED);
@@ -187,7 +139,7 @@ test("the band's open control asks for the rows the first card needs at the inli
 
 	await ui.press({ key: control?.key ?? "" });
 
-	const opened = { read: { kind: "status", status: fullStatus }, now: NOW, amberAfterSeconds: 300 } as const;
+	const opened = { read: { kind: "status", status: fullStatus }, now: NOW, amberAfterSeconds: 300, dismissed: [] } as const;
 	const bandRows = openingRows({ ...opened, width: NARROW });
 
 	expect(asked).toEqual([openingRows({ ...opened, width: INLINE_BODY })]);

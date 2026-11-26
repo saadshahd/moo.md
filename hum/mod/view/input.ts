@@ -1,4 +1,4 @@
-import type { Unread } from "../../types";
+import type { Dismissal, Unread } from "../../types";
 import type { ViewRead } from "./read.ts";
 
 /** What every drawing of the view starts from. */
@@ -11,6 +11,8 @@ export type ViewInput = {
 	readonly width: number;
 	/** A read of the work source that keeps failing; the view reports it once it is past the amber limit. */
 	readonly unread?: Unread;
+	/** The fault cards dismissed in any pane on the repo. */
+	readonly dismissed: readonly Dismissal[];
 };
 
 /** The clock and the amber limit, which every age's text and colour come from. */
