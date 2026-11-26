@@ -249,8 +249,8 @@ export class SlotPool {
 
 		this.#recheckOut = false;
 
-		await this.#reclaim().catch((error: Error) => this.#maintenanceFailed("reclaim", error));
-		await this.#dropIdleTalkCopies().catch((error: Error) => this.#maintenanceFailed("talk copies", error));
+		await this.#upkeep("reclaim", () => this.#reclaim());
+		await this.#upkeep("talk copies", () => this.#dropIdleTalkCopies());
 
 		for (let index = 0; index < config.runners; index++) {
 			const name = slotName(index);
@@ -261,15 +261,18 @@ export class SlotPool {
 		for (const listed of this.#slots()) {
 			const slot = recheck && listed.status === "out" ? this.#save(freed(listed, "new")) : listed;
 
-			await this.#settle(slot).then(
-				() => state.faults.clear({ code: SLOT_MAINTENANCE_CODE, item: slot.name }),
-				(error: Error) => this.#maintenanceFailed(slot.name, error),
-			);
+			await this.#upkeep(slot.name, () => this.#settle(slot));
 		}
 	}
 
-	#maintenanceFailed(name: string, error: Error): void {
-		this.#o.state.faults.raise({ code: SLOT_MAINTENANCE_CODE, item: name, cause: `Run slot upkeep for ${name} failed: ${error.message}`.slice(0, CARD_OUTPUT), fix: "hum tries again at its next tick." });
+	/** Runs one upkeep step: a failure raises the step's card, and a later run that succeeds clears it. */
+	#upkeep(name: string, step: () => Promise<void>): Promise<void> {
+		const { faults } = this.#o.state;
+
+		return step().then(
+			() => faults.clear({ code: SLOT_MAINTENANCE_CODE, item: name }),
+			(error: Error) => void faults.raise({ code: SLOT_MAINTENANCE_CODE, item: name, cause: `Run slot upkeep for ${name} failed: ${error.message}`.slice(0, CARD_OUTPUT), fix: "hum tries again at its next tick." }),
+		);
 	}
 
 	/** One upkeep pass: slots made, returned slots refreshed, orphans returned. Resolves when the pass has run. */

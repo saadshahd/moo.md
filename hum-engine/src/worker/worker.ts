@@ -147,6 +147,12 @@ export const UNREAD_CODE = "item-unread";
 /** The card for a review-note loop pass that failed. */
 const LOOP_CODE = "review-loop";
 
+/** The card for queued questions a tick could not ask. */
+const RELEASE_CODE = "question-release";
+
+/** The card for an item's pass that threw. */
+const RUN_ERROR_CODE = "run-error";
+
 /** Runs one step of a longer job; a failure names the step it failed in. */
 const during = async <T>(step: string, run: () => Promise<T>): Promise<T> => {
 	try {
@@ -627,6 +633,7 @@ export class Worker {
 
 	#ended(id: string, known: Known, result: ThinResult): void {
 		this.#inFlight.delete(id);
+		this.#o.state.faults.clear({ code: RUN_ERROR_CODE, item: id });
 
 		if (this.#o.ciJob) this.#handled.add(id);
 
@@ -781,7 +788,7 @@ export class Worker {
 
 		if (this.#o.ciJob) this.#handled.add(id);
 		this.#o.state.faults.raise({
-			code: "run-error",
+			code: RUN_ERROR_CODE,
 			item: id,
 			cause: `The run for ${id} failed: ${error.message}`.slice(0, ERROR_EXCERPT),
 			fix: "hum tries the item again when its claim lapses; look at the cause if this card stays.",
@@ -968,9 +975,12 @@ export class Worker {
 
 		if (this.#o.ciJob?.kind !== "work") {
 			await this.#askParked();
-			await releaseQuestions({ state, config, workSource: this.#o.adapters.workSource, questions: this.#o.adapters.questions, now: this.#now }).catch((error: Error) => {
-				state.faults.raise({ code: "question-release", cause: `Queued questions could not be asked: ${error.message}`.slice(0, ERROR_EXCERPT), fix: "hum asks them again on the next tick." });
-			});
+			await releaseQuestions({ state, config, workSource: this.#o.adapters.workSource, questions: this.#o.adapters.questions, now: this.#now }).then(
+				() => state.faults.clear({ code: RELEASE_CODE }),
+				(error: Error) => {
+					state.faults.raise({ code: RELEASE_CODE, cause: `Queued questions could not be asked: ${error.message}`.slice(0, ERROR_EXCERPT), fix: "hum asks them again on the next tick." });
+				},
+			);
 
 			this.#loopIfDue(t);
 			this.#judgesIfDue(t);
