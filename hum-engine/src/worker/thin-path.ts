@@ -133,11 +133,11 @@ export type ThinResult =
 
 type Answered = { readonly question: string; readonly answer: string; readonly option: string | undefined; readonly plan: string; readonly at: number };
 
-/** The question, the answer to it and the plan, once the owner has answered the latest question. */
-export const answerTo = (item: Item): Answered | undefined => {
+/** The question, the answer to it and the plan, once the owner has answered the latest question from `since` on. */
+export const answerTo = (item: Item, since = 0): Answered | undefined => {
 	const answer = answerToLatest(item.thread);
 
-	if (!answer) return undefined;
+	if (!answer || answer.at < since) return undefined;
 
 	const plan = item.thread.findLast((e) => e.kind === "comment" && e.text.startsWith(PLAN_MARK));
 
@@ -298,10 +298,10 @@ export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gather
 	const kindName = settled ? settled.kind : keepKind(kindContext, item, await pickKind(kindContext, item));
 	const kind = kindNamed(o.config, kindName);
 	const asking = isWaitingOnOwner(kind, at);
-	const answered = asking || !onSnapshot ? answerTo(item) : undefined;
+	const wait = asking ? o.state.items.savedOf(id) : undefined;
+	const answered = asking ? answerTo(item, wait?.savedAt) : onSnapshot ? undefined : answerTo(item);
 	const isAwaitingAnswer = asking && answered === undefined;
-	const waited = isAwaitingAnswer ? o.state.items.savedOf(id) : undefined;
-	const timedOut = waited !== undefined && isDue(o.state, { kind, saved: waited }, now()) ? waited : undefined;
+	const timedOut = isAwaitingAnswer && wait !== undefined && isDue(o.state, { kind, saved: wait }, now()) ? wait : undefined;
 
 	if (isAwaitingAnswer && timedOut === undefined) return { outcome: "waiting", item: id };
 
