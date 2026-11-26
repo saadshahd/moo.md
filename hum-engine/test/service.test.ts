@@ -250,10 +250,17 @@ test("hum's status reads as one OSC 7501 record: its newest fault first, then th
 
 test("a second `hum work` on one state folder is refused, naming it, while `hum serve` there is not", async () => {
 	const dir = tempDir("alone");
+	const holding = Promise.withResolvers<void>();
 	const kept = Promise.withResolvers<void>();
 	const lost = () => {};
-	const held = alone(dir, "work", lost, () => kept.promise);
 
+	const held = alone(dir, "work", lost, () => {
+		holding.resolve();
+
+		return kept.promise;
+	});
+
+	await holding.promise;
 	await expect(alone(dir, "work", lost, async () => "second")).rejects.toThrow(`another \`hum work\` runs on ${dir}`);
 	expect(await alone(dir, "serve", lost, async () => "serve")).toBe("serve");
 
