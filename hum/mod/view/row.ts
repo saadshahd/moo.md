@@ -1,3 +1,4 @@
+import type { Dismissal } from "../../types";
 import { plain, spaces } from "./cells.ts";
 
 /** `filled` is a label between two cap glyphs: the caps in the accent colour and the label on it. */
@@ -7,7 +8,8 @@ export type Tone = "plain" | "dim" | "strong" | "amber" | "filled";
 export type Press =
 	| { readonly kind: "fold"; readonly id: string }
 	| { readonly kind: "fill"; readonly item: string; readonly word: string }
-	| { readonly kind: "open" };
+	| { readonly kind: "open" }
+	| { readonly kind: "dismiss"; readonly cards: readonly Dismissal[] };
 
 export type Span = { readonly text: string; readonly tone: Tone; readonly press?: Press };
 

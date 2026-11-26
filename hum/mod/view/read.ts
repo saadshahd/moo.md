@@ -25,12 +25,20 @@ export const parseStatus = (text: string): ViewRead => {
 	}
 };
 
-/** The status file's place: the repo's git common dir, as the engine's default state folder. */
-export const statusPathOf = ({ cwd, commonDir }: { readonly cwd: string; readonly commonDir: string }): string => {
+type GitPlaces = { readonly cwd: string; readonly commonDir: string };
+
+/** hum's state folder: in the repo's git common dir, as the engine's default, so every worktree of the repo shares it. */
+const stateFolderOf = ({ cwd, commonDir }: GitPlaces): string => {
 	const absolute = commonDir.startsWith("/") ? commonDir : `${cwd}/${commonDir}`;
 
-	return `${absolute.replace(/\/\.?$/, "")}/hum/status.json`;
+	return `${absolute.replace(/\/\.?$/, "")}/hum`;
 };
+
+/** The status file the engine writes. */
+export const statusPathOf = (git: GitPlaces): string => `${stateFolderOf(git)}/status.json`;
+
+/** The pane's own file beside the status file: the fault cards dismissed in any pane on the repo. The engine never reads it. */
+export const dismissedPathOf = (git: GitPlaces): string => `${stateFolderOf(git)}/pane-dismissed.json`;
 
 export const readOf = (source: ServedSource): ViewRead => {
 	switch (source.kind) {

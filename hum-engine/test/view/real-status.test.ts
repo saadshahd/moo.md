@@ -48,7 +48,7 @@ test("the view reads the status file the engine wrote, and every section draws i
 	expect(read.status.measure?.byDoneBy.map(({ doneBy }) => doneBy)).toEqual(["checks"]);
 
 	for (const width of WIDTHS) {
-		const rows = [...paneRows({ read, now, amberAfterSeconds: AMBER_AFTER, width, unfolded: new Set() }), bandRow({ read, now, amberAfterSeconds: AMBER_AFTER, width })];
+		const rows = [...paneRows({ read, now, amberAfterSeconds: AMBER_AFTER, dismissed: [], width, unfolded: new Set() }), bandRow({ read, now, amberAfterSeconds: AMBER_AFTER, dismissed: [], width })];
 
 		for (const row of rows) {
 			expect(rowCells(row), `${textOf(row)} at ${width}`).toBeLessThanOrEqual(width);

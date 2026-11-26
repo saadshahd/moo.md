@@ -1,5 +1,6 @@
 import type { Card, Status } from "../../../hum-engine/src/status/format.ts";
-import { blankRow, noticeCardRows, questionCardRows, unreadCardRows } from "./cards.ts";
+import { blankRow, faultCardRows, noticeCardRows, questionCardRows, unreadCardRows } from "./cards.ts";
+import { shownFaultGroups } from "./faults.ts";
 import { reportedUnread, sinceText } from "./freshness.ts";
 import { headerRow, measureRow } from "./header.ts";
 import type { ViewInput } from "./input.ts";
@@ -13,8 +14,8 @@ type PaneInput = ViewInput & {
 	readonly unfolded: ReadonlySet<string>;
 };
 
-/** Notice cards in the order the pane lists them. */
-const NOTICE_ORDER: readonly Card["kind"][] = ["waiting", "limited", "fault"];
+/** Notice cards in the order the pane lists them, before the fault cards. */
+const NOTICE_ORDER: readonly Card["kind"][] = ["waiting", "limited"];
 
 const separated = (blocks: readonly (readonly Row[])[]): Row[] => blocks.filter((block) => block.length > 0).flatMap((block, index) => (index === 0 ? [...block] : [blankRow(), ...block]));
 
@@ -61,11 +62,12 @@ const unreadBlocks = (input: ViewInput): Row[][] => {
 	return reported === undefined ? [] : [unreadCardRows(reported, input)];
 };
 
-/** The cards, the unread read first, then question cards and then waiting, limited and fault. */
+/** The cards, the unread read first, then question cards, then waiting and limited, then the fault cards not dismissed. */
 const cardBlocks = (status: Status, input: ViewInput): Row[][] => [
 	...unreadBlocks(input),
 	...status.questions.map((question) => questionCardRows(question, input)),
 	...NOTICE_ORDER.flatMap((kind) => status.cards.filter((card) => card.kind === kind).map((card) => noticeCardRows(card, input))),
+	...shownFaultGroups(status, input.dismissed).map((group) => faultCardRows(group, input)),
 ];
 
 /** The rows above the first card: the header's two lines. */

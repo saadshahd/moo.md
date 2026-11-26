@@ -37,13 +37,13 @@ const foldIdsOf = ({ inFlight, merged, choices }: typeof worstStatus): Set<strin
 
 const drawn = (row: Row): string => row.map(({ text }) => text).join("");
 
-const bandsAt = (width: number): Row[] => READS.flatMap((read) => BAND_STATES.map((state) => bandRow({ read, now: NOW, amberAfterSeconds: AMBER_AFTER, width, ...state })));
+const bandsAt = (width: number): Row[] => READS.flatMap((read) => BAND_STATES.map((state) => bandRow({ read, now: NOW, amberAfterSeconds: AMBER_AFTER, dismissed: [], width, ...state })));
 
 const panesAt = (width: number): Row[] =>
 	READS.flatMap((read) => [
-		...paneRows({ read, now: NOW, amberAfterSeconds: AMBER_AFTER, width, unfolded: new Set() }),
-		...paneRows({ read, now: NOW, amberAfterSeconds: AMBER_AFTER, width, unfolded: foldIdsOf(worstStatus) }),
-		...paneRows({ read, now: NOW, amberAfterSeconds: AMBER_AFTER, width, unfolded: new Set(), unread: UNREAD }),
+		...paneRows({ read, now: NOW, amberAfterSeconds: AMBER_AFTER, dismissed: [], width, unfolded: new Set() }),
+		...paneRows({ read, now: NOW, amberAfterSeconds: AMBER_AFTER, dismissed: [], width, unfolded: foldIdsOf(worstStatus) }),
+		...paneRows({ read, now: NOW, amberAfterSeconds: AMBER_AFTER, dismissed: [], width, unfolded: new Set(), unread: UNREAD }),
 	]);
 
 const headersAt = (width: number): Row[] => [headerRow(worstStatus, { now: NOW, amberAfterSeconds: AMBER_AFTER, width: width }), measureRow(worstStatus.measure, width), measureRow(null, width)];
@@ -78,7 +78,7 @@ test("every pane and band row has one empty cell at each side, inside its width"
 test("a view narrower than any it is built for still draws and does not throw", () => {
 	for (const width of BELOW_THE_SMALLEST_WIDTH) {
 		expect(() => [...bandsAt(width), ...panesAt(width), ...headersAt(width)]).not.toThrow();
-		expect(() => openingRows({ read: WORST_READ, now: NOW, amberAfterSeconds: AMBER_AFTER, width })).not.toThrow();
+		expect(() => openingRows({ read: WORST_READ, now: NOW, amberAfterSeconds: AMBER_AFTER, dismissed: [], width })).not.toThrow();
 	}
 });
 
@@ -104,7 +104,7 @@ test("a tool's colour codes in a card show as the words they hold", () => {
 
 const STATUS_READ: ViewRead = { kind: "status", status: worstStatus };
 
-const UNREAD_INPUT = { read: STATUS_READ, now: NOW, amberAfterSeconds: AMBER_AFTER, width: 200 };
+const UNREAD_INPUT = { read: STATUS_READ, now: NOW, amberAfterSeconds: AMBER_AFTER, dismissed: [], width: 200 };
 
 test("a read of the work source that keeps failing says so in a few words in the band", () => {
 	const band = drawn(bandRow({ ...UNREAD_INPUT, unread: UNREAD }));
@@ -133,8 +133,8 @@ test("a read of the work source that failed only briefly shows in neither the ba
 
 test("the opening rows of an inline pane end where its first card ends, with or without an unread read", () => {
 	for (const unread of [undefined, UNREAD]) {
-		const rows = paneRows({ read: STATUS_READ, now: NOW, amberAfterSeconds: AMBER_AFTER, width: 80, unfolded: new Set(), unread });
-		const opening = openingRows({ read: STATUS_READ, now: NOW, amberAfterSeconds: AMBER_AFTER, width: 80, unread });
+		const rows = paneRows({ read: STATUS_READ, now: NOW, amberAfterSeconds: AMBER_AFTER, dismissed: [], width: 80, unfolded: new Set(), unread });
+		const opening = openingRows({ read: STATUS_READ, now: NOW, amberAfterSeconds: AMBER_AFTER, dismissed: [], width: 80, unread });
 
 		expect([drawn(rows[opening - 1] ?? []).trim() === "", drawn(rows[opening] ?? []).trim() === ""]).toEqual([false, true]);
 	}
@@ -142,7 +142,7 @@ test("the opening rows of an inline pane end where its first card ends, with or 
 
 test("a count of one says needs and a count above one says need", () => {
 	const band = (questions: number) =>
-		drawn(bandRow({ read: { kind: "status", status: { ...worstStatus, questions: worstStatus.questions.slice(0, questions) } }, now: NOW, amberAfterSeconds: AMBER_AFTER, width: 200 }));
+		drawn(bandRow({ read: { kind: "status", status: { ...worstStatus, questions: worstStatus.questions.slice(0, questions) } }, now: NOW, amberAfterSeconds: AMBER_AFTER, dismissed: [], width: 200 }));
 
 	expect(band(1)).toContain("1 needs you");
 	expect(band(2)).toContain("2 need you");
@@ -171,11 +171,11 @@ test("the worst-case lists are as long as the shipped settings allow", () => {
 test("a status file with no items draws only its header", () => {
 	const empty = { ...worstStatus, questions: [], cards: [], inFlight: [], merged: [], choices: [] };
 
-	expect(paneRows({ read: { kind: "status", status: empty }, now: NOW, amberAfterSeconds: AMBER_AFTER, width: 80, unfolded: new Set() })).toHaveLength(2);
+	expect(paneRows({ read: { kind: "status", status: empty }, now: NOW, amberAfterSeconds: AMBER_AFTER, dismissed: [], width: 80, unfolded: new Set() })).toHaveLength(2);
 });
 
 test("a status file with hundreds of items lists every item once", () => {
-	const listed = new Set(paneRows({ read: { kind: "status", status: hugeStatus }, now: NOW, amberAfterSeconds: AMBER_AFTER, width: 80, unfolded: new Set() }).map(([, first]) => first?.text));
+	const listed = new Set(paneRows({ read: { kind: "status", status: hugeStatus }, now: NOW, amberAfterSeconds: AMBER_AFTER, dismissed: [], width: 80, unfolded: new Set() }).map(([, first]) => first?.text));
 
 	expect(hugeStatus.merged.filter(({ item }) => !listed.has(`#${item}`))).toEqual([]);
 	expect(hugeStatus.inFlight.filter(({ item }) => item !== LONGEST_ID && !listed.has(`#${item}`))).toEqual([]);
