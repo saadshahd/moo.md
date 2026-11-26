@@ -6,6 +6,8 @@ import { openState } from "../src/state/open.ts";
 import { HOUR_MS } from "../src/time.ts";
 import { queueQuestion, releaseQuestions } from "../src/worker/questions.ts";
 import { configWith } from "./fixtures/config.ts";
+import { scriptedJudge, SOUND } from "./fixtures/judge.ts";
+import { type Decided, READY_PLAN } from "./fixtures/shim.ts";
 import { TTL, workerWorld, type WorkerWorld } from "./fixtures/worker-world.ts";
 import { itemFile, markdownSettings, sh } from "./fixtures/work-repo.ts";
 import { tempDir } from "./fixtures/temp.ts";
@@ -141,6 +143,42 @@ test("an item that waits on a question still held back takes no earlier answer a
 
 	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
 	expect(w.shim.calls()).toHaveLength(4);
+});
+
+test("an item run again after it parks keeps the owner's answer to its plan's question: the next plan run reads it, and reads no retry", async () => {
+	const flag = join(tempDir("flag"), "flag");
+	const blocked: Decided = { event: "plan-blocked", sure: true, reason: "The title is open.", question: "Which title?" };
+	const ready: Decided = { ...READY_PLAN, plan: { summary: "Write a.", steps: ["Write it."], paths: ["docs/a.md"] } };
+	const feature = scriptedJudge({ kind: { kind: "feature" }, alignment: SOUND });
+	const w = await workerWorld({ items: { a: { writeForItem: true } }, decisions: [blocked, ready] }, { checks: [`test -f ${flag}`], settings: { maxFixRuns: 1 }, worker: { where: "ci", judge: feature } });
+
+	const pass = async () => {
+		await w.worker.tick();
+		await w.worker.idle();
+	};
+
+	w.item("a", "docs/a.md");
+	await pass();
+	expect(w.results.at(-1)).toMatchObject({ outcome: "asked", item: "a" });
+
+	w.clock.at += 1000;
+	await w.adapter.answers!.answer(ItemId.parse("a"), { text: "Use Plain" });
+	await pass();
+	expect(w.results.at(-1)).toMatchObject({ outcome: "stuck", item: "a" });
+
+	w.clock.at += TTL + 1;
+	await w.worker.tick();
+	writeFileSync(flag, "");
+	w.clock.at += 1000;
+	await w.adapter.answers!.answer(ItemId.parse("a"), { text: "retry" });
+	w.clock.at += 1000;
+	await pass();
+
+	const [, replan] = w.shim.decisions();
+
+	expect(replan?.purpose).toBe("plan");
+	expect(replan?.prompt).toContain("Question: Which title?\nAnswer: Use Plain");
+	expect(replan?.prompt).not.toContain("Run this item again?");
 });
 
 test("a CI run with an empty state reads the question's age from the thread: it waits inside the deadline and parks stuck past it, asking nothing twice", async () => {

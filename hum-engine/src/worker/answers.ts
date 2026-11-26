@@ -3,10 +3,11 @@ import type { ModelCall } from "../adapters/model-call.ts";
 import { optionsIn } from "../adapters/marked.ts";
 import { onceCalls } from "../adapters/once.ts";
 import { dispose, type Disposition, matchOption, NONE_OF_THESE, replyQuestion, replyStem, replyText, type Resolution, STAGE_ACTIONS, type Stage } from "../decide/answer.ts";
+import type { QuestionAnswer } from "../decide/talk.ts";
 import { visibleText } from "../adapters/marked.ts";
 import type { State } from "../state/open.ts";
-import { optionOf, type SettledAnswer } from "../state/saved.ts";
-import { isFromHum, latestQuestionAt } from "./thread.ts";
+import { changesPlan, optionOf, type SettledAnswer } from "../state/saved.ts";
+import { isFromHum, isHumQuestion, latestQuestionAt } from "./thread.ts";
 
 export type AnswerContext = {
 	readonly state: State;
@@ -29,18 +30,16 @@ const isReply = (entry: ThreadEntry): boolean => entry.kind === "answer" || (ent
 
 type Reply = { readonly entry: ThreadEntry; readonly ordinal: number; readonly index: number };
 
-/** Every reply on the thread, numbered. Replies from people count only after a question; before one they are remarks. */
-const repliesOn = (thread: readonly ThreadEntry[], afterQuestion: number): Reply[] => {
+/** Every reply on the thread, numbered from 1 in thread order. */
+const numberedReplies = (thread: readonly ThreadEntry[]): Reply[] => {
 	let ordinal = 0;
 
-	return thread.flatMap((entry, index) => {
-		if (!isReply(entry)) return [];
-
-		ordinal++;
-
-		return index > afterQuestion && (afterQuestion >= 0 || entry.kind === "answer") ? [{ entry, ordinal, index }] : [];
-	});
+	return thread.flatMap((entry, index) => (isReply(entry) ? [{ entry, ordinal: ++ordinal, index }] : []));
 };
+
+/** The replies after the question at `afterQuestion`. Replies from people count only after a question; before one they are remarks. */
+const repliesOn = (thread: readonly ThreadEntry[], afterQuestion: number): Reply[] =>
+	numberedReplies(thread).filter(({ entry, index }) => index > afterQuestion && (afterQuestion >= 0 || entry.kind === "answer"));
 
 const resolveReply = async (ctx: AnswerContext, { itemId, question, options, stage, reply: { entry } }: { readonly itemId: string; readonly question: string; readonly options: readonly string[]; readonly stage: Stage; readonly reply: Reply }): Promise<Resolution> => {
 	const matched = matchOption(entry, options, STAGE_ACTIONS[stage]);
@@ -149,6 +148,21 @@ export const settleAnswers = async (ctx: AnswerContext, item: Item, { stage, opt
 
 	return withSettledAnswers(ctx.state, item);
 };
+
+/** One of hum's questions on an item's thread, the owner's answer to it, and when the owner gave it. */
+export type OwnerAnswer = QuestionAnswer & { readonly at: number };
+
+/**
+ * The owner's answers on the item's thread, as read from its source, that changed the plan, oldest first, each with
+ * hum's question before it. Picks of `steering`, hum's own options, are not among them.
+ */
+export const planChangingAnswers = (state: Pick<State, "answers">, item: Item, steering: ReadonlySet<string>): OwnerAnswer[] =>
+	numberedReplies(item.thread).flatMap(({ entry, ordinal, index }) => {
+		const record = state.answers.get(keyOf(item.id, ordinal));
+		const asked = item.thread.slice(0, index).findLast(isHumQuestion);
+
+		return record && asked && changesPlan(record, steering) ? [{ question: asked.text, answer: entry.text, at: entry.at }] : [];
+	});
 
 /**
  * The item with its thread as the engine reads it, from the answers `state` saved and with no call: a reply to hum's
