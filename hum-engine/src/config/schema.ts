@@ -300,9 +300,9 @@ const Shipped = z.object({
 	hookPaths: z.array(name).describe("Globs of tracked git hooks; a change to one changes hum itself."),
 	diffLimit: count.describe("The most characters of a change's diff one prompt carries."),
 	reviewReads: z
-		.strictObject({ paths: z.array(z.string().min(1).refine(isInsideRepo, "a review file is a path inside the repo, without a leading or trailing '/'")), maxBytes: count })
+		.strictObject({ paths: z.array(z.string().min(1).refine(isInsideRepo, "a review path is a file or folder inside the repo, without a leading or trailing '/'")), maxBytes: count })
 		.describe(
-			"Files a fresh review run reads beside the item and the diff, as the base branch holds them, so a change cannot rewrite the rules that judge it: 'paths' every review reads, such as the repo's rules file, then the files an item names on a `reads: a, b` line; 'maxBytes' caps their text together, and the prompt names what the cap cut. A named file git does not track on the base, one that is not a regular file, or one strictPaths marks, ends the item stuck, naming it.",
+			"Files a fresh review run reads beside the item and the diff, as the base branch holds them, so a change cannot rewrite the rules that judge it: 'paths' every review reads, such as the repo's rules file or its folder of rules, then those an item names on a `reads: a, b` line. A path names a file or a folder, literally, never a glob; a folder stands for every file git tracks under it, and a file named twice is read once, at its first place. 'maxBytes' caps their text together, and the prompt names what the cap cut. A named path git does not track on the base, or a file under it that is not a regular file or that strictPaths marks, ends the item stuck, naming that file.",
 		),
 	failureTail: count.describe("The last characters of the checks' output a fix run reads."),
 	kindMeanings: z.record(name, z.string().min(1)).describe("One line per kind saying what work it holds; the cheap model call reads these to pick an item's kind."),

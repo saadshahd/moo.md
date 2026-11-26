@@ -9,8 +9,8 @@ export type ItemText = { readonly id: string; readonly title: string; readonly b
 /** A file a review run reads beside the diff: its path in the repo, and its bytes as the base branch holds them. */
 export type ReadFile = { readonly path: string; readonly bytes: Uint8Array };
 
-/** The files an item's review reads: the repo's own, then those the item names on a `reads:` line, each once. */
-export const reviewPaths = (item: Pick<Item, "body">, { reviewReads }: Pick<HumConfig, "reviewReads">): string[] => [...new Set([...reviewReads.paths, ...listedPaths(item.body, "reads")])];
+/** The paths an item's review names, each a file or a folder: the repo's own, then those the item names on a `reads:` line, in order. */
+export const reviewPaths = (item: Pick<Item, "body">, { reviewReads }: Pick<HumConfig, "reviewReads">): string[] => [...reviewReads.paths, ...listedPaths(item.body, "reads")];
 
 /** A file's text as far as `room` bytes reach, with no character split. */
 const textWithin = (bytes: Uint8Array, room: number): string => new TextDecoder().decode(bytes.subarray(0, room), { stream: true });

@@ -186,6 +186,35 @@ export const push = async (git: Git, rest: readonly string[]): Promise<PushOutco
 	throw new GitFailed(args, result);
 };
 
+/** One object `git cat-file --batch` printed: `<oid> <type> <size>`, a newline, the bytes and a newline. */
+const BATCH_HEADER = /^([0-9a-f]+) blob (\d+)$/;
+
+const NEWLINE = 0x0a;
+
+/** Each blob's bytes by its oid, every one read by a single `git cat-file --batch`; an oid that names no blob throws. */
+export const readBlobs = async (git: Git, oids: readonly string[]): Promise<ReadonlyMap<string, Buffer>> => {
+	const blobs = new Map<string, Buffer>();
+
+	if (oids.length === 0) return blobs;
+
+	const batch = await git.bytes(["cat-file", "--batch"], `${oids.join("\n")}\n`);
+
+	for (let at = 0; at < batch.length; ) {
+		const end = batch.indexOf(NEWLINE, at);
+		const header = batch.toString("utf8", at, end);
+		const [, oid, size] = BATCH_HEADER.exec(header) ?? [];
+
+		if (oid === undefined) throw new Error(`git cat-file --batch printed ${header}, not a blob`);
+
+		const stop = end + 1 + Number(size);
+
+		blobs.set(oid, batch.subarray(end + 1, stop));
+		at = stop + 1;
+	}
+
+	return blobs;
+};
+
 /** Whether `git` holds `sha` as a commit. */
 export const isCommit = async (git: Git, sha: string): Promise<boolean> => (await git.run(["cat-file", "-e", `${sha}^{commit}`])).code === 0;
 
