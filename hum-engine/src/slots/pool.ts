@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import PQueue from "p-queue";
 import { type Git, gitIn, whenGitFailed } from "../adapters/git.ts";
@@ -10,10 +10,9 @@ import type { FreeSlot, HeldSlot, Slot } from "../state/saved.ts";
 import { SECOND_MS } from "../time.ts";
 import { runChecks } from "../worker/checks.ts";
 import type { Checkedout, Checkout, TalkCopy } from "../worker/thin-path.ts";
-import { type SlotIdentity, slotEnv, slotFolder, slotName, talkCopyName } from "./env.ts";
+import { type SlotIdentity, slotEnv, slotFolder, slotName, talkCopyItem, talkCopyNaming } from "./env.ts";
 import { excludeFromRepo } from "./exclude.ts";
 import { isWorktreeOf } from "./worktree.ts";
-import { orMissing } from "../state/fs.ts";
 
 export const SLOT_OUT_CODE = "slot-out";
 
@@ -33,7 +32,7 @@ export type PoolOptions = {
 	readonly base: string;
 	/** The names of the runs alive outside this process; a taken slot whose item has none of them is returned. */
 	readonly liveRuns?: () => Promise<ReadonlySet<string>>;
-	/** The items whose runs the owner talks to the runner keeps; an item's talk copy stays while it has one. */
+	/** The items whose runs the owner talks to the runner keeps; an item's talk copies stay while it has one. */
 	readonly talking?: () => Promise<ReadonlyMap<string, boolean>>;
 	readonly now: () => number;
 };
@@ -54,6 +53,9 @@ const nextChange = (changes: EventTarget, signal: AbortSignal | undefined): Prom
 		signal?.addEventListener("abort", aborted, { once: true });
 	});
 
+/** A talk copy's slot identity, with the branch it is on. */
+type TalkCopyIdentity = SlotIdentity & { readonly branch: string };
+
 const isHeld = (slot: Slot): slot is HeldSlot => slot.status === "taken" || slot.status === "kept";
 
 /** The slot with no item, at a free status. */
@@ -73,7 +75,7 @@ export class SlotPool {
 	readonly #returning = new Set<string>();
 	/** Makes and drops talk copies one at a time, apart from slot upkeep, so a talk row never waits on a slot's install. */
 	readonly #talkCopies = new PQueue({ concurrency: 1 });
-	/** The recipe's prepare in each item's talk copy, run once by this process. */
+	/** The recipe's prepare in each talk copy, by its branch, run once by this process. */
 	readonly #prepared = new Map<string, Promise<void>>();
 	readonly #now: () => number;
 	#recheckOut = true;
@@ -295,15 +297,15 @@ export class SlotPool {
 		return this.#slots();
 	}
 
-	/** An item's talk copy: in the pool folder beside the slots, with the block of ports past theirs. */
-	#talkCopyOf(item: string): SlotIdentity {
-		const name = talkCopyName(item);
+	/** A run's talk copy: in the pool folder beside the slots, on a branch of its own, with the block of ports past theirs. */
+	#talkCopyOf(item: string, run: string): TalkCopyIdentity {
+		const { name, branch } = talkCopyNaming(item, run);
 
-		return { name, index: this.#o.config.runners, folder: slotFolder(this.#o.repo, this.#settings.pool, name) };
+		return { name, branch, index: this.#o.config.runners, folder: slotFolder(this.#o.repo, this.#settings.pool, name) };
 	}
 
-	/** Makes the talk copy's worktree at the latest base where it is not there. */
-	async #makeTalkCopy({ folder }: SlotIdentity): Promise<void> {
+	/** Makes the talk copy's worktree at the latest base, on its own branch, where it is not there; the branch tracks nothing, so the checkout's git config stays as hum read it. */
+	async #makeTalkCopy({ folder, branch }: TalkCopyIdentity): Promise<void> {
 		if (existsSync(folder)) return;
 
 		const { repo, base } = this.#o;
@@ -311,61 +313,73 @@ export class SlotPool {
 		mkdirSync(dirname(folder), { recursive: true });
 		await excludeFromRepo(repo, dirname(folder), commandTimeoutMs(this.#o.config));
 		await this.#git(repo).raw(["fetch", "-q", "origin"]);
-		await this.#git(repo).raw(["worktree", "add", "-q", "--detach", folder, `origin/${base}`]);
+		await this.#git(repo).raw(["worktree", "add", "-q", "--no-track", "-B", branch, folder, `origin/${base}`]);
 	}
 
-	/** Runs the recipe's prepare in the item's talk copy once; a failure throws, and the next ask runs it again. */
-	#prepareTalkCopy(item: string, copy: SlotIdentity): Promise<void> {
-		const known = this.#prepared.get(item);
+	/** Runs the recipe's prepare in the talk copy once; a failure throws, and the next ask runs it again. */
+	#prepareTalkCopy(copy: TalkCopyIdentity): Promise<void> {
+		const known = this.#prepared.get(copy.branch);
 
 		if (known) return known;
 
 		const started = this.#run(copy, this.#settings.recipe.prepare).then((failure) => {
 			if (failure === undefined) return;
 
-			this.#prepared.delete(item);
+			this.#prepared.delete(copy.branch);
 
-			throw new Error(`the slot recipe's prepare failed in ${item}'s talk copy: ${failure}`);
+			throw new Error(`the slot recipe's prepare failed in the talk copy ${copy.name}: ${failure}`);
 		});
 
-		this.#prepared.set(item, started);
+		this.#prepared.set(copy.branch, started);
 
 		return started;
 	}
 
 	/**
-	 * The seam the rows the owner talks to take their item's talk copy from: a worktree of the owner's checkout at the
-	 * latest base, in the pool folder and no run slot. It is made at the first ask and stays across the item's passes
-	 * while the item has a pass in this process or a run the owner talks to; upkeep drops it after, with all its rows
-	 * left there. Asked `prepared`, the recipe's prepare runs in it once first; an ask for none never waits on that.
+	 * The seam each run the owner talks to takes its own talk copy from: a worktree of the owner's checkout at the latest
+	 * base, on a branch of its own, in the pool folder and no run slot, so roundup adopts it for that run's row alone. It
+	 * is made at the run's first ask and stays across the item's passes while the item has a pass in this process or a
+	 * run the owner talks to; upkeep drops it after, with its branch. Asked `prepared`, the recipe's prepare runs in it
+	 * once first; an ask for none never waits on that.
 	 */
-	readonly talkCopy: TalkCopy = async ({ item, prepared }) => {
-		const copy = this.#talkCopyOf(item);
+	readonly talkCopy: TalkCopy = async ({ item, run, prepared }) => {
+		const copy = this.#talkCopyOf(item, run);
 
 		await this.#talkCopies.add(() => this.#makeTalkCopy(copy));
 
-		if (prepared) await this.#prepareTalkCopy(item, copy);
+		if (prepared) await this.#prepareTalkCopy(copy);
 
 		return { folder: copy.folder, env: this.#envOf(copy) };
 	};
 
-	/** Drops each talk copy whose item has no pass in this process and no run the owner talks to, each decided as it is dropped. */
+	/** The talk copies git lists among the checkout's worktrees, once it forgot those whose folder is gone. */
+	async #listTalkCopies(): Promise<{ readonly folder: string; readonly branch: string; readonly item: string }[]> {
+		const git = this.#git(this.#o.repo);
+
+		await git.raw(["worktree", "prune"]);
+
+		return (await git.raw(["worktree", "list", "--porcelain"])).split("\n\n").flatMap((entry) => {
+			const folder = /^worktree (.+)$/mu.exec(entry)?.[1];
+			const branch = /^branch refs\/heads\/(.+)$/mu.exec(entry)?.[1];
+			const item = branch === undefined ? undefined : talkCopyItem(branch);
+
+			return folder === undefined || branch === undefined || item === undefined ? [] : [{ folder, branch, item }];
+		});
+	}
+
+	/** Drops each talk copy, with its branch, whose item has no pass in this process and no run the owner talks to, each decided as it is dropped. */
 	async #dropIdleTalkCopies(): Promise<void> {
-		const { repo } = this.#o;
-		const prefix = this.#talkCopyOf("").folder;
-		const pool = dirname(prefix);
-		const copies = orMissing(() => readdirSync(pool), []).map((entry) => join(pool, entry)).filter((folder) => folder.startsWith(prefix));
+		const git = this.#git(this.#o.repo);
 
-		for (const folder of copies) {
-			const item = folder.slice(prefix.length);
-
+		for (const { folder, branch, item } of await this.#listTalkCopies()) {
 			await this.#talkCopies.add(async () => {
 				const talks = (await this.#o.talking?.())?.has(item) ?? false;
 
-				if (talks || [...this.#active.values()].includes(item) || !(await isWorktreeOf(repo, folder, commandTimeoutMs(this.#o.config)))) return;
+				if (talks || [...this.#active.values()].includes(item)) return;
 
-				await this.#git(repo).raw(["worktree", "remove", "--force", folder]);
-				this.#prepared.delete(item);
+				await git.raw(["worktree", "remove", "--force", folder]);
+				await git.raw(["branch", "-q", "-D", branch]);
+				this.#prepared.delete(branch);
 			});
 		}
 	}

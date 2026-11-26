@@ -81,7 +81,7 @@ export type WorkerOptions = {
 	readonly workDir?: string;
 	/** Gives each pass its working copy; by default a `git clone`. */
 	readonly checkout?: Checkout;
-	/** Gives the rows the owner talks to their item's talk copy; where runs are Rail rows, the run slots give it. */
+	/** Gives each run the owner talks to a talk copy of its own; where runs are Rail rows, the run slots give it. */
 	readonly talkCopy?: TalkCopy;
 	/** The run slots behind `checkout`, if any: each tick asks them to keep slots ready, and the worker is idle once their upkeep ends. */
 	readonly slots?: Pick<SlotPool, "keepReady" | "idle">;

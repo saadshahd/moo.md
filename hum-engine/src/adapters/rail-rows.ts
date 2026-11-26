@@ -36,6 +36,36 @@ export const NOT_PROGRAM_CODE = "rows-not-program";
 /** The card for a row roundup would not start. */
 export const ROW_REFUSED_CODE = "row-refused";
 
+/** roundup's JSON-RPC code for a call only the Project's Program may make. */
+const FORBIDDEN = -32002;
+
+/** What a refusal roundup names means for hum's run, in plain words, and what the owner does about it. */
+type RefusalReading = { readonly means?: string; readonly fix: string };
+
+const NOT_PROGRAM: RefusalReading = { means: "roundup does not take this hum for the Project's Program", fix: PROGRAM_FIX };
+
+const UNREAD: RefusalReading = { fix: "Change what roundup names; hum starts the row at the item's next pass." };
+
+const REFUSALS = new Map<string, RefusalReading>(
+	Object.entries({
+		outside_program_directory: { means: "the run's folder lies outside the Worktree path the Program names", fix: PROGRAM_FIX },
+		worktree_in_use: { means: "another Agent works in the run's folder", fix: "Stop that Agent on roundup's Rail; hum starts the row at the item's next pass." },
+		detached_head: { means: "the run's folder holds no branch", fix: "Check out the branch hum made in that folder; hum starts the row at the item's next pass." },
+		adopt_stale: { means: "the run's folder left the branch hum made there", fix: "Check that branch out in the folder again; hum starts the row at the item's next pass." },
+		cwd_not_in_worktree: { means: "this hum starts a row outside a worktree, which roundup's Worktrees refuse", fix: "Update hum, or turn Worktrees off in roundup's Project settings." },
+	}),
+);
+
+/**
+ * The card for a row roundup refused: the cause says what roundup's reason means and keeps its words, and the fix is
+ * to set the Program again only where roundup does not take hum for it or the folder lies outside its Worktree path.
+ */
+export const refusalCard = (refusal: RoundupRefusal) => {
+	const { means, fix } = refusal.code === FORBIDDEN ? NOT_PROGRAM : (REFUSALS.get(refusal.reason ?? "") ?? UNREAD);
+
+	return { cause: `roundup refused hum's run${means === undefined ? "" : `, as ${means}`}: ${refusal.message}`, fix };
+};
+
 /** The command a row pipes its answer to: the engine `repo` installs, so a row that outlives an update answers the engine that runs after it. */
 const runAnswerCommand = (repo: string): string => [process.execPath, installedCli(repo), "run-answer"].map(shellQuote).join(" ");
 
@@ -77,8 +107,6 @@ export type RowStart = {
 	readonly folder: RunFolder;
 	readonly request: Pick<RunRequest, "prompt" | "schema" | "cwd" | "model" | "effort" | "env" | "talk">;
 	readonly workstream: string;
-	/** The row adopts its run's slot; a row that changes no file starts in the Project's own folder instead. */
-	readonly adopt: boolean;
 };
 
 const writeBrief = async (call: RoundupCall, name: string, text: string, workstream: string): Promise<void> => {
@@ -92,11 +120,14 @@ const writeBrief = async (call: RoundupCall, name: string, text: string, workstr
 	await call("pad.move", { name: pad, home: workstream });
 };
 
-/** Where a row starts: its run's slot, on the branch the slot holds, or the Project's folder. */
-const placeOf = async (config: RowConfig, { request: { cwd }, name, adopt }: RowStart): Promise<{ readonly method: string; readonly params: Record<string, Json> }> =>
-	adopt
-		? { method: "agent.adopt", params: { path: cwd, branch: (await gitIn(cwd, { timeoutMs: commandTimeoutMs(config) }).raw(["rev-parse", "--abbrev-ref", "HEAD"])).trim() } }
-		: { method: "agent.spawn", params: { cwd, name: railName(name) } };
+/**
+ * Where a row starts: a row in the Project's own folder starts there, as roundup adopts no folder outside the
+ * Program's Worktree path; any other row adopts its folder, on the branch the folder holds, with Worktrees on or off.
+ */
+const placeOf = async (config: RowConfig, repo: string, { request: { cwd }, name }: RowStart): Promise<{ readonly method: string; readonly params: Record<string, Json> }> =>
+	cwd === repo
+		? { method: "agent.spawn", params: { cwd, name: railName(name) } }
+		: { method: "agent.adopt", params: { path: cwd, branch: (await gitIn(cwd, { timeoutMs: commandTimeoutMs(config) }).raw(["rev-parse", "--abbrev-ref", "HEAD"])).trim() } };
 
 const ModelList = z.looseObject({ models: z.array(z.looseObject({ id: z.string() })) });
 
@@ -132,7 +163,7 @@ export const startRow = async (call: RoundupCall, { repo, stateDir, config }: { 
 	await writeBrief(call, name, briefOf(request, repo), workstream);
 
 	const env = { ...request.env, HUM_RUN: name, HUM_RUN_KEY: runKey(stateDir, name), HUM_RUN_DIR: folder.root };
-	const place = await placeOf(config, start);
+	const place = await placeOf(config, repo, start);
 
 	const node = RailNode.parse(await call(place.method, { ...place.params, parent: workstream, order: orderOf(name), model: await launchModel(call, request.model), effort: request.effort, settings: rowSettings(config, folder, env, request.model), visibility: request.talk === true ? "shown" : "internal" }));
 
@@ -187,9 +218,9 @@ export const TALK_WATCH_CODE = "talk-watch";
  * `hum run-answer`, which counts only under the run's key. A row found alive under the run's name is taken over, never
  * started twice, and one hum stops on its way out is left running for the next hum to take over. A row that ends a turn
  * with no answer gets one note; a second such turn, or no new turn within the configured wait, stops it and fails the
- * run. A run the owner talks to starts shown, in the run's working copy without adopting it, so several such rows run
- * there side by side. Its answer counts only once roundup showed the row waiting on the owner; one that answers and goes
- * idle without asking gets one note to ask first, and hum drops what it saved so far. Answering so again stops it and
+ * run. A run the owner talks to starts shown, adopting a talk copy of its own, so its siblings run beside it in theirs.
+ * Its answer counts only once roundup showed the row waiting on the owner; one that answers and goes idle without
+ * asking gets one note to ask first, and hum drops what it saved so far. Answering so again stops it and
  * fails the run. Each call looks at such a run's row once: while the row waits on the owner the run comes back waiting
  * and the row goes on, and one watch reads the Rail each poll for every such row, marks a row asked once roundup shows it
  * waiting on the owner, and wakes the worker for an item whose row hum must look at. A cheap model call and a run with
@@ -427,14 +458,10 @@ export const railRunner = ({ call, repo, state, config, fallback, now, signal }:
 			});
 	};
 
-	/** A refusal to start a row, held with one card that names roundup's words and the fix. */
+	/** A refusal to start a row, held with one card that names roundup's words, what they mean and the fix. */
 	const refused = (error: RoundupRefusal): RunOutcome => ({
 		kind: "held",
-		card: state.faults.raise({
-			code: ROW_REFUSED_CODE,
-			cause: `roundup refused hum's run: ${error.message}`,
-			fix: PROGRAM_FIX,
-		}),
+		card: state.faults.raise({ code: ROW_REFUSED_CODE, ...refusalCard(error) }),
 	});
 
 	/** Starts a row and records it in its run's folder, or takes over the one recorded or alive under the run's name, and looks at it. */
@@ -460,7 +487,7 @@ export const railRunner = ({ call, repo, state, config, fallback, now, signal }:
 
 		try {
 			const workstream = await itemWorkstream(call, item);
-			const row = (await rowOf(folder, name, workstream, talks)) ?? (await startRow(call, { repo, stateDir: state.dir, config }, { name, folder, request, workstream, adopt: !talks })).id;
+			const row = (await rowOf(folder, name, workstream, talks)) ?? (await startRow(call, { repo, stateDir: state.dir, config }, { name, folder, request, workstream })).id;
 
 			state.faults.clear({ code: ROW_REFUSED_CODE });
 

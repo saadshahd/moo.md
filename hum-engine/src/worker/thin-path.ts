@@ -94,7 +94,7 @@ export type ThinPathOptions = {
 	readonly workDir?: string;
 	/** Gives the run its working copy on the remote's base branch, and takes it back when the item's pass ends. By default a `git clone` in a temp folder. */
 	readonly checkout?: Checkout;
-	/** Gives the rows the owner talks to their item's talk copy; where runs are Rail rows, the run slots give it. */
+	/** Gives each run the owner talks to a talk copy of its own; where runs are Rail rows, the run slots give it. */
 	readonly talkCopy?: TalkCopy;
 	readonly dir?: string;
 	/** Take this item; default the first ready one. */
@@ -411,11 +411,11 @@ export type Checkedout = Workspace & {
 export type Checkout = (request: CheckoutRequest) => Promise<Checkedout>;
 
 /**
- * Gives the rows the owner talks to their item's talk copy: a working copy of the base of the item's own, outside the
- * run slots, kept across its passes, so a row goes on once its pass ends. With `prepared`, the slot recipe's prepare
- * has run in it first, once, as a row that runs the repo's code needs.
+ * Gives each of an item's runs the owner talks to its own talk copy: a working copy of the base on a branch of its own,
+ * outside the run slots, kept across the item's passes, so the run's row goes on once a pass ends and holds the copy
+ * alone. With `prepared`, the slot recipe's prepare has run in it first, once, as a row that runs the repo's code needs.
  */
-export type TalkCopy = (request: { readonly item: string; readonly prepared: boolean }) => Promise<Workspace>;
+export type TalkCopy = (request: { readonly item: string; readonly run: string; readonly prepared: boolean }) => Promise<Workspace>;
 
 /** A fresh `git clone` in a new folder under `workDir` (a temp folder by default), removed when the pass ends. */
 const clonesIn =
@@ -936,16 +936,16 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		});
 
 	/**
-	 * A run the owner talks to, under its own name, in its item's talk copy, whose answer must match `answer`: undefined
+	 * A run the owner talks to, under its own name, in its own talk copy, whose answer must match `answer`: undefined
 	 * while its row waits on the owner. Only a runner whose runs are Rail rows hosts one.
 	 */
 	const talk = async <Answer>(role: string, run: string, contract: string, answer: z.ZodType<Answer>, signal: AbortSignal): Promise<Answer | undefined> => {
 		if (runner.talks !== true) throw failed(`the ${run} run talks with the owner, which only a Rail row can host: run hum as its roundup Project's program`);
 
-		if (d.talkCopy === undefined) throw failed(`the ${run} run talks with the owner in its item's talk copy, which only run slots give`);
+		if (d.talkCopy === undefined) throw failed(`the ${run} run talks with the owner in a talk copy of its own, which only run slots give`);
 
 		const head = (await g(["rev-parse", "HEAD"])).trim();
-		const place = await d.talkCopy({ item: id, prepared: config.hum.roles[role]?.prepared === true }).catch((error: Error) => Promise.reject(failed(`the ${run} run has no talk copy: ${error.message}`)));
+		const place = await d.talkCopy({ item: id, run, prepared: config.hum.roles[role]?.prepared === true }).catch((error: Error) => Promise.reject(failed(`the ${run} run has no talk copy: ${error.message}`)));
 		const outcome = await launch(role, [roleOf(config, role), itemHeading(talked()), contract].join("\n\n"), jsonSchemaOf(answer), signal, { place, judged: { head }, run });
 
 		if (outcome.kind === "waiting") return undefined;

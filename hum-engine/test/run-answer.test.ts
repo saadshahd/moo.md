@@ -50,7 +50,7 @@ test("a row's brief pipes its answer to the engine the repo installs, so a row t
 		return replies.get(method) ?? {};
 	};
 
-	await startRow(call, { repo, stateDir, config: SHIPPED_DEFAULTS }, { name: RUN, folder: runFolder(stateDir, RUN), request: { prompt: "work", schema: RUN_SCHEMA, cwd: repo, model: "m", effort: "low" }, workstream: "1", adopt: false });
+	await startRow(call, { repo, stateDir, config: SHIPPED_DEFAULTS }, { name: RUN, folder: runFolder(stateDir, RUN), request: { prompt: "work", schema: RUN_SCHEMA, cwd: repo, model: "m", effort: "low" }, workstream: "1" });
 
 	expect(String(pads[0])).toContain(`'${installedCli(repo)}'`);
 });

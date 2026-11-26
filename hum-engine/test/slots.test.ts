@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
+import { expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { x } from "tinyexec";
@@ -9,25 +9,11 @@ import { SLOT_KEPT_CODE, SLOT_MAINTENANCE_CODE, SLOT_OUT_CODE } from "../src/slo
 import type { Slot } from "../src/state/saved.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { sh } from "./fixtures/work-repo.ts";
-import { BASE, type SlotSettings, slotWorld, type SlotWorld } from "./fixtures/slot-world.ts";
+import { BASE, slotWorld, type SlotWorld } from "./fixtures/slot-world.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
-const worlds: SlotWorld[] = [];
-
-const world = (settings?: SlotSettings, liveRuns?: Parameters<typeof slotWorld>[1], talking?: Parameters<typeof slotWorld>[2]): SlotWorld => {
-	const made = slotWorld(settings, liveRuns, talking);
-
-	worlds.push(made);
-
-	return made;
-};
-
-afterEach(async () => {
-	for (const made of worlds.splice(0)) {
-		await made.slots.idle();
-	}
-});
+const world = slotWorld;
 
 const excludedLines = (repo: string): string[] =>
 	readFileSync(join(repo, ".git", "info", "exclude"), "utf8")
@@ -250,32 +236,40 @@ test("a pool outside the checkout adds nothing to the checkout's info/exclude", 
 	expect(excludedLines(w.repo.owner)).toEqual([]);
 });
 
-test("an item's talk copy is a worktree of the checkout at the base, beside the slots and none of them, with the ports past theirs; the recipe's prepare runs in it once, only for an ask that needs it, and upkeep drops it once its item no longer talks", async () => {
+test("each run the owner talks to gets a talk copy of its own: a worktree of the checkout at the base on a branch of its own, beside the slots and none of them, with the ports past theirs; the recipe's prepare runs in it once, only for an ask that needs it, and upkeep drops each copy with its branch once its item no longer talks", async () => {
 	const log = join(tempDir("prepare"), "log");
-	let talks = true;
-	const w = world({ runners: 1, recipe: { prepare: [`echo "$HUM_SLOT" >> ${log}`] } }, undefined, async () => new Map(talks ? [["a", true]] : []));
+	let talking = ["a", "a-1"];
+	const w = world({ runners: 1, recipe: { prepare: [`echo "$HUM_SLOT" >> ${log}`] } }, undefined, async () => new Map(talking.map((item) => [item, true])));
 
-	const plain = await w.slots.talkCopy({ item: "a", prepared: false });
+	const ideate = await w.slots.talkCopy({ item: "a", run: "ideate", prepared: false });
 
 	expect(existsSync(log)).toBe(false);
 
-	const prepared = await w.slots.talkCopy({ item: "a", prepared: true });
+	const spike = await w.slots.talkCopy({ item: "a", run: "spike 2", prepared: true });
+	const other = await w.slots.talkCopy({ item: "a-1", run: "ideate", prepared: false });
 
-	await w.slots.talkCopy({ item: "a", prepared: true });
-
-	expect(prepared.folder).toBe(plain.folder);
-	expect(plain.folder).toBe(join(w.pool, `${basename(w.repo.owner)}-talk-a`));
-	expect(plain.env[SLOT_ENV.portBase]).toBe(String(SHIPPED_DEFAULTS.runSlots.ports.base + SHIPPED_DEFAULTS.runSlots.ports.stride));
-	expect(sh(plain.folder, ["rev-parse", "HEAD"])).toBe(sh(w.repo.owner, ["rev-parse", `origin/${BASE}`]));
-	expect(readFileSync(log, "utf8")).toBe("talk-a\n");
+	expect(await w.slots.talkCopy({ item: "a", run: "spike 2", prepared: true })).toEqual(spike);
+	expect(new Set([ideate, spike, other].map(({ folder }) => folder)).size).toBe(3);
+	expect(ideate.folder).toBe(join(w.pool, `${basename(w.repo.owner)}-talk-a-ideate`));
+	expect(ideate.env[SLOT_ENV.portBase]).toBe(String(SHIPPED_DEFAULTS.runSlots.ports.base + SHIPPED_DEFAULTS.runSlots.ports.stride));
+	expect([ideate, spike, other].map(({ folder }) => sh(folder, ["rev-parse", "--abbrev-ref", "HEAD"]).trim())).toEqual(["hum-talk/a/ideate", "hum-talk/a/spike-2", "hum-talk/a-1/ideate"]);
+	expect(sh(spike.folder, ["rev-parse", "HEAD"])).toBe(sh(w.repo.owner, ["rev-parse", `origin/${BASE}`]));
+	expect(readFileSync(log, "utf8")).toBe("talk-a-spike-2\n");
+	expect(sh(w.repo.owner, ["config", "--list"])).not.toContain("branch.hum-talk/");
 
 	await w.slots.maintain();
 
-	expect(w.slots.list().map(({ folder }) => folder)).not.toContain(plain.folder);
-	expect(existsSync(plain.folder)).toBe(true);
+	expect(w.slots.list().map(({ folder }) => folder)).not.toContain(ideate.folder);
+	expect([ideate, spike, other].map(({ folder }) => existsSync(folder))).toEqual([true, true, true]);
 
-	talks = false;
+	talking = ["a"];
 	await w.slots.maintain();
 
-	expect(existsSync(plain.folder)).toBe(false);
+	expect([ideate, spike, other].map(({ folder }) => existsSync(folder))).toEqual([true, true, false]);
+
+	talking = [];
+	await w.slots.maintain();
+
+	expect([ideate, spike].map(({ folder }) => existsSync(folder))).toEqual([false, false]);
+	expect(sh(w.repo.owner, ["branch", "--list", "hum-talk/*"]).trim()).toBe("");
 });

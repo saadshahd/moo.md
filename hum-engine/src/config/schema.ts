@@ -393,7 +393,7 @@ const Role = z.strictObject({
 	file: name,
 	purpose: z.enum(PURPOSES),
 	skills: z.array(name),
-	prepared: z.boolean().optional().describe("A row the owner talks to that runs the repo's code, as a spike does: hum runs the slot recipe's prepare once in the item's talk copy before its first such row starts."),
+	prepared: z.boolean().optional().describe("A row the owner talks to that runs the repo's code, as a spike does: hum runs the slot recipe's prepare once in the row's talk copy before the row starts."),
 });
 
 export const Level = z.strictObject({
