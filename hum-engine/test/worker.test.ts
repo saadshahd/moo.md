@@ -14,6 +14,7 @@ import { WAIT_HOURS } from "../src/setup/tables.ts";
 import { DAY_MS, HOUR_MS } from "../src/time.ts";
 import { scriptedJudge, SOUND } from "./fixtures/judge.ts";
 import { type AdapterContext, Holder, ItemId } from "../src/adapter-api.ts";
+import { parseArgument } from "../src/adapters/argument.ts";
 import { markdownAdapter } from "../src/adapters/markdown.ts";
 import { RUN_AGAIN } from "../src/decide/answer.ts";
 import { OWNER_APPROVAL } from "../src/decide/merge.ts";
@@ -899,6 +900,23 @@ test("a review-note loop pass that succeeds clears the card an earlier failed pa
 	await w.worker.idle();
 
 	expect(w.state.faults.list()).toEqual([]);
+});
+
+test("a review-note loop pass that fails raises a card naming the step it failed in and the value it refused", async () => {
+	const issueNumber = ItemId.refine((id) => /^[1-9]\d*$/.test(id), "a GitHub issue number is a whole number above 0");
+
+	const comments = async () => {
+		parseArgument(issueNumber, "rn-1a2b");
+
+		return [];
+	};
+
+	const w = await workerWorld({ items: {} }, { worker: { loop: { comments } } });
+
+	await w.worker.tick();
+	await w.worker.idle();
+
+	expect(w.state.faults.list().map(({ code, cause }) => ({ code, cause }))).toEqual([{ code: "review-loop", cause: 'The review-note loop failed: read and pair review notes: "rn-1a2b": ✖ a GitHub issue number is a whole number above 0' }]);
 });
 
 /** The shipped config whose review role changed after its scores were measured. */

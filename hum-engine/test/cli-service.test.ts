@@ -218,6 +218,20 @@ test("a wake whose saved state holds the signal card hum 0.7.0 kept for good run
 	expect((await savedState(o)).faults.list().map(({ code }) => code)).not.toContain("signal-not-applied");
 });
 
+test("a wake whose saved state holds the review-loop card an earlier engine kept runs every job once its review-note loop passes, and saves no such card", async () => {
+	const o = owner({ items: { a: { writeForItem: true } } });
+
+	expect(wake(o, ["--event", "issue_comment"]).code).toBe(0);
+	await keepCard(o, { code: "review-loop", cause: "The review-note loop failed: ✖ a GitHub issue number is a whole number above 0", fix: "It runs again next interval; look at the cause if this card stays." });
+	rmSync(stateDir(o), { recursive: true, force: true });
+
+	const run = wake(o, ["--event", "issue_comment"]);
+
+	expect(run.out).not.toContain("hum review-loop");
+	expect(run.code).toBe(0);
+	expect((await savedState(o)).faults.list().map(({ code }) => code)).not.toContain("review-loop");
+});
+
 test("a wake while an item waits on the owner: gather claims nothing, the work job reads nothing for the item, and each job exits 0", async () => {
 	const o = owner({ items: { a: { writeForItem: true, askUnlessAnswered: "Which?" } } });
 
