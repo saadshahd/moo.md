@@ -1,4 +1,4 @@
-import { type Git, isAncestor, PATCH, push, type PushOutcome } from "../adapters/git.ts";
+import { type Git, isAncestor, PATCH, push, type PushOutcome, readBlobs } from "../adapters/git.ts";
 import type { FileChanges, GitHubCommits } from "../adapters/github-commits.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
 
@@ -12,31 +12,6 @@ export type PushContext = {
 
 /** A push that landed, at the commit the branch now holds. */
 type Signed = { readonly kind: "pushed"; readonly sha: string } | Exclude<PushOutcome, { kind: "pushed" }>;
-
-/** One object `git cat-file --batch` printed: `<oid> <type> <size>`, a newline, the bytes and a newline. */
-const BATCH_HEADER = /^([0-9a-f]+) blob (\d+)$/;
-
-const NEWLINE = 0x0a;
-
-/** Each blob's bytes in base64 by its oid, from what `git cat-file --batch` printed; anything but a blob throws. */
-const blobsOf = (batch: Buffer): ReadonlyMap<string, string> => {
-	const blobs = new Map<string, string>();
-
-	for (let at = 0; at < batch.length; ) {
-		const end = batch.indexOf(NEWLINE, at);
-		const header = batch.toString("utf8", at, end);
-		const [, oid, size] = BATCH_HEADER.exec(header) ?? [];
-
-		if (oid === undefined) throw new Error(`git cat-file --batch printed ${header}, not a blob`);
-
-		const stop = end + 1 + Number(size);
-
-		blobs.set(oid, batch.subarray(end + 1, stop).toString("base64"));
-		at = stop + 1;
-	}
-
-	return blobs;
-};
 
 const DELETED = "D";
 
@@ -71,10 +46,10 @@ export const uncarriedChange = async (git: Git, to: string, base: string): Promi
 const changesBetween = async (git: Git, from: string, to: string): Promise<FileChanges> => {
 	const changed = await rawChanges(git, from, to);
 	const kept = changed.filter(({ status }) => status !== DELETED);
-	const blobs = kept.length === 0 ? new Map<string, string>() : blobsOf(await git.bytes(["cat-file", "--batch"], `${kept.map(({ blob }) => blob).join("\n")}\n`));
+	const blobs = await readBlobs(git, kept.map(({ blob }) => blob));
 
 	return {
-		additions: kept.map(({ path, blob }) => ({ path, contents: blobs.get(blob) ?? "" })),
+		additions: kept.map(({ path, blob }) => ({ path, contents: blobs.get(blob)?.toString("base64") ?? "" })),
 		deletions: changed.filter(({ status }) => status === DELETED).map(({ path }) => ({ path })),
 	};
 };

@@ -1080,7 +1080,7 @@
 				"maxBytes"
 			],
 			"additionalProperties": false,
-			"description": "Files a fresh review run reads beside the item and the diff, as the base branch holds them, so a change cannot rewrite the rules that judge it: 'paths' every review reads, such as the repo's rules file, then the files an item names on a `reads: a, b` line; 'maxBytes' caps their text together, and the prompt names what the cap cut. A named file git does not track on the base, one that is not a regular file, or one strictPaths marks, ends the item stuck, naming it."
+			"description": "Files a fresh review run reads beside the item and the diff, as the base branch holds them, so a change cannot rewrite the rules that judge it: 'paths' every review reads, such as the repo's rules file or its folder of rules, then those an item names on a `reads: a, b` line. A path names a file or a folder, literally, never a glob; a folder stands for every file git tracks under it, and a file named twice is read once, at its first place. 'maxBytes' caps their text together, and the prompt names what the cap cut. A named path git does not track on the base, or a file under it that is not a regular file or that strictPaths marks, ends the item stuck, naming that file."
 		},
 		"failureTail": {
 			"default": 4000,
