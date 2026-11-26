@@ -20,6 +20,8 @@ export const shimSpecJson = (): string => {
 export type Behavior = {
 	/** Files to write in the working directory, which hum then commits. Without `structured`, the run ends done with a pull request title. */
 	write?: Record<string, string>;
+	/** File modes to set once the files are written, as chmod sets them. */
+	modes?: Record<string, number>;
 	/** Commit what the run wrote as the shim's own commit, as a run told to leave its change uncommitted might. */
 	commitsItself?: boolean;
 	/** A structured result. */

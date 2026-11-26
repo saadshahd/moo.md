@@ -114,11 +114,12 @@ export type WorkerOptions = {
 /**
  * A wake's job that holds a token, `gather`, claims each item and settles its answers and kind, keeps it in `gathered`
  * and runs nothing. The job that holds none, `work`, reads only the threads of the items gather `claimed`, runs each
- * pass and hands its outbox to `publish`; it asks, files and posts nothing itself. Either takes each item once.
+ * pass, as the base `signs` commits or not, and hands its outbox to `publish`; it asks, files and posts nothing itself.
+ * Either takes each item once.
  */
 export type CiJob =
 	| { readonly kind: "gather"; readonly gathered: Map<string, Item> }
-	| { readonly kind: "work"; readonly claimed: ReadonlySet<string>; readonly publish: NonNullable<ThinPathOptions["publish"]> };
+	| { readonly kind: "work"; readonly claimed: ReadonlySet<string>; readonly signs: boolean; readonly publish: NonNullable<ThinPathOptions["publish"]> };
 
 /** What the tick read of its sources: whether the watch saw a change, and the ready list. */
 type Sources = {
@@ -622,6 +623,7 @@ export class Worker {
 				newSessionId: this.#o.newSessionId,
 				pulls: this.#o.pulls,
 				commits: this.#o.commits,
+				signs: this.#o.ciJob?.kind === "work" ? this.#o.ciJob.signs : undefined,
 				mayLand: () => this.#updating === undefined,
 				publish: this.#o.ciJob?.kind === "work" ? this.#o.ciJob.publish : undefined,
 			}).then(

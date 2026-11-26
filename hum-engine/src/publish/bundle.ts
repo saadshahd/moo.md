@@ -1,4 +1,5 @@
-import { type Git, type GitIdentity, PATCH } from "../adapters/git.ts";
+import type { Git, GitIdentity } from "../adapters/git.ts";
+import { uncarriedChange } from "../worker/signed-push.ts";
 
 /** Where publish keeps the refs it read from an outbox's bundle, apart from every ref of its own. */
 export const OUTBOX_REFS = "refs/hum/outbox/";
@@ -32,11 +33,6 @@ const COMMIT_FORMAT = ["%H", "%P", "%an", "%ae", "%cn", "%ce"].join("%x1f");
 
 /** A commit's author as `newCommits` names it. */
 const AUTHOR_FORMAT = "%an <%ae>";
-
-/** The one file mode GitHub's API writes. A link, a submodule or an executable bit comes back as another tree. */
-const API_MODE = "100644";
-
-const DELETED = "D";
 
 const isAllowedRef = (ref: string, { branchPrefixes }: BundleTrust): boolean => ref.startsWith(EVIDENCE_REFS) || branchPrefixes.some((prefix) => ref.startsWith(`refs/heads/${prefix}`));
 
@@ -99,18 +95,6 @@ const commitFault = (commits: readonly NewCommit[], evidenceTips: ReadonlySet<st
 	return undefined;
 };
 
-/** The first path a branch changes, against where it left gather's base, that GitHub's API cannot carry. */
-const uncarried = async (git: Git, tip: string, base: string): Promise<string | undefined> => {
-	const from = (await git.raw(["merge-base", tip, base])).trim();
-	const fields = (await git.raw(["diff", "--raw", "--no-abbrev", "--no-renames", "-z", ...PATCH, from, tip])).split("\0").filter(Boolean);
-
-	return fields.flatMap((meta, at) => {
-		const [, mode = "", , , status = ""] = meta.split(" ");
-
-		return at % 2 === 0 && status !== DELETED && mode !== API_MODE ? [`${fields[at + 1] ?? ""} (mode ${mode})`] : [];
-	})[0];
-};
-
 /**
  * Reads an outbox's bundle into publish's repo under `OUTBOX_REFS` and checks it before any write: every ref is one
  * hum writes, every object passes git's own check, commitIdentity commits every new commit and writes it unless a
@@ -135,8 +119,8 @@ export const checkBundle = async (git: Git, bundle: string, trust: BundleTrust):
 	if (fault !== undefined) return { ok: false, why: fault };
 
 	const branches = [...refs].filter(([ref]) => !ref.startsWith(EVIDENCE_REFS));
-	const carried = trust.signs ? await Promise.all(branches.map(async ([ref, tip]) => ({ ref, path: await uncarried(git, tip, trust.base) }))) : [];
-	const refused = carried.find(({ path }) => path !== undefined);
+	const carried = trust.signs ? await Promise.all(branches.map(async ([ref, tip]) => ({ ref, file: await uncarriedChange(git, tip, trust.base) }))) : [];
+	const refused = carried.find(({ file }) => file !== undefined);
 
-	return refused ? { ok: false, why: `${refused.ref} changes ${refused.path}, which a commit through GitHub's API cannot carry` } : { ok: true, refs };
+	return refused?.file ? { ok: false, why: `${refused.ref} changes ${refused.file.path} (mode ${refused.file.mode}), which a commit through GitHub's API cannot carry` } : { ok: true, refs };
 };

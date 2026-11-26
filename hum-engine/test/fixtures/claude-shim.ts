@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
 	appendFileSync,
+	chmodSync,
 	mkdirSync,
 	readFileSync,
 	writeFileSync,
@@ -185,6 +186,8 @@ for (const [path, content] of Object.entries(step.write ?? {})) {
 	mkdirSync(dirname(join(process.cwd(), path)), { recursive: true });
 	writeFileSync(join(process.cwd(), path), content);
 }
+
+for (const [path, mode] of Object.entries(step.modes ?? {})) chmodSync(join(process.cwd(), path), mode);
 
 if (step.commitsItself) {
 	spawnSync("git", ["add", "-A"]);

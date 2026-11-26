@@ -163,7 +163,7 @@ test("publish refuses a work job's move to the kind the item has, keeps the kind
 
 	const results = await publishWake({
 		publisher: { ...publisher, workSource: { ...publisher.workSource, read: async (item) => (item === other ? Promise.reject(new Error("the work source broke")) : publisher.workSource.read(item)) }, save: async () => void saves++ },
-		gathered: { holder: w.thinPath().holder, base: "main", baseSha, heads: {}, claimed: [id, other] },
+		gathered: { holder: w.thinPath().holder, base: "main", baseSha, signs: false, heads: {}, claimed: [id, other] },
 		outbox: { passes: [{ item: id, result: { outcome: "moved", item: id, kind: "docs" }, intents: [...outbox.intents], bundle: undefined }, { item: other, result: { outcome: "held", item: other, why: "publish lands the change" }, intents: [], bundle: undefined }], baseCheck: undefined, stateDir: tempDir("work-state"), bundleOf: () => outbox.bundle },
 		work: openState(tempDir("work-state"), { now }),
 	});
@@ -195,7 +195,7 @@ test("publish takes a pass past the owner's wait gather settled their answer to,
 
 	const results = await publishWake({
 		publisher: { ...publisher, workSource: { ...publisher.workSource, read: async (item) => ({ ...(await publisher.workSource.read(item)), thread }) }, save: async () => {} },
-		gathered: { holder: publisher.holder, base: "main", baseSha: sh(w.repo.remote, ["rev-parse", "main"]).trim(), heads: {}, claimed: [id] },
+		gathered: { holder: publisher.holder, base: "main", baseSha: sh(w.repo.remote, ["rev-parse", "main"]).trim(), signs: false, heads: {}, claimed: [id] },
 		outbox: { passes: [{ item: id, result: { outcome: "waiting", item: id }, intents: [], bundle: undefined }], baseCheck: undefined, stateDir: tempDir("work-state"), bundleOf: () => undefined },
 		work,
 	});

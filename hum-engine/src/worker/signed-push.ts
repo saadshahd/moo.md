@@ -1,4 +1,4 @@
-import { type Git, isAncestor, push, type PushOutcome } from "../adapters/git.ts";
+import { type Git, isAncestor, PATCH, push, type PushOutcome } from "../adapters/git.ts";
 import type { FileChanges, GitHubCommits } from "../adapters/github-commits.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
 
@@ -38,22 +38,44 @@ const blobsOf = (batch: Buffer): ReadonlyMap<string, string> => {
 	return blobs;
 };
 
+const DELETED = "D";
+
+/** The one file mode GitHub's API writes. A link, a submodule or an executable bit comes back as another tree. */
+const API_MODE = "100644";
+
+/** One file `git diff --raw` lists: its mode and blob in `to`, its status letter and its path. */
+type RawChange = { readonly mode: string; readonly blob: string; readonly status: string; readonly path: string };
+
+/** The files `to` changes against `from`, as `git diff --raw` lists them, a rename as a delete and an add. */
+const rawChanges = async (git: Git, from: string, to: string): Promise<RawChange[]> => {
+	const fields = (await git.raw(["diff", "--raw", "--no-abbrev", "--no-renames", "-z", ...PATCH, from, to])).split("\0").filter(Boolean);
+
+	return fields.flatMap((meta, at) => {
+		const [, mode = "", , blob = "", status = ""] = meta.split(" ");
+
+		return at % 2 === 0 ? [{ mode, blob, status, path: fields[at + 1] ?? "" }] : [];
+	});
+};
+
+/** A file whose mode a commit through GitHub's API cannot carry, with that mode. */
+export type Uncarried = { readonly path: string; readonly mode: string };
+
+/** The first file `to` adds or changes, against where it left `base`, whose mode a commit through GitHub's API cannot carry. */
+export const uncarriedChange = async (git: Git, to: string, base: string): Promise<Uncarried | undefined> => {
+	const from = (await git.raw(["merge-base", to, base])).trim();
+
+	return (await rawChanges(git, from, to)).find(({ status, mode }) => status !== DELETED && mode !== API_MODE);
+};
+
 /** The files `to` adds, changes and deletes against `from`, as GitHub's commit takes them, every blob read by one git process. */
 const changesBetween = async (git: Git, from: string, to: string): Promise<FileChanges> => {
-	const fields = (await git.raw(["diff", "--raw", "--no-abbrev", "--no-renames", "-z", from, to])).split("\0").filter(Boolean);
-
-	const changed = fields.flatMap((meta, at) => {
-		const [, , , blob = "", status = ""] = meta.split(" ");
-
-		return at % 2 === 0 ? [{ blob, status, path: fields[at + 1] ?? "" }] : [];
-	});
-
-	const kept = changed.filter(({ status }) => status !== "D");
+	const changed = await rawChanges(git, from, to);
+	const kept = changed.filter(({ status }) => status !== DELETED);
 	const blobs = kept.length === 0 ? new Map<string, string>() : blobsOf(await git.bytes(["cat-file", "--batch"], `${kept.map(({ blob }) => blob).join("\n")}\n`));
 
 	return {
 		additions: kept.map(({ path, blob }) => ({ path, contents: blobs.get(blob) ?? "" })),
-		deletions: changed.filter(({ status }) => status === "D").map(({ path }) => ({ path })),
+		deletions: changed.filter(({ status }) => status === DELETED).map(({ path }) => ({ path })),
 	};
 };
 

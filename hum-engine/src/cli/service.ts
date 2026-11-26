@@ -29,6 +29,7 @@ import { Worker, type WorkerOptions } from "../worker/worker.ts";
 import { DEFAULT_BASE, publisherOf } from "../worker/thin-path.ts";
 import { tallyOf } from "../worker/tally.ts";
 import { installedVersion } from "../worker/signature.ts";
+import { signsCommits } from "../worker/signed-push.ts";
 import { Gathered, inboxIntegrations, readInbox, readOutbox, workRemote, writeBaseCheck, writeInbox, writeOutboxState, writePass } from "../publish/handover.ts";
 import { checkMergesAt } from "../worker/base-check.ts";
 import { publishWake } from "../publish/wake.ts";
@@ -302,7 +303,7 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 
 			heads.delete(base);
 
-			const gathered: Gathered = { holder: options.holder, base, baseSha, heads: Object.fromEntries(heads), claimed: [...claimed.keys()].map((id) => ItemId.parse(id)), stateRead: saved.read };
+			const gathered: Gathered = { holder: options.holder, base, baseSha, signs: await signsCommits({ pulls: options.pulls, base }), heads: Object.fromEntries(heads), claimed: [...claimed.keys()].map((id) => ItemId.parse(id)), stateRead: saved.read };
 
 			writeInbox(flags.inbox, { gathered, items: [...claimed.values()] }, dir);
 			core.setOutput("gathered", JSON.stringify(gathered));
@@ -325,7 +326,7 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 			const options = await optionsFor(io, { holder: gathered.holder, base: gathered.base }, "ci", {
 				remote,
 				integrations: inboxIntegrations(inbox, Date.now),
-				ciJob: { kind: "work", claimed: new Set(gathered.claimed), publish: async (pass, worked) => void writePass(flags.outbox, { ...pass, result: worked }) },
+				ciJob: { kind: "work", claimed: new Set(gathered.claimed), signs: gathered.signs, publish: async (pass, worked) => void writePass(flags.outbox, { ...pass, result: worked }) },
 			});
 
 			const baseCheck = await checkMergesAt({ ...options, git: gitIn(io.cwd, { timeoutMs }) }, gathered.baseSha);
