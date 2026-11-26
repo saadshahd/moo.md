@@ -20,13 +20,15 @@ const OUTBOX_FILE = "outbox.json";
 
 /**
  * What gather settled for a wake, which publish trusts and reads from gather's own job outputs, never from an
- * artifact the work job could replace: who claimed, the base and hum branch heads it saw, the items it claimed, and
- * the state commit it saved.
+ * artifact the work job could replace: who claimed, the base and hum branch heads it saw, whether the base takes only
+ * signed commits, the items it claimed, and the state commit it saved.
  */
 export const Gathered = z.strictObject({
 	holder: Holder,
 	base: text,
 	baseSha: sha,
+	/** The base's rules require signed commits, as gather read them; the work job holds no token to read them itself. */
+	signs: z.boolean(),
 	/** Each hum branch gather saw, at its head. */
 	heads: z.record(text, sha),
 	claimed: z.array(ItemId),

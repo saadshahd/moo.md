@@ -7,6 +7,7 @@ import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../../src/exec.ts";
 import { runBranch, runThinPath } from "../../src/worker/thin-path.ts";
 import { FakeGitHub, mergeCommitOf } from "../fixtures/fake-github.ts";
+import type { Behavior } from "../fixtures/shim.ts";
 import { sh, WorkRepo } from "../fixtures/work-repo.ts";
 import { gitIn } from "../../src/adapters/git.ts";
 import { dropEvidence, evidenceMarkdown, evidenceRef, keepEvidence } from "../../src/worker/evidence.ts";
@@ -22,8 +23,8 @@ const NOTE = { write: { "docs/note.md": "hello\n" } };
 const WRITTEN = { title: "Write the note", body: "## Context\nThe item asks for a note in docs, so readers find it there.\n\n## Testing\ntest -f docs/note.md passes.", evidence: "note.png" };
 
 /** A worker world whose items are issues on a fake GitHub, with the change's git branches on the world's bare remote. */
-const issuesWorld = async ({ requiresPullRequest, requiresSignatures = false }: { readonly requiresPullRequest: boolean; readonly requiresSignatures?: boolean }) => {
-	const w = await workerWorld({ script: [{}, { ...NOTE, saveEvidence: WRITTEN.evidence, structured: { status: "done", pullRequest: WRITTEN } }] }, { checks: ["test -f docs/note.md"] });
+const issuesWorld = async ({ requiresPullRequest, requiresSignatures = false, script = [{}, { ...NOTE, saveEvidence: WRITTEN.evidence, structured: { status: "done", pullRequest: WRITTEN } }] }: { readonly requiresPullRequest: boolean; readonly requiresSignatures?: boolean; readonly script?: Behavior[] }) => {
+	const w = await workerWorld({ script }, { checks: ["test -f docs/note.md"] });
 	const github = new FakeGitHub();
 	const context: AdapterContext = { report: () => {}, now: Date.now, env: process.env };
 	const client = gitHubClient({ token: "fake-token", fetch: github.fetch, spaced: false, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
@@ -161,6 +162,15 @@ test("where main requires signed commits and takes a push, main moves to GitHub'
 	expect(sh(w.repo.remote, ["show", "main:docs/note.md"])).toBe("hello\n");
 	expect(refused()).toBe(0);
 	expect(github.issueState(Number(id))).toBe("CLOSED");
+});
+
+test("where main's rules require signed commits, a run's executable script is fixed within the pass, so publish takes the change and main gets GitHub's signed commit", async () => {
+	const files = { ...NOTE.write, "docs/check.sh": "echo ok\n" };
+	const { w, github, id, pass } = await issuesWorld({ requiresPullRequest: false, requiresSignatures: true, script: [{}, { write: files, modes: { "docs/check.sh": 0o755 } }, { write: files, modes: { "docs/check.sh": 0o644 } }] });
+
+	expect(await pass()).toEqual({ outcome: "merged", item: id });
+	expect(github.signed.has(sh(w.repo.remote, ["rev-parse", "main"]).trim())).toBe(true);
+	expect(sh(w.repo.remote, ["ls-tree", "main", "docs/check.sh"])).toStartWith("100644");
 });
 
 test("where main requires signed commits, a binary file reaches GitHub's commit byte for byte", async () => {

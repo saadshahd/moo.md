@@ -46,6 +46,7 @@ import { type GatherTrust, type PassOutbox, type Publisher, publishPass, settleS
 import { PUBLISH_DIR as PUBLISH_REPO } from "../state/open.ts";
 import type { GitHubCommits } from "../adapters/github-commits.ts";
 import { repoFromRemote } from "../adapters/github.ts";
+import { signsCommits, type Uncarried, uncarriedChange } from "./signed-push.ts";
 
 /** How long a claim lasts unless its holder renews it. */
 export const claimTtlMs = (config: Config): number => config.hum.claimExpirySeconds * SECOND_MS;
@@ -107,6 +108,8 @@ export type ThinPathOptions = {
 	readonly pulls?: PullRequests;
 	/** The remote's branches through GitHub's API, which signs the commits it makes, for a remote on GitHub. */
 	readonly commits?: GitHubCommits;
+	/** Whether the base's rules require signed commits; by default read through `pulls`. A wake's work job holds no token, so gather reads it. */
+	readonly signs?: boolean;
 	/** The names, never the values, of the variables the runs have; a missing secret is checked against them. */
 	readonly runnerVariables: ReadonlySet<string>;
 	/** A fresh id for each run's session. */
@@ -849,11 +852,18 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		state.repros.put(id, { ...repro, proven: config.hum.fixProofRuns });
 	});
 
+	/** Where the base takes only signed commits, a file the change keeps whose mode GitHub's API cannot carry goes to a fix run, before publish refuses the change. */
+	const carriedOrFix = async (): Promise<void> => {
+		const file = (d.signs ?? (await signsCommits({ pulls: d.pulls, base }))) ? await uncarriedChange(d.git, "HEAD", d.baseSha) : undefined;
+
+		if (file !== undefined) throw failedCheck(uncarriedFailure(base, file));
+	};
+
 	/** A failing check goes to a fix run, unless it is one of the repo's and the base fails it too: no change of the item's can pass it, so the item ends for the owner. */
 	const checksSource = invoked(async () => {
 		const failed = await firstFailing(d.checks, clone, checkOptions);
 
-		if (failed === undefined) return;
+		if (failed === undefined) return carriedOrFix();
 
 		if (!d.ownChecks.includes(failed.command) && (await failsOnBase(failed.command))) return pause({ outcome: "stuck", item: id, detail: `${failed.command} fails on ${base} too, at ${d.baseSha.slice(0, SHORT_SHA)}: no change of this item can pass it until ${base} does` });
 
@@ -1126,6 +1136,15 @@ const withTimeoutNote = (kind: Kind, state: string, note: Pending): Pending => {
 	const told = `With no reply within ${timeout.hours} hours, the item goes on to ${target}.`;
 
 	return { ...note, question: { ...note.question, detail: [note.question.detail, told].filter(Boolean).join(" ") } };
+};
+
+const EXECUTABLE = "100755";
+
+/** What a fix run reads when the change keeps a file whose mode `base`'s signed commits cannot carry: how to keep the file plain. */
+const uncarriedFailure = (base: string, { path, mode }: Uncarried): string => {
+	const fix = mode === EXECUTABLE ? `Drop its executable bit (\`chmod -x ${path}\`) and call it through its interpreter wherever the change runs it, as \`bash ${path}\` for a shell script.` : "Put a plain file in its place.";
+
+	return `${path} has mode ${mode}, which ${base}'s signed commits cannot carry: GitHub's API makes them, and it writes no executable bit, link or submodule. ${fix}`;
 };
 
 /**

@@ -275,6 +275,18 @@ test("failed checks go to a fix run, and the fix run gets the failure", async ()
 	expect(sh(w.repo.remote, ["show", "main:docs/note.md"])).toBe("good\n");
 });
 
+test("where the base requires signed commits, a change that makes a script executable goes to a fix run that reads how to call it instead, and the fixed change lands", async () => {
+	const fixStdin = stdinFile();
+	const script = { "docs/note.md": "hello\n", "docs/check.sh": "echo ok\n" };
+	const w = await world({ script: [{}, { write: script, modes: { "docs/check.sh": 0o755 } }, { write: script, modes: { "docs/check.sh": 0o644 }, saveStdin: fixStdin }] });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.thinPath({ signs: true }))).toEqual({ outcome: "merged", item: id });
+	expect(w.shim.calls()).toHaveLength(3);
+	expect(readFileSync(fixStdin, "utf8")).toContain("bash docs/check.sh");
+	expect(sh(w.repo.remote, ["ls-tree", "main", "docs/check.sh"])).toStartWith("100644");
+});
+
 test("checks that never pass end in stuck after the fix limit, and main is untouched", async () => {
 	const config = configWith((raw) => {
 		raw.hum.maxFixRuns = 2;
