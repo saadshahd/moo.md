@@ -7,8 +7,25 @@ const CONTROLS = /\p{Cc}+/gu;
 /** What a terminal draws for `text`: no escape sequences, and each run of control characters, newlines and tabs one space. */
 export const plain = (text: string): string => stripAnsi(text).replace(CONTROLS, " ");
 
+/** How many measured texts are kept: a drawing measures the same rules, labels and glyphs again at every width and every poll. */
+const MEASURED_KEPT = 4096;
+
+const measured = new Map<string, number>();
+
 /** The width of what `text` draws, so a tool's own words with a newline or a colour code in them measure as they show. */
-export const cells = (text: string): number => stringWidth(plain(text));
+export const cells = (text: string): number => {
+	const known = measured.get(text);
+
+	if (known !== undefined) return known;
+
+	if (measured.size >= MEASURED_KEPT) measured.clear();
+
+	const width = stringWidth(plain(text));
+
+	measured.set(text, width);
+
+	return width;
+};
 
 export const rowCells = (row: Row): number => row.reduce((total, { text }) => total + cells(text), 0);
 

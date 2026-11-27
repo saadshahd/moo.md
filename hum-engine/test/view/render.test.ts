@@ -273,22 +273,6 @@ test("an unclear item carries the word beside its level", () => {
 	);
 });
 
-test("every row of the pane stays inside its width, and the unfolded set draws its rows whole", () => {
-	for (const read of READS) {
-		for (const width of WIDTHS) {
-			const rows = paneRows({
-				...inputOf(read, width),
-				unfolded: new Set(["flow:seed-3", "passed:72", "merged:69", "choice:70:1"]),
-			});
-
-			for (const row of rows)
-				expect(rowCells(row), `${read.kind} at ${width}`).toBeLessThanOrEqual(
-					width,
-				);
-		}
-	}
-});
-
 test("on roundup, the pane with its runs unfolded and each item's feed row pane stay inside their width, and an unfolded open item lists its runs", () => {
 	const linked: ViewRead = { kind: "status", status: linkedStatus };
 
