@@ -10,7 +10,7 @@ import { FakeGitHub } from "./fixtures/fake-github.ts";
 import { NOW, TTL, workerWorld, type WorkerWorld } from "./fixtures/worker-world.ts";
 import { readHeartbeat, readStatus } from "../src/status/file.ts";
 import type { ItemLinks } from "../src/status/format.ts";
-import { LINKS_CODE } from "../src/worker/worker.ts";
+import { FEEDS_CODE, LINKS_CODE } from "../src/worker/worker.ts";
 import { tempDir } from "./fixtures/temp.ts";
 import { WAIT_HOURS } from "../src/setup/tables.ts";
 import { DAY_MS, HOUR_MS } from "../src/time.ts";
@@ -401,12 +401,13 @@ test("the status file lists each item with a saved state: a waiting one at its w
 	await worker.idle();
 });
 
-test("where runs are rows, the status file links each open item's rows and handoff Pad and its question's row; a read that fails shows no links and one card until a read goes through", async () => {
+test("where runs are rows, each tick keeps every open item's feed row, and the status file links each open item's rows and handoff Pad and its question's row; a read that fails shows no links and one card until a read goes through", async () => {
 	const w = await workerWorld({ items: { a: { writeForItem: true, askUnlessAnswered: "Which?" } } });
 	const ask = { name: "hum a ask 1", agent: "4", state: "needs-you", link: "roundup://agent/4?project=key" };
 	const linked = { rows: [{ name: "hum a build", agent: "3", state: "done", link: "roundup://agent/3?project=key" }, ask], ask, handoff: { name: "#a handoff", link: "roundup://pad/%23a%20handoff?project=key" } };
 	let read = async (): Promise<ReadonlyMap<string, ItemLinks>> => new Map([["a", linked]]);
-	const worker = w.workerWith({ runner: { ...(await w.startedRunner()), links: () => read() } });
+	const fed: (readonly string[])[] = [];
+	const worker = w.workerWith({ runner: { ...(await w.startedRunner()), links: () => read(), keepFeeds: async (items) => void fed.push(items) } });
 
 	const published = async () => {
 		w.clock.at += 1000;
@@ -424,12 +425,36 @@ test("where runs are rows, the status file links each open item's rows and hando
 	await published();
 
 	expect(await published()).toEqual({ open: [{ item: "a", rows: linked.rows, handoff: linked.handoff }], questions: [{ item: "a", row: ask }], cards: [] });
+	expect(fed.at(-1)).toEqual(["a"]);
 
 	read = () => Promise.reject(new Error("roundup is not running"));
 	expect(await published()).toEqual({ open: [{ item: "a", rows: undefined, handoff: undefined }], questions: [{ item: "a", row: undefined }], cards: [LINKS_CODE] });
 
 	read = async () => new Map([["a", linked]]);
 	expect((await published()).cards).toEqual([]);
+});
+
+test("an open item whose feed row the runner could not start raises one card, which a tick that starts it clears", async () => {
+	const w = await workerWorld({ items: { a: { writeForItem: true, askUnlessAnswered: "Which?" } } });
+	let keep = (): Promise<void> => Promise.reject(new Error("roundup is not running"));
+	const worker = w.workerWith({ runner: { ...(await w.startedRunner()), keepFeeds: () => keep() } });
+
+	const cards = async () => {
+		w.clock.at += 1000;
+		await worker.tick();
+		await worker.idle();
+
+		return w.state.faults.list().map(({ code }) => code);
+	};
+
+	w.item("a", "docs/a.md");
+	await cards();
+
+	expect(await cards()).toEqual([FEEDS_CODE]);
+
+	keep = async () => {};
+
+	expect(await cards()).toEqual([]);
 });
 
 test("the claim of a run in flight is renewed each tick, and a run whose claim is gone stops", async () => {

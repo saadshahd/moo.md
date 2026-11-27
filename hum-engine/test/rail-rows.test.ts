@@ -104,3 +104,30 @@ test("where the owner opens an item: each row of its Workstream but its feed row
 		]),
 	);
 });
+
+test("an item's feed row starts in its Workstream with hum's plugin on, the item named and no order or prompt, and never where a row of its name stands or no Workstream does", async () => {
+	const state = openState(tempDir("rail-rows"), { now: Date.now });
+	const repo = tempDir("repo");
+	const spawned: Json[] = [];
+
+	const nodes: Json[] = [
+		{ id: "1", name: "#7 Add export", kind: "workstream", parent: null },
+		{ id: "2", name: "#8 Other", kind: "workstream", parent: null },
+		{ id: "3", name: "hum 8 feed", kind: "agent", parent: "2", status: { kind: "done" } },
+	];
+
+	const call: RoundupCall = async (method, params): Promise<Json> => {
+		if (method === "rail.tree") return nodes;
+
+		if (method !== "agent.spawn") throw new Error(`no ${method} here`);
+
+		spawned.push(params ?? null);
+
+		return { id: "4", name: "hum 7 feed", kind: "agent", parent: "1" };
+	};
+
+	await railRunner({ call, repo, state, config: SHIPPED_DEFAULTS, fallback: unused, now: Date.now }).keepFeeds?.(["7", "8", "9"]);
+
+
+	expect(spawned).toEqual([{ cwd: repo, parent: "1", name: "hum 7 feed", settings: { enabledPlugins: { "hum@moo.md": true }, env: { HUM_FEED_ITEM: "7" } }, visibility: "shown" }]);
+});

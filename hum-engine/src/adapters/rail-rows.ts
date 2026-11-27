@@ -11,10 +11,10 @@ import type { ItemLinks } from "../status/format.ts";
 import { SECOND_MS } from "../time.ts";
 import { type RunOutcome, type RunRequest, type Runner } from "./claude-p.ts";
 import { gitIn } from "./git.ts";
-import { answerHooks, failedWith, finishedOf, hookReports, runSettings, STOP_EVENT, succeededWith, tokensOf } from "./hooked-run.ts";
+import { answerHooks, failedWith, finishedOf, HUM_PLUGIN, hookReports, runSettings, STOP_EVENT, succeededWith, tokensOf } from "./hooked-run.ts";
 import { type LimitEnded, limitOf, savedLimitUntil, settleLimit } from "./limit.ts";
 import { handoffPadName } from "./handoff-pad.ts";
-import { ENDED, itemRows, itemWorkstream, NEEDS_YOU, padLinkOf, projectKeyOf, putPad, RailNode, railName, railTree } from "./rail.ts";
+import { ENDED, FEED_ITEM_ENV, feedName, isItemWorkstream, itemRows, itemWorkstream, NEEDS_YOU, padLinkOf, projectKeyOf, putPad, RailNode, railName, railTree } from "./rail.ts";
 import { HUM_EXT, type RoundupCall, type RoundupClient, RoundupRefusal } from "./roundup-rpc.ts";
 import { askedSince, dropAnswers, hasSavedAnswer, keepSchema, keepTalkRun, markAsked, type RunFolder, runFolder, runFolders, runKey, takeAnswer, talkRunOf } from "./run-answer.ts";
 import { readTranscript, type RunTranscript } from "./transcript.ts";
@@ -565,7 +565,27 @@ export const railRunner = ({ call, repo, state, config, fallback, now, signal }:
 		return new Map(await Promise.all(items.map(async (id) => [id, { ...itemRows(nodes, id, key), handoff: await padLinkOf(call, handoffPadName(id), key) }] as const)));
 	};
 
-	return { run, limitedUntil: fallback.limitedUntil, liveRuns, talking, forget, links, talks: true };
+	/**
+	 * Starts the feed row of each of `items` whose Workstream stands: a session with hum's plugin on and no prompt, so it
+	 * spends nothing until the owner types in it, whose hum pane shows the item alone. A Workstream that holds a row of
+	 * the feed's name, ended or not, gets none, so a feed row the owner stopped stays stopped.
+	 */
+	const keepFeeds = async (items: readonly string[]): Promise<void> => {
+		const nodes = await tree();
+
+		for (const id of items) {
+			const home = nodes.find((node) => isItemWorkstream(id, node));
+			const name = feedName(id);
+
+			if (home === undefined || nodes.some((node) => node.parent === home.id && node.name === name)) continue;
+
+			const row = RailNode.parse(await call("agent.spawn", { cwd: repo, parent: home.id, name, settings: { enabledPlugins: { [HUM_PLUGIN]: true }, env: { [FEED_ITEM_ENV]: id } }, visibility: "shown" }));
+
+			if (row.name !== name) await call("rail.rename", { id: row.id, name });
+		}
+	};
+
+	return { run, limitedUntil: fallback.limitedUntil, liveRuns, talking, forget, keepFeeds, links, talks: true };
 };
 
 /**

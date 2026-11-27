@@ -175,6 +175,9 @@ const JUDGE_CODE = "judge-changed";
 /** The card for an engine update that waits on the owner or failed. */
 const ENGINE_CODE = "engine-update";
 
+/** The card for an open item whose feed row the runner could not start. */
+export const FEEDS_CODE = "item-feeds";
+
 /** The card for a read of where the owner opens each item that failed, so the status shows no links until one goes through. */
 export const LINKS_CODE = "item-links";
 
@@ -974,6 +977,8 @@ export class Worker {
 		this.#showRefusedMemory(memory.refused);
 		const open = this.#openItems();
 		const questions = openQuestions(state.questions.list(), state.answers.list());
+		await this.#keepFeeds(open.map(({ item }) => item));
+
 		const [latest, ci, links] = await Promise.all([this.#latest(), this.#ciTick(), this.#links([...new Set([...open.map(({ item }) => item), ...questions.map(({ item }) => item)])])]);
 		writeStatus(state.statusPath, {
 			...before,
@@ -995,6 +1000,18 @@ export class Worker {
 			measure: measureOf({ ...measureInputsOf(state), window: config.hum.measureWindow, globs: config.hum.paths.map(({ glob }) => glob) }) ?? null,
 			rules: state.learned.list().map(({ glob, level, item, at, commit }) => ({ glob, level, item, at, undo: { label: "Undo", command: `git revert ${commit}` } })),
 		});
+	}
+
+	/** Each open item's feed row, where the runner keeps such rows, so an item hum held before them gets one too; a failure raises one card until a tick starts every one. */
+	async #keepFeeds(items: readonly string[]): Promise<void> {
+		const { runner, state } = this.#o;
+
+		if (runner.keepFeeds === undefined) return;
+
+		await runner.keepFeeds(items).then(
+			() => state.faults.clear({ code: FEEDS_CODE }),
+			(error: Error) => void state.faults.raise({ code: FEEDS_CODE, cause: `hum could not start the row that shows you each item: ${error.message}`.slice(0, ERROR_EXCERPT), fix: "hum tries again at its next tick." }),
+		);
 	}
 
 	/** Where the owner opens each of `items`, where the runner has such places; a read that fails raises one card, and the status shows no links until a read goes through. */
