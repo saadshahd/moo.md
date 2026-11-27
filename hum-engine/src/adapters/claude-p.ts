@@ -13,7 +13,7 @@ import { raiseRejectedToken, UNAUTHORIZED } from "../service/token.ts";
 import { atomicWrite, isMissing } from "../state/fs.ts";
 import type { State } from "../state/open.ts";
 import { SECOND_MS } from "../time.ts";
-import { CARD_EXCERPT, type Card } from "../status/format.ts";
+import { CARD_EXCERPT, type Card, type ItemLinks } from "../status/format.ts";
 import { LIMIT_TEXT, LIMIT_UNPARSED, type LimitEnded, limitOf, savedLimitUntil, settleLimit } from "./limit.ts";
 import { billed, Counts } from "./transcript.ts";
 
@@ -340,6 +340,8 @@ export type Runner = {
 	readonly talking?: () => Promise<ReadonlyMap<string, boolean>>;
 	/** Stops each named run where it still runs outside this process, and drops what the runner keeps of it. */
 	readonly forget?: (names: readonly string[]) => Promise<void>;
+	/** Where the owner opens each of `items` and its runs, by item: only a runner whose runs are Rail rows has such places. */
+	readonly links?: (items: readonly string[]) => Promise<ReadonlyMap<string, ItemLinks>>;
 };
 
 export type RunnerOptions = {

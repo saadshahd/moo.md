@@ -32,10 +32,11 @@ const heldAt = (disk: Disk, path: string): Held | undefined => {
 	return path === STATUS_PATH && disk.status !== undefined ? { text: disk.status, modified: disk.modified } : undefined;
 };
 
-/** The engine beneath the plugin: git, a disk the test changes where the mod may write only its dismissals, the repo's hum, and the clock that moves it on. */
-export const engineWith = (on: On, disk: Disk, hum: Hum = () => undefined) => {
+/** The engine beneath the plugin: the session's environment, git, a disk the test changes where the mod may write only its dismissals, the repo's hum, and the clock that moves it on. */
+export const engineWith = (on: On, disk: Disk, hum: Hum = () => undefined, env: Readonly<Record<string, string>> = {}) => {
 	const clock = mock.clock(on, { now: NOW });
 
+	on("env.get", (_, e) => ({ value: env[e.name] }));
 	on("process.run", async (_, e) => {
 		if (e.argv[0] === "git") return { value: disk.isRepo ? ran(0, GIT_PLACES) : ran(128, "") };
 

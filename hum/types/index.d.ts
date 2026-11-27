@@ -61,6 +61,7 @@ declare module "claude-code" {
 			answerMode: Shaped<AnswerSnapshot>;
 			unread: Shaped<Unread | null>;
 			dismissed: Shaped<Dismissed | null>;
+			feed: Shaped<string | null>;
 		};
 	}
 }

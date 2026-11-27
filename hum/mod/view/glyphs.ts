@@ -5,6 +5,7 @@ export const GLYPHS = {
 	rule: "─",
 	capLeft: "▐",
 	capRight: "▌",
+	link: "↗",
 } as const;
 
 export const SEPARATOR = ` ${GLYPHS.separator} `;

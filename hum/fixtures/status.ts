@@ -47,3 +47,18 @@ export const fullStatus: Status = {
 		],
 	},
 };
+
+const agentRow = (agent: string, name: string, state: string) => ({ name, agent, state, link: `roundup://agent/${agent}?project=key` });
+
+const ASK_74 = agentRow("24", "hum 74 ask 1", "needs-you");
+
+/** The full status as hum writes it on roundup: each open item with the rows of its Workstream, and #74's question with the row that asks it and its handoff Pad. */
+export const linkedStatus: Status = {
+	...fullStatus,
+	questions: [...fullStatus.questions, { item: "74", text: "Approve the release workflow change?", options: ["approve", "run again"], since: ago(600), row: ASK_74 }],
+	open: fullStatus.open.map((item) =>
+		item.item === "74"
+			? { ...item, title: "Add exam export", rows: [agentRow("21", "hum 74 build", "done"), agentRow("22", "hum 74 review 1", "done"), ASK_74], handoff: { name: "#74 handoff", link: "roundup://pad/%2374%20handoff?project=key" } }
+			: { ...item, rows: [agentRow(`3${item.item.length}`, `hum ${item.item} build`, "working")] },
+	),
+};

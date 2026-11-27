@@ -37,6 +37,7 @@ const Result = z.looseObject({
 	rows: z.array(Node.extend({ visibility: z.string().optional(), worktree: z.looseObject({ path: z.string(), adopted: z.boolean() }).nullish() }).loose()).optional(),
 	parent: z.looseObject({ outcome: z.string().optional() }).optional(),
 	talk: z.looseObject({}).optional(),
+	feed: z.looseObject({ rows: z.array(Node.extend({ status: z.looseObject({ kind: z.string() }).nullish() })), argv: z.array(z.string()), left: z.array(Node) }).optional(),
 	passes: z.looseObject({ outcomes: z.array(z.string()) }).optional(),
 	prepareMs: z.array(z.number()).optional(),
 	handoff: z
@@ -281,4 +282,12 @@ test.skipIf(!live)("a part split from a talked feature item keeps the owner's wo
 	expect(parent?.outcome).toBe("merged");
 	expect(stepsOf(rows)).toEqual([["plan-after-talk", "internal"]]);
 	expect(talk).toMatchObject({ order: { title: "Write the note" }, choices: [{ pick: "the first" }, { pick: "the first" }, { pick: "the first" }, { pick: "plain" }] });
+}, RIG_MS);
+
+test.skipIf(!live)("a claimed item's feed row starts once, idle, with no prompt, and goes with the item's Workstream when it lands", async () => {
+	const { feed } = await run("feed");
+
+	expect(feed?.rows.map(({ status }) => status?.kind)).toEqual(["idle"]);
+	expect(feed?.argv.filter((_, at) => at % 2 === 0).every((arg) => arg.startsWith("--"))).toBe(true);
+	expect(feed?.left).toEqual([]);
 }, RIG_MS);

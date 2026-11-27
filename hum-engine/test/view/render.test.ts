@@ -1,5 +1,9 @@
 import { expect, test } from "bun:test";
-import { fullStatus, NOW } from "../../../hum/fixtures/status.ts";
+import {
+	fullStatus,
+	linkedStatus,
+	NOW,
+} from "../../../hum/fixtures/status.ts";
 import { agesShown } from "../../../hum/mod/view/ages.ts";
 import { bandRow } from "../../../hum/mod/view/band.ts";
 import { button, buttonRows } from "../../../hum/mod/view/buttons.ts";
@@ -282,6 +286,25 @@ test("every row of the pane stays inside its width, and the unfolded set draws i
 				);
 		}
 	}
+});
+
+test("on roundup, the pane with its runs unfolded and each item's feed row pane stay inside their width, and an unfolded item in flight lists its runs", () => {
+	const linked: ViewRead = { kind: "status", status: linkedStatus };
+
+	for (const width of WIDTHS) {
+		const panes = [
+			paneRows({ ...inputOf(linked, width), unfolded: new Set(["in-flight:72", "in-flight:seed-3"]) }),
+			...["74", "72", "99"].map((feed) => paneRows({ ...inputOf(linked, width), feed, unfolded: new Set() })),
+		];
+
+		for (const row of panes.flat())
+			expect(rowCells(row), `at ${width}`).toBeLessThanOrEqual(width);
+	}
+
+	const unfolded = paneRows({ ...inputOf(linked, 80), unfolded: new Set(["in-flight:72"]) }).map(textOf);
+
+	expect(unfolded.some((line) => /▸ build {2}working {2,}open ↗/.test(line))).toBe(true);
+	expect(paneRows({ ...inputOf(linked, 80), feed: "99", unfolded: new Set() }).map(textOf)).toContainEqual(expect.stringContaining("hum holds no open item #99"));
 });
 
 test("the pane lists question cards, then waiting, limited and fault cards, then in flight, merged and choices made without you", () => {

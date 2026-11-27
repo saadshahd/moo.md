@@ -9,6 +9,8 @@ import { readTranscript } from "../src/adapters/transcript.ts";
 import { FakeGitHub } from "./fixtures/fake-github.ts";
 import { NOW, TTL, workerWorld, type WorkerWorld } from "./fixtures/worker-world.ts";
 import { readHeartbeat, readStatus } from "../src/status/file.ts";
+import type { ItemLinks } from "../src/status/format.ts";
+import { LINKS_CODE } from "../src/worker/worker.ts";
 import { tempDir } from "./fixtures/temp.ts";
 import { WAIT_HOURS } from "../src/setup/tables.ts";
 import { DAY_MS, HOUR_MS } from "../src/time.ts";
@@ -397,6 +399,37 @@ test("the status file lists each item with a saved state: a waiting one at its w
 	await w.adapter.workSource!.claim(b, Holder.parse("worker-2"), 5000);
 	await worker.tick();
 	await worker.idle();
+});
+
+test("where runs are rows, the status file links each open item's rows and handoff Pad and its question's row; a read that fails shows no links and one card until a read goes through", async () => {
+	const w = await workerWorld({ items: { a: { writeForItem: true, askUnlessAnswered: "Which?" } } });
+	const ask = { name: "hum a ask 1", agent: "4", state: "needs-you", link: "roundup://agent/4?project=key" };
+	const linked = { rows: [{ name: "hum a build", agent: "3", state: "done", link: "roundup://agent/3?project=key" }, ask], ask, handoff: { name: "#a handoff", link: "roundup://pad/%23a%20handoff?project=key" } };
+	let read = async (): Promise<ReadonlyMap<string, ItemLinks>> => new Map([["a", linked]]);
+	const worker = w.workerWith({ runner: { ...(await w.startedRunner()), links: () => read() } });
+
+	const published = async () => {
+		w.clock.at += 1000;
+		await worker.tick();
+		await worker.idle();
+
+		const status = readStatus(w.state.statusPath);
+
+		if (!status.ok) throw new Error(status.message);
+
+		return { open: status.status.open.map(({ item, rows, handoff }) => ({ item, rows, handoff })), questions: status.status.questions.map(({ item, row }) => ({ item, row })), cards: status.status.cards.map(({ code }) => code) };
+	};
+
+	w.item("a", "docs/a.md");
+	await published();
+
+	expect(await published()).toEqual({ open: [{ item: "a", rows: linked.rows, handoff: linked.handoff }], questions: [{ item: "a", row: ask }], cards: [] });
+
+	read = () => Promise.reject(new Error("roundup is not running"));
+	expect(await published()).toEqual({ open: [{ item: "a", rows: undefined, handoff: undefined }], questions: [{ item: "a", row: undefined }], cards: [LINKS_CODE] });
+
+	read = async () => new Map([["a", linked]]);
+	expect((await published()).cards).toEqual([]);
 });
 
 test("the claim of a run in flight is renewed each tick, and a run whose claim is gone stops", async () => {

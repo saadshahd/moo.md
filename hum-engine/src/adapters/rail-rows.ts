@@ -7,12 +7,14 @@ import { commandTimeoutMs, type Env, shellQuote } from "../exec.ts";
 import { atomicWrite, dropInto, orMissing } from "../state/fs.ts";
 import type { State } from "../state/open.ts";
 import { PROGRAM_FIX, readProgram } from "../service/program.ts";
+import type { ItemLinks } from "../status/format.ts";
 import { SECOND_MS } from "../time.ts";
 import { type RunOutcome, type RunRequest, type Runner } from "./claude-p.ts";
 import { gitIn } from "./git.ts";
 import { answerHooks, failedWith, finishedOf, hookReports, runSettings, STOP_EVENT, succeededWith, tokensOf } from "./hooked-run.ts";
 import { type LimitEnded, limitOf, savedLimitUntil, settleLimit } from "./limit.ts";
-import { ENDED, itemWorkstream, NEEDS_YOU, putPad, RailNode, railName, railTree } from "./rail.ts";
+import { handoffPadName } from "./handoff-pad.ts";
+import { ENDED, itemRows, itemWorkstream, NEEDS_YOU, padLinkOf, projectKeyOf, putPad, RailNode, railName, railTree } from "./rail.ts";
 import { HUM_EXT, type RoundupCall, type RoundupClient, RoundupRefusal } from "./roundup-rpc.ts";
 import { askedSince, dropAnswers, hasSavedAnswer, keepSchema, keepTalkRun, markAsked, type RunFolder, runFolder, runFolders, runKey, takeAnswer, talkRunOf } from "./run-answer.ts";
 import { readTranscript, type RunTranscript } from "./transcript.ts";
@@ -556,7 +558,14 @@ export const railRunner = ({ call, repo, state, config, fallback, now, signal }:
 		return new Set(rows.filter(({ id }) => live.has(id)).map(({ name }) => name));
 	};
 
-	return { run, limitedUntil: fallback.limitedUntil, liveRuns, talking, forget, talks: true };
+	/** Where the owner opens each item: the rows of its Workstream from one read of the Rail, and its handoff Pad. */
+	const links = async (items: readonly string[]): Promise<ReadonlyMap<string, ItemLinks>> => {
+		const [nodes, key] = await Promise.all([tree(), projectKeyOf(call)]);
+
+		return new Map(await Promise.all(items.map(async (id) => [id, { ...itemRows(nodes, id, key), handoff: await padLinkOf(call, handoffPadName(id), key) }] as const)));
+	};
+
+	return { run, limitedUntil: fallback.limitedUntil, liveRuns, talking, forget, links, talks: true };
 };
 
 /**
