@@ -24,7 +24,7 @@ type Node = { id: string; name: string; kind: string; parent: string | null; sta
 
 type Comment = { author: { id: string }; body: string; created_at: number };
 
-type Params = { id?: number | string; title?: string; body?: string; home?: string | null; name?: string; parent?: string };
+type Params = { id?: number | string; title?: string; body?: string; home?: string | null; name?: string; parent?: string; text?: string };
 
 /** One method the Daemon serves: what it answers `params` with. */
 type Method = (params: Params) => object;
@@ -39,6 +39,7 @@ export const fakeRoundup = async () => {
 	const todos = new Map<number, Todo>();
 	const nodes: Node[] = [];
 	const comments = new Map<number, Comment[]>();
+	const pads = new Map<string, { name: string; text: string; home: string | null }>();
 	const calls: { readonly method: string; readonly params: Params }[] = [];
 	const conns = new Set<Socket>();
 	const refusals = new Map<string, number>();
@@ -98,8 +99,36 @@ export const fakeRoundup = async () => {
 				return {};
 			},
 			"project.get": () => ({ models: { roles: [] } }),
-			"pad.create": ({ name = "" }) => ({ name, home: null }),
-			"pad.move": ({ name = "", home = null }) => ({ name, home }),
+			"pad.create": ({ name = "", text = "" }) => {
+				if (pads.has(name)) throw new Refusal(-32602, `a pad named ${name} exists`);
+
+				const pad = { name, text, home: null };
+
+				pads.set(name, pad);
+
+				return pad;
+			},
+			"pad.write": ({ name = "", text = "" }) => {
+				const pad = pads.get(name);
+
+				if (!pad) throw new Refusal(NOT_FOUND, `not found: pad ${name}`);
+
+				return Object.assign(pad, { text });
+			},
+			"pad.move": ({ name = "", home = null }) => {
+				const pad = pads.get(name);
+
+				if (!pad) throw new Refusal(NOT_FOUND, `not found: pad ${name}`);
+
+				return Object.assign(pad, { home });
+			},
+			"pad.read": ({ name = "" }) => {
+				const pad = pads.get(name);
+
+				if (!pad) throw new Refusal(NOT_FOUND, `not found: pad ${name}`);
+
+				return pad;
+			},
 			"agent.spawn": ({ name = "", parent = null }) => {
 				const node = { id: String(nextId++), name, kind: "agent", parent, status: { kind: "working", since: Date.now() } };
 
@@ -174,6 +203,8 @@ export const fakeRoundup = async () => {
 		waitOnOwner: (id: string) => void Object.assign(nodeOf(id), { status: { kind: "needs-you", since: Date.now() } }),
 		/** How many calls of `method` named the Todo `id`. */
 		callsOn: (method: string, id: string) => calls.filter((call) => call.method === method && String(call.params.id) === id).length,
+		/** Deletes the Pad `name`, as removing the Workstream that holds it does. */
+		removePad: (name: string) => void pads.delete(name),
 		/** Refuses every call of `method` with `code`. */
 		refuse: (method: string, code: number) => void refusals.set(method, code),
 		/** Stops answering, as a Daemon that went down. */

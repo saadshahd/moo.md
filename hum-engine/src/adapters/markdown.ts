@@ -4,7 +4,7 @@ import { join } from "node:path";
 import slugify from "@sindresorhus/slugify";
 import PQueue from "p-queue";
 import pRetry from "p-retry";
-import { type Adapter, ADAPTER_API_VERSION, type AdapterContext, type Claim, type Failed, type Item, ItemGone, ITEM_ID_LENGTH, ItemId, type ItemRef, PermanentError, REQUEST_KINDS, type ThreadEntry, type Watch } from "../adapter-api.ts";
+import { type Adapter, ADAPTER_API_VERSION, type AdapterContext, type Claim, type Failed, type Item, ItemGone, ITEM_ID_LENGTH, ItemId, type ItemRef, NOTE_KIND, PermanentError, REQUEST_KINDS, type ThreadEntry, type Watch } from "../adapter-api.ts";
 import type { HumConfig, MergeMethod } from "../config/schema.ts";
 import { growthLabelsOf } from "../decide/growth.ts";
 import { parseArgument } from "./argument.ts";
@@ -27,7 +27,7 @@ const WRITE_RACE_BACKOFF_MS = 50;
 const FOLLOW_UP_SLUG_LENGTH = 40;
 
 /** The entries the owner writes, which land the way the base asks of an owner's commit. */
-const OWNERS_KINDS: ReadonlySet<ThreadEntry["kind"]> = new Set(["answer", ...REQUEST_KINDS]);
+const OWNERS_KINDS: ReadonlySet<ThreadEntry["kind"]> = new Set(["answer", ...REQUEST_KINDS, NOTE_KIND]);
 
 export type MarkdownOptions = {
 	/** A clone of the work repo. The adapter never touches its working tree or its branches. */

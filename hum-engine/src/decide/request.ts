@@ -1,5 +1,6 @@
-import { type OwnerRequest, REQUEST_KINDS, type RequestKind, type ThreadEntry } from "../adapter-api.ts";
+import { NOTE_KIND, type OwnerRequest, REQUEST_KINDS, type RequestKind, type ThreadEntry } from "../adapter-api.ts";
 import type { Controls, Status } from "../status/format.ts";
+import { unreachableNote } from "./note.ts";
 
 /** What became of a request: it acts on the item, or it is refused and the thread says why. */
 export const REQUEST_DISPOSITIONS = ["applied", "refused"] as const;
@@ -29,7 +30,7 @@ const REQUEST_RULES = {
 export type RequestScope = { readonly at: string | undefined; readonly controls: RequestControls };
 
 /** Why a request may not act where the item stands, or undefined where it may: it names the step the item is at, and that step allows it. */
-export const requestRefusal = ({ kind, step }: OwnerRequest, { at, controls }: RequestScope): string | undefined => {
+export const requestRefusal = ({ kind, step }: { readonly kind: RequestKind; readonly step: string }, { at, controls }: RequestScope): string | undefined => {
 	if (at === undefined) return "the item has no saved step";
 
 	if (at !== step) return `the item is at ${at} now, not ${step}`;
@@ -40,14 +41,18 @@ export const requestRefusal = ({ kind, step }: OwnerRequest, { at, controls }: R
 };
 
 /**
- * Why the item's row in the local status file refuses a request before it is written, or undefined where it lets the
- * request go on to the worker. Where no row names the item, as where its state lives only in CI, the worker's check
- * alone decides.
+ * Why the item's row in the local status file refuses a request or a note before it is written, or undefined where it
+ * lets it go on to the worker: a note goes only to a step the row lists under `noteTo`. Where no row names the item, as
+ * where its state lives only in CI, the worker's check alone decides.
  */
 export const statusRefusal = (request: OwnerRequest, item: string, open: Status["open"]): string | undefined => {
 	const row = open.find((found) => found.item === item);
 
-	return row === undefined ? undefined : requestRefusal(request, row);
+	if (row === undefined) return undefined;
+
+	if (request.kind === NOTE_KIND) return row.controls.noteTo.includes(request.step) ? undefined : unreachableNote(request.step, row.at);
+
+	return requestRefusal(request, row);
 };
 
 /** Where an item stands for the requests on its thread, as its saved state says. */

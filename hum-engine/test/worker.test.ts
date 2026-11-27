@@ -391,8 +391,8 @@ test("the status file lists each item with a saved state: a waiting one at its w
 	const flowRow = { kind: "docs", flowVersion: w.config.kinds.docs!.machine.version, since: NOW };
 
 	expect(status.ok && status.status.open.toSorted((x, y) => x.item.localeCompare(y.item))).toEqual([
-		{ ...flowRow, item: "a", title: "a", steps: steps("asking"), at: "asking", passed: ["building"], running: false, controls: { choices: [], answer: true, skip: false, runNow: false, noteTo: ["building", "checking", "fixing", "merging", "asking", "stuck"] } },
-		{ ...flowRow, item: "b", title: "b", steps: steps(), at: "building", passed: [], running: true, controls: { choices: [], answer: false, skip: false, runNow: false, noteTo: ["building", "checking", "fixing", "merging", "stuck"] } },
+		{ ...flowRow, item: "a", title: "a", steps: steps("asking"), at: "asking", passed: ["building"], running: false, controls: { choices: [], answer: true, skip: false, runNow: false, noteTo: ["building", "fixing"] } },
+		{ ...flowRow, item: "b", title: "b", steps: steps(), at: "building", passed: [], running: true, controls: { choices: [], answer: false, skip: false, runNow: false, noteTo: ["building", "fixing"] } },
 	]);
 
 	w.clock.at += 10_000;
@@ -698,6 +698,149 @@ test("the owner's skip takes a wait its kind file lets them skip where the skip 
 	expect((await w.adapter.workSource!.read(a)).thread.map(({ text }) => text)).toEqual(
 		expect.arrayContaining(["Request 1 refused: the item is at asking now, not building.", "Request 2 applied: the item leaves asking where its kind file's skip leads.", "This question closed: you skipped its wait. An answer to it no longer applies."]),
 	);
+});
+
+test("the owner's notes wait for the step each names, reach that step's next run once, in order, and the thread says what became of each", async () => {
+	const w = await workerWorld({ items: { a: { writeForItem: true, askUnlessAnswered: "Which?" } } });
+	const a = ItemId.parse("a");
+	const thread = async () => (await w.adapter.workSource!.read(a)).thread.map(({ text }) => text);
+	const firstNote = "Name the file plainly.\n\nKeep it short.";
+
+	w.item("a", "docs/a.md");
+	await w.worker.tick();
+	await w.worker.idle();
+	expect(w.state.items.savedOf("a")?.state).toBe("asking");
+
+	await w.adapter.answers!.request(a, { kind: "note", step: "building", text: firstNote });
+	await w.adapter.answers!.request(a, { kind: "note", step: "merging", text: "Merge it." });
+	await w.adapter.answers!.request(a, { kind: "note", step: "fixing", text: "Fix it gently." });
+	await w.adapter.answers!.request(a, { kind: "note", step: "building", text: "Add a title." });
+	await w.worker.tick();
+	await w.worker.idle();
+
+	expect(await thread()).toEqual(
+		expect.arrayContaining([
+			"Note 1 kept: hum gives it to the next run of building.",
+			"Note 2 refused: no run of merging lies ahead of the item at asking.",
+			"Note 3 kept: hum gives it to the next run of fixing.",
+			"Note 4 kept: hum gives it to the next run of building.",
+		]),
+	);
+	expect(w.state.items.savedOf("a")?.state).toBe("asking");
+
+	await w.adapter.answers!.answer(a, { text: "Use B" });
+	await w.worker.tick();
+	await w.worker.idle();
+
+	const [build] = w.shim.calls().filter(({ itemId }) => itemId === "a").slice(-1);
+
+	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
+	expect(build?.prompt).toContain(`## The owner's notes to building\n\nThe owner sent these to this step, oldest first.\n\n${firstNote}\n\nAdd a title.`);
+	expect(build?.prompt).not.toContain("Fix it gently.");
+	expect(await thread()).toEqual(expect.arrayContaining(["Note 1 delivered: it reached the run of building.", "Note 4 delivered: it reached the run of building.", "Note 3 dropped: the item ended."]));
+	expect(w.state.stepNotes.list().map(({ ordinal, disposition }) => [ordinal, disposition]).toSorted(([one], [other]) => Number(one) - Number(other))).toEqual([
+		[1, "delivered"],
+		[2, "refused"],
+		[3, "dropped"],
+		[4, "delivered"],
+	]);
+});
+
+test("a run that stops before its model reads the prompt leaves its notes kept; the run hum takes over then delivers only the notes its prompt was built with; and a thread that cannot be read again before a run leaves the pass going on", async () => {
+	const w = await workerWorld({ items: { a: { writeForItem: true } } });
+	const a = ItemId.parse("a");
+	const source = w.adapter.workSource!;
+	const real = await w.startedRunner();
+	let limited = true;
+	let readsSinceClaim = 0;
+
+	const worker = w.workerWith({
+		runner: { ...real, run: async (request) => (limited ? { kind: "limited", until: NOW + HOUR_MS } : real.run(request)) },
+		adapters: {
+			workSource: {
+				...source,
+				claim: async (...args) => {
+					readsSinceClaim = 0;
+
+					return source.claim(...args);
+				},
+				read: async (id) => {
+					readsSinceClaim += 1;
+
+					if (readsSinceClaim === 2 && !limited) throw new Error("the work source is down");
+
+					return source.read(id);
+				},
+			},
+			questions: w.adapter.questions!,
+			answers: w.adapter.answers,
+		},
+	});
+
+	w.item("a", "docs/a.md");
+	await w.adapter.answers!.request(a, { kind: "note", step: "building", text: "Keep it short." });
+	await worker.tick();
+	await worker.idle();
+
+	expect(w.results.at(-1)).toMatchObject({ outcome: "limited", item: "a" });
+	expect(w.state.stepNotes.get("a#1")?.disposition).toBe("kept");
+
+	await w.adapter.answers!.request(a, { kind: "note", step: "building", text: "Name it plainly." });
+	limited = false;
+	w.clock.at += 2 * HOUR_MS;
+	await worker.tick();
+	await worker.idle();
+
+	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
+	expect(w.shim.calls().find(({ itemId }) => itemId === "a")?.prompt).toContain("Keep it short.");
+	expect(w.state.stepNotes.get("a#1")?.disposition).toBe("delivered");
+	expect(w.state.stepNotes.get("a#2")).toMatchObject({ disposition: "dropped", why: "the item ended" });
+});
+
+test("a note the owner sends after a pass gathered its item reaches the step's run in the same pass: hum reads the thread again just before the step's runs", async () => {
+	const w = await workerWorld({ items: { a: { writeForItem: true } } });
+	const a = ItemId.parse("a");
+	const source = w.adapter.workSource!;
+	let readsSinceClaim = 0;
+	let sent = false;
+
+	const worker = w.workerWith({
+		adapters: {
+			workSource: {
+				...source,
+				claim: async (...args) => {
+					readsSinceClaim = 0;
+
+					return source.claim(...args);
+				},
+				read: async (id) => {
+					readsSinceClaim += 1;
+
+					if (readsSinceClaim === 2 && !sent) {
+						sent = true;
+						await w.adapter.answers!.request(a, { kind: "note", step: "building", text: "Sent mid-pass." });
+					}
+
+					return source.read(id);
+				},
+			},
+			questions: w.adapter.questions!,
+			answers: w.adapter.answers,
+		},
+	});
+
+	w.item("a", "docs/a.md");
+	await worker.tick();
+	await worker.idle();
+
+	expect(w.shim.calls().find(({ itemId }) => itemId === "a")?.prompt).toContain("Sent mid-pass.");
+	expect(w.state.stepNotes.get("a#1")?.disposition).toBe("delivered");
+
+	await worker.tick();
+	await worker.idle();
+
+	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
+	expect((await source.read(a)).thread.map(({ text }) => text)).toContain("Note 1 delivered: it reached the run of building.");
 });
 
 test("an item someone else claims never starts and carries a card naming them, which goes once they let it go", async () => {

@@ -3,6 +3,7 @@ import shippedFix from "../defaults/kinds/fix.json" with { type: "json" };
 import { KindFile } from "../src/config/kind-file.ts";
 import { withOverCapWaits } from "../src/config/machine.ts";
 import { flowOf } from "../src/status/flow.ts";
+import { configWith } from "./fixtures/config.ts";
 import type { Tree } from "./fixtures/config.ts";
 import { newestChoices, openQuestions } from "../src/status/sections.ts";
 import type { QueuedQuestion, SettledAnswer } from "../src/state/saved.ts";
@@ -36,12 +37,17 @@ const fixWith = (edit: (states: Tree) => void) => {
 	return withOverCapWaits(KindFile.parse(raw));
 };
 
+const ROLES = configWith().hum.roles;
+
+/** An item no pass runs on, with no change saved for landing. */
+const BETWEEN = { running: false, landing: false, parked: false };
+
 const FIX_STEPS = ["reproducing", "confirming", "objecting", "building", "checking", "proving", "fixing", "reviewing", "owner-review", "merging", "stuck", "done"];
 
 test("at a wait, the flow names every step it shows, which of them wait on the owner and which the item passed, and the options, answer, skip and notes the wait allows", () => {
-	const flow = flowOf(fixWith((states) => (states["owner-review"].meta.skip = { target: "merging" })));
+	const flow = flowOf(fixWith((states) => (states["owner-review"].meta.skip = { target: "merging" })), ROLES);
 
-	expect(flow("owner-review", ["reproducing", "confirming", "building", "asking", "checking", "owner-review", "reviewing"])).toEqual({
+	expect(flow("owner-review", ["reproducing", "confirming", "building", "asking", "checking", "owner-review", "reviewing"], BETWEEN)).toEqual({
 		steps: FIX_STEPS.map((name) => ({ name, waitsOnOwner: name === "objecting" || name === "owner-review" })),
 		at: "owner-review",
 		passed: ["reproducing", "confirming", "building", "checking", "reviewing"],
@@ -50,32 +56,33 @@ test("at a wait, the flow names every step it shows, which of them wait on the o
 			answer: true,
 			skip: true,
 			runNow: false,
-			noteTo: ["building", "checking", "proving", "fixing", "reviewing", "owner-review", "merging", "stuck"],
+			noteTo: ["building", "fixing", "reviewing"],
 		},
 	});
 });
 
 test("a step allows a skip and a timer run now only where it waits on the owner, which a pass restores, and only where they leave the wait: a run now only where its earliest timer leads on to work, not to a stuck step", () => {
-	const flow = flowOf(fixWith((states) => (states.building.meta = { skip: { target: "checking" } })));
-	const toStuck = flowOf(fixWith((states) => (states.objecting.after = { "3600000": { target: "stuck" }, "86400000": { target: "building" } })));
+	const flow = flowOf(fixWith((states) => (states.building.meta = { skip: { target: "checking" } })), ROLES);
+	const toStuck = flowOf(fixWith((states) => (states.objecting.after = { "3600000": { target: "stuck" }, "86400000": { target: "building" } })), ROLES);
 
 	const toItself = flowOf(
 		fixWith((states) => {
 			states.objecting.meta.skip = { target: "objecting" };
 			states.objecting.after = { "3600000": { target: "objecting" } };
 		}),
+		ROLES,
 	);
 
-	expect(flow("building", [])?.controls).toMatchObject({ skip: false, runNow: false });
-	expect(flow("objecting", [])?.controls).toMatchObject({ skip: false, runNow: true });
-	expect(toStuck("objecting", [])?.controls).toMatchObject({ runNow: false });
-	expect(toItself("objecting", [])?.controls).toMatchObject({ skip: false, runNow: false });
+	expect(flow("building", [], BETWEEN)?.controls).toMatchObject({ skip: false, runNow: false });
+	expect(flow("objecting", [], BETWEEN)?.controls).toMatchObject({ skip: false, runNow: true });
+	expect(toStuck("objecting", [], BETWEEN)?.controls).toMatchObject({ runNow: false });
+	expect(toItself("objecting", [], BETWEEN)?.controls).toMatchObject({ skip: false, runNow: false });
 });
 
 test("a wait a run stops at past its token cap is a step only while the item is in it, and a final step has no flow", () => {
-	const flow = flowOf(fixWith(() => {}));
+	const flow = flowOf(fixWith(() => {}), ROLES);
 
-	expect(flow("asking-reviewing", undefined)?.steps.map(({ name }) => name)).toEqual([...FIX_STEPS, "asking-reviewing"]);
-	expect(flow("reviewing", undefined)?.steps.map(({ name }) => name)).toEqual(FIX_STEPS);
-	expect(flow("done", [])).toBeUndefined();
+	expect(flow("asking-reviewing", undefined, BETWEEN)?.steps.map(({ name }) => name)).toEqual([...FIX_STEPS, "asking-reviewing"]);
+	expect(flow("reviewing", undefined, BETWEEN)?.steps.map(({ name }) => name)).toEqual(FIX_STEPS);
+	expect(flow("done", [], BETWEEN)).toBeUndefined();
 });

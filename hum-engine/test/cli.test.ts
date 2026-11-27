@@ -130,6 +130,26 @@ test("hum skip and hum run-now write a request only where the item's local statu
 	expect(requests().map(({ kind }: { kind: string }) => kind)).toEqual(["skip", "skip", "run-now"]);
 });
 
+test("hum note writes the whole text after -- only to a step the item's local status row lists under noteTo, and refuses any other naming it and the step the item is at", () => {
+	const repo = new WorkRepo();
+	const worker = repo.worker("w");
+	const id = repo.seed("notes");
+	const text = "-- keep the old API\n\nand name the flag plainly";
+	const statusFile = join(worker, ".git", "hum", "status.json");
+	const controls = { choices: [], answer: false, skip: false, runNow: false, noteTo: ["fixing"] };
+
+	writeSettings(worker);
+	writeStatus(statusFile, { ...emptyStatus("0.0.0", 0), open: [{ item: id, kind: "fix", flowVersion: "1", steps: [], at: "building", since: 0, running: true, controls }] });
+
+	const refused = hum(worker, "note", id, "reviewing", "--", text);
+
+	expect(refused.code).toBe(1);
+	expect(refused.err).toContain("hum note: refused: no run of reviewing lies ahead of the item at building");
+	expect(json(worker, "note", id, "fixing", "--", text)).toEqual({ ok: true });
+	expect(json(worker, "read", id).thread).toMatchObject([{ kind: "note", step: "fixing", text: text.trim() }]);
+	expect(inboxOf(worker)).toContain(id);
+});
+
 test("hum claim without --ttl lasts claimExpirySeconds from the repo's hum.json", () => {
 	const repo = new WorkRepo();
 	const worker = repo.worker("w");

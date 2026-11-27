@@ -75,6 +75,27 @@ test.each([
 	await adapter.close();
 });
 
+test("a note of several lines posts its first words on the Todo and its whole text in a Pad, and reads back whole, the same text sent twice too, or as its first words once the Pad is gone", async () => {
+	const { daemon, adapter, id } = await claimedTodo();
+	const text = "Keep the old API.\n\nName the flag plainly.";
+
+	await adapter.answers.request(id, { kind: "note", step: "fixing", text });
+
+	await adapter.answers.request(id, { kind: "note", step: "reviewing", text });
+
+	expect((await adapter.workSource.read(id)).thread).toMatchObject([
+		{ kind: "note", step: "fixing", text, author: "hum" },
+		{ kind: "note", step: "reviewing", text, author: "hum" },
+	]);
+
+	const [pad] = daemon.calls.filter(({ method }) => method === "pad.create").map(({ params }) => params.name ?? "");
+
+	daemon.removePad(pad ?? "");
+
+	expect((await adapter.workSource.read(id)).thread[0]).toMatchObject({ kind: "note", step: "fixing", text: `Keep the old API. Name the flag plainly. … full text in Pad "${pad}"` });
+	await adapter.close();
+});
+
 test("a request posts on the Todo as hum's own marked comment and reads back on the thread with its kind and step, where an answer through hum is refused", async () => {
 	const { adapter, id } = await claimedTodo();
 

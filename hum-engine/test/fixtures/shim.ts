@@ -73,7 +73,7 @@ export type Shim = {
 	/** Environment that makes the shim read `spec`. */
 	readonly env: Record<string, string>;
 	/** One entry per `-p` call, in order. */
-	readonly calls: () => { at: number; itemId: string | undefined; argv: string[]; stdinBytes: number; stdinSha: string; pid: number; cwd: string }[];
+	readonly calls: () => { at: number; itemId: string | undefined; argv: string[]; stdinBytes: number; stdinSha: string; prompt: string; pid: number; cwd: string }[];
 	/** When each `-p` process wrote its result, by pid. */
 	readonly ends: () => { pid: number; at: number }[];
 	/** When each `-p` process wrote its first assistant message, by pid. */

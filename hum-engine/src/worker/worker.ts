@@ -46,6 +46,8 @@ import type { PullRequests } from "../adapters/pull-requests.ts";
 import type { SlotPool } from "../slots/pool.ts";
 import { type AnswerScope, settleAnswers } from "./answers.ts";
 import { settleRequests, standOf } from "./requests.ts";
+import { noteStandOf, noteWrites, settleNotes } from "./step-notes.ts";
+import { type Going, noteFrom } from "../decide/note.ts";
 import { PARK_OPTIONS, RUN_AGAIN } from "../decide/answer.ts";
 import { endWait, queueQuestion, recentlyAsked, releaseQuestions } from "./questions.ts";
 import type { Parked } from "../state/saved.ts";
@@ -571,6 +573,8 @@ export class Worker {
 					const answered = wait !== undefined && answerTo(item, wait.savedAt) !== undefined;
 					const requested = await this.#settleRequests(item, { answered, parked: held !== undefined });
 
+					await this.#settleNotes(item);
+
 					if (held) {
 						if (isAnsweredSince(lastAnswerAt, held.since)) this.#unpark(id, lastAnswer);
 
@@ -592,6 +596,30 @@ export class Worker {
 		const kind = saved && this.#kindNamed(saved.kind)?.kind;
 
 		return settleRequests({ state, workSource: adapters.workSource, questions: adapters.questions, now: this.#now }, item, standOf(kind, saved, flags));
+	}
+
+	/** How the item goes on: whether a pass runs on it now, whether it saved a change that lands with no run, and whether it is parked. */
+	#goingOf(id: string): Going {
+		const { state } = this.#o;
+
+		return { running: this.#inFlight.has(id), landing: state.landings.get(id) !== undefined, parked: state.parked.get(id) !== undefined };
+	}
+
+	/**
+	 * Settles the notes on an item no pass runs on, from where it goes on between passes. A pass in flight settles its
+	 * own before each step's runs, and a CI work job leaves them to gather, as it may write only through a pass's outbox.
+	 */
+	async #settleNotes(item: Item): Promise<void> {
+		if (this.#inFlight.has(item.id) || this.#o.ciJob?.kind === "work") return;
+
+		const { state, adapters, config } = this.#o;
+		const saved = state.items.savedOf(item.id);
+		const named = state.itemKinds.get(item.id)?.kind;
+		const kind = saved === undefined ? (named === undefined ? undefined : config.kinds[named]) : this.#kindNamed(saved.kind)?.kind;
+
+		if (kind === undefined) return;
+
+		await settleNotes({ state, writes: noteWrites(state, adapters.workSource), now: this.#now }, item, noteStandOf(kind, config.hum.roles, noteFrom(kind, saved?.state, this.#goingOf(item.id))));
 	}
 
 	/** Runs one item's read; a failure raises the card that names the item, and the item is read again next tick. */
@@ -1082,10 +1110,10 @@ export class Worker {
 		if (!this.#flows.has(key)) {
 			const kind = this.#o.state.kinds.get(key);
 
-			if (kind) this.#flows.set(key, flowOf(kind));
+			if (kind) this.#flows.set(key, flowOf(kind, this.#o.config.hum.roles));
 		}
 
-		return this.#flows.get(key)?.(at, saved.passed);
+		return this.#flows.get(key)?.(at, saved.passed, this.#goingOf(saved.itemId));
 	}
 
 	/** Every item with a saved state that has not ended: where its flow stands, and whether a pass runs on it now. */

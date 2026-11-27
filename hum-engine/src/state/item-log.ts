@@ -4,7 +4,7 @@ import { asJson, type Json } from "../config/json.ts";
 import type { DoneBy } from "../decide/merge.ts";
 import { SPLIT } from "../decide/prose.ts";
 import { type EventLog, KeptOutcome, type NewEvent, type SavedEvent } from "./events.ts";
-import type { BegunRun, RunKey, RunRecords } from "./runs.ts";
+import type { BegunRun, RunKey, RunLaunch, RunRecords } from "./runs.ts";
 
 /** A record of one type, as the log keeps it. */
 type Entry<Type extends SavedEvent["type"]> = Extract<SavedEvent, { readonly type: Type }>;
@@ -30,7 +30,7 @@ export const ownerAnswered = (itemId: string, at: number): NewEvent => ({ source
 /** What one model run is asked, and whether an answer the log keeps to the same question stands in for running it. */
 export type Ask = {
 	readonly key: RunKey;
-	readonly launch: { readonly name: string; readonly sessionId?: string };
+	readonly launch: RunLaunch;
 	/** The version of the item's kind machine the run is made under. */
 	readonly machineVersion: string;
 	/** What the run is asked, given only for a run whose answer is all it does: a kept answer to it is read back, and nothing runs. */

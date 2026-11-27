@@ -242,6 +242,23 @@ const answerChecks = (target: ContractTarget, source: WorkSource, answers: Answe
 		},
 	},
 	{
+		name: "answers: a note of several lines lands on the thread whole, with the step it goes to, and so does the same text sent again",
+		run: async () => {
+			const id = await target.seed("noted");
+			const text = "Keep the old API.\n\n- name the flag plainly\n- log once";
+
+			await answers.request(id, { kind: "note", step: "fixing", text });
+			await answers.request(id, { kind: "note", step: "reviewing", text });
+
+			const notes = Item.parse(await source.read(id)).thread.map(({ kind, step, text: read }) => ({ kind, step, text: read }));
+
+			assert.deepEqual(notes, [
+				{ kind: "note", step: "fixing", text },
+				{ kind: "note", step: "reviewing", text },
+			]);
+		},
+	},
+	{
 		name: "answers: an idle watch costs nothing and a write flips it",
 		run: async () => {
 			const id = await target.seed("watched");

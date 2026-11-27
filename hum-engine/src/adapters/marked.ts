@@ -12,6 +12,8 @@ export const Marker = z.looseObject({
 	kind: z.enum(THREAD_KINDS),
 	option: z.string().min(1).optional(),
 	step: z.string().min(1).optional(),
+	/** The Pad that holds the comment's whole text, where the comment holds only its first words. */
+	pad: z.string().min(1).optional(),
 	options: z.array(z.string()).optional(),
 	followUp: z.object({ key: z.string(), item: z.string().min(1) }).optional(),
 });
