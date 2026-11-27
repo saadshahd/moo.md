@@ -12,7 +12,7 @@ import { type RunOutcome, type RunRequest, type Runner } from "./claude-p.ts";
 import { gitIn } from "./git.ts";
 import { answerHooks, failedWith, finishedOf, hookReports, runSettings, STOP_EVENT, succeededWith, tokensOf } from "./hooked-run.ts";
 import { type LimitEnded, limitOf, savedLimitUntil, settleLimit } from "./limit.ts";
-import { ENDED, itemWorkstream, NEEDS_YOU, RailNode, railName, railTree } from "./rail.ts";
+import { ENDED, itemWorkstream, NEEDS_YOU, putPad, RailNode, railName, railTree } from "./rail.ts";
 import { HUM_EXT, type RoundupCall, type RoundupClient, RoundupRefusal } from "./roundup-rpc.ts";
 import { askedSince, dropAnswers, hasSavedAnswer, keepSchema, keepTalkRun, markAsked, type RunFolder, runFolder, runFolders, runKey, takeAnswer, talkRunOf } from "./run-answer.ts";
 import { readTranscript, type RunTranscript } from "./transcript.ts";
@@ -128,11 +128,7 @@ export type RowStart = {
 const writeBrief = async (call: RoundupCall, name: string, text: string, workstream: string): Promise<void> => {
 	const pad = briefName(name);
 
-	await call("pad.create", { name: pad, text, visibility: "internal" }).catch(async (error: Error) => {
-		if (!(error instanceof RoundupRefusal)) throw error;
-
-		await call("pad.write", { name: pad, text });
-	});
+	await putPad(call, { name: pad, text, visibility: "internal" });
 	await call("pad.move", { name: pad, home: workstream });
 };
 

@@ -98,8 +98,33 @@ export const Watch = z.strictObject({ token: text, changed: z.boolean() });
 
 export type Watch = z.infer<typeof Watch>;
 
-/** `detail` rides folded on the thread, for agents; the owner reads `text` alone. */
-export type Question = { readonly text: string; readonly options?: readonly string[]; readonly detail?: string };
+/**
+ * Changes a review asked for, in the files its plan names, else the files it cites. `open`: none of those files
+ * changed after the review, so nothing settled it; `untouched` names those the change never holds. `unclear`: one
+ * changed, and only reading it tells whether that settles it; `changed` names them, absent where hum keeps no record
+ * of what changed since.
+ */
+export type HandoffRequest =
+	| { readonly status: "open"; readonly text: string; readonly files: readonly string[]; readonly untouched: readonly string[] }
+	| { readonly status: "unclear"; readonly text: string; readonly files: readonly string[]; readonly changed?: readonly string[] };
+
+/** One review of the change as the owner knows it: its label, its Rail row where it ran as one, its verdict, why hum set it aside where it did, and what it asked to change. */
+export type HandoffReview = { readonly label: string; readonly row?: string; readonly event: string; readonly refused?: string; readonly request?: HandoffRequest };
+
+/**
+ * What the owner reads about an item's change: its branch, its files with lines added and removed, absent where hum
+ * keeps no saved change, every review of it, oldest first, and the Rail rows that built, fixed and reviewed it; then
+ * what the owner may answer while it waits on them, or the commit it merged at.
+ */
+export type OwnerHandoff = {
+	readonly branch: string;
+	readonly files?: readonly { readonly path: string; readonly added?: number; readonly removed?: number }[];
+	readonly reviews: readonly HandoffReview[];
+	readonly rows: readonly { readonly label: string; readonly name: string }[];
+} & ({ readonly decide: { readonly options: readonly string[]; readonly ownWords: boolean } } | { readonly merged: { readonly commit: string } });
+
+/** `detail` rides folded on the thread, for agents; the owner reads `text` alone. A question about a change that waits on the owner carries its `handoff`, for a source that shows it. */
+export type Question = { readonly text: string; readonly options?: readonly string[]; readonly detail?: string; readonly handoff?: OwnerHandoff };
 
 export type Answer = { readonly text: string; readonly option?: string };
 
@@ -118,8 +143,8 @@ export interface WorkSource {
 	comment(id: ItemId, text: string): Promise<void>;
 	/** Files a ready item. `from` is the item it came from, or a key that names no item. Filing the same `title` from the same `from` twice returns the first item. */
 	fileFollowUp(from: ItemId, followUp: FollowUp): Promise<ItemRef>;
-	/** Ends an item whose change merged, so `listReady` never lists it again. Ending an ended item changes nothing. */
-	finish(id: ItemId): Promise<void>;
+	/** Ends an item whose change merged, so `listReady` never lists it again; `handoff` says what merged, for a source that shows the owner. Ending an ended item changes nothing. */
+	finish(id: ItemId, handoff?: OwnerHandoff): Promise<void>;
 }
 
 /** Where a run's questions and the choices made without the owner land. */

@@ -6,6 +6,12 @@ export const RunKey = z.object({ itemId: z.string().min(1), run: z.string().min(
 
 export type RunKey = z.infer<typeof RunKey>;
 
+/** How the owner knows a run: its role and attempt, as "review #5". */
+export const runLabel = ({ run, attempt }: Pick<RunKey, "run" | "attempt">): string => `${run} #${attempt}`;
+
+/** A run's name, which its Rail row goes by too. */
+export const runName = (key: RunKey): string => `hum ${key.itemId} ${runLabel(key)}`;
+
 const BegunRecord = RunKey.extend({
 	/** On the Mac the run's name is saved before launch and found by it after a crash. */
 	name: z.string().min(1),

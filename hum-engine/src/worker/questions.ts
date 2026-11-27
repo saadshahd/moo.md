@@ -7,6 +7,7 @@ import type { State } from "../state/open.ts";
 import type { QueuedQuestion } from "../state/saved.ts";
 import { DAY_MS, HOUR_MS } from "../time.ts";
 import { footprintOf, doOverlap } from "./scheduler.ts";
+import { waitingHandoff } from "./owner-handoff.ts";
 import { openQuestion } from "./thread.ts";
 
 export type QuestionContext = {
@@ -77,7 +78,7 @@ export const roomToday = ({ state, config, now }: Pick<QuestionContext, "state" 
 	return roomToAsk({ askedAt: [...asked, ...state.followUps.list().map(({ at }) => at)], cap: config.hum.dailyQuestionCap, now: now() });
 };
 
-/** Asks the queued questions the daily cap has room for, first by the owner's priority label, then by how many items wait on it, then by age. */
+/** Asks the queued questions the daily cap has room for, first by the owner's priority label, then by how many items wait on it, then by age; one about a change that waits on the owner carries its handoff. */
 export const releaseQuestions = async (ctx: QuestionContext): Promise<string[]> => {
 	const { state, workSource, questions, now } = ctx;
 	const room = roomToday(ctx);
@@ -87,7 +88,7 @@ export const releaseQuestions = async (ctx: QuestionContext): Promise<string[]> 
 	for (const queued of waitingOrder(all.filter(isWaiting)).slice(0, room)) {
 		const calls = onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource, questions }, state.ops, { run: "ask", attempt: queued.queuedAt });
 
-		await calls.questions?.ask(ItemId.parse(queued.item), { text: queued.text, options: queued.options, detail: queued.detail });
+		await calls.questions?.ask(ItemId.parse(queued.item), { text: queued.text, options: queued.options, detail: queued.detail, handoff: waitingHandoff(state, ctx.config, queued.item, queued.options) });
 		state.questions.put(queuedKey(queued), { ...queued, askedAt: now() });
 		released.push(queued.item);
 	}

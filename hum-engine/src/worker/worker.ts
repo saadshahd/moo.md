@@ -51,6 +51,7 @@ import type { Parked } from "../state/saved.ts";
 import { answerTo, type Checkout, doesStartOver, ownerWaitStage, claimTtlMs, DEFAULT_BASE, gatherItem, hasEndedStuck, isGathered, isTalking, park, parkQuestion, rememberKinds, runThinPath, type TalkCopy, talkWaits, type ThinPathOptions, type ThinResult } from "./thin-path.ts";
 import { ownerAnswered } from "../state/item-log.ts";
 import { forgetItem, hasProgress } from "./kind.ts";
+import { dropReviews } from "./owner-handoff.ts";
 
 export type { TickResult } from "./lifecycle.ts";
 
@@ -439,6 +440,7 @@ export class Worker {
 
 		state.items.remove(id);
 		state.landings.remove(id);
+		dropReviews(state, id);
 
 		const spent = state.spent.get(id);
 

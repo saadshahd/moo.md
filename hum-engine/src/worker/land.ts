@@ -60,7 +60,8 @@ import {
 	type Policy,
 } from "../decide/risk.ts";
 import type { State } from "../state/open.ts";
-import type { Landing as SavedLanding, SavedRepro, Verdict } from "../state/saved.ts";
+import type { ChangedFile, Landing as SavedLanding, SavedRepro, Verdict } from "../state/saved.ts";
+import { mergedHandoff, reviewsOf } from "./owner-handoff.ts";
 import { PLAIN_QUESTIONS } from "../decide/question.ts";
 import { checkLimits, runChecks } from "./checks.ts";
 import { mergedThrough, type OnBase, recordMerged } from "./merged.ts";
@@ -196,9 +197,33 @@ export const tierOf = async (ctx: Pick<LandContext, "config" | "state" | "git" |
 	return { model: ctx.config.hum.models[row.tier], effort: row.effort };
 };
 
-/** The run branch's diff from where it left the base to `tip`, the item's own file left out: hum's done mark is no part of the change. */
-const changeDiff = ({ git, base, dir, id }: Pick<LandContext, "git" | "base" | "dir" | "id">, tip = "HEAD"): Promise<string> =>
-	git.raw(["diff", ...PATCH, `origin/${base}...${tip}`, "--", ".", `:(exclude)${dir}/${id}.md`]);
+/** What every read of the change's diff takes: the run branch from where it left the base to `tip`, the item's own file left out, as hum's done mark is no part of the change. */
+const changeRange = ({ base, dir, id }: Pick<LandContext, "base" | "dir" | "id">, tip = "HEAD"): string[] => [`origin/${base}...${tip}`, "--", ".", `:(exclude)${dir}/${id}.md`];
+
+/** The run branch's diff against the base. */
+const changeDiff = (ctx: Pick<LandContext, "git" | "base" | "dir" | "id">, tip = "HEAD"): Promise<string> => ctx.git.raw(["diff", ...PATCH, ...changeRange(ctx, tip)]);
+
+/** A count from git's numstat, which shows "-" for a binary file. */
+const counted = (column: string | undefined): number | undefined => (column === undefined || column === "-" ? undefined : Number(column));
+
+/** Each file the change holds, with its lines added and removed. */
+const filesOf = async (ctx: Pick<LandContext, "git" | "base" | "dir" | "id">): Promise<ChangedFile[]> =>
+	(await ctx.git.raw(["diff", "--numstat", "--no-renames", ...changeRange(ctx)]))
+		.split("\n")
+		.filter(Boolean)
+		.map((line) => {
+			const [added, removed, ...path] = line.split("\t");
+
+			return { path: path.join("\t"), added: counted(added), removed: counted(removed) };
+		});
+
+/** By the head each of the item's reviews judged, the files that changed from it to `head`; a head git cannot read is left out. */
+const changedSinceReviews = async ({ git, state, id }: Pick<LandContext, "git" | "state" | "id">, head: string): Promise<Record<string, string[]>> => {
+	const heads = [...new Set(reviewsOf(state, id).map((review) => review.head))].filter((from) => from !== head);
+	const read = await Promise.all(heads.map(async (from) => ({ from, diff: await git.run(["diff", "--name-only", from, head]) })));
+
+	return Object.fromEntries(read.flatMap(({ from, diff }) => (diff.code === 0 ? [[from, diff.stdout.split("\n").filter(Boolean)]] : [])));
+};
 
 /** The diff of the run branch against the base, read as the risk level reads it. */
 export const changeOn = async (ctx: Pick<LandContext, "git" | "base" | "config" | "dir" | "id">): Promise<Change> => changeOf(await changeDiff(ctx), ctx.config.hum);
@@ -313,7 +338,7 @@ const branchCommits = async ({ git, base }: Pick<LandContext, "git" | "base">): 
 
 /**
  * Marks the item done on the run branch where it holds the item's file, pushes the branch and saves what its diff
- * showed and the commits it pushed, so a retry lands it without a run. The saved head is the change before hum's done mark; a push GitHub signed
+ * showed, its files and what changed since each review, and the commits it pushed, so a retry lands it without a run. The saved head is the change before hum's done mark; a push GitHub signed
  * rebuilt the change as its own commit, which is then the head, and a verdict on the old commit holds for its tree.
  * The same change saved again, as after a rebase, keeps when it was first saved, so the owner's answers since then
  * still count; a new change starts the count afresh.
@@ -321,6 +346,7 @@ const branchCommits = async ({ git, base }: Pick<LandContext, "git" | "base">): 
 export const prepareLanding = async (ctx: LandContext): Promise<PushOutcome> => {
 	const { git, id, branch, state, now } = ctx;
 	const change = await changeOn(ctx);
+	const files = await filesOf(ctx);
 	const built = (await git.raw(["rev-parse", "HEAD"])).trim();
 	const patch = await patchOf(ctx);
 	const saved = state.landings.get(id);
@@ -336,7 +362,7 @@ export const prepareLanding = async (ctx: LandContext): Promise<PushOutcome> => 
 
 	if (head !== built && verdict?.head === built) state.verdicts.put(id, { ...verdict, head });
 
-	state.landings.put(id, { item: id, branch, since: kept?.since ?? now(), change, head, lostRaces: kept?.lostRaces ?? 0, alignment: kept?.alignment, patch, commits: await branchCommits(ctx) });
+	state.landings.put(id, { item: id, branch, since: kept?.since ?? now(), change, head, lostRaces: kept?.lostRaces ?? 0, alignment: kept?.alignment, patch, commits: await branchCommits(ctx), files, changedSince: await changedSinceReviews(ctx, head) });
 
 	return pushed;
 };
@@ -396,7 +422,7 @@ const endedByChange = async ({ git, dir, id }: LandContext): Promise<boolean> =>
 const finish = async (ctx: LandContext, onBase: OnBase): Promise<ThinResult> => {
 	const { state, git, id, item, workSource, now } = ctx;
 
-	if (!(await endedByChange(ctx))) await workSource.finish(item.id);
+	if (!(await endedByChange(ctx))) await workSource.finish(item.id, mergedHandoff(state, id, onBase.sha));
 	await recordMerged(state, { git, remote: "origin" }, { item: id, at: now(), ...onBase });
 
 	return { outcome: "merged", item: id };

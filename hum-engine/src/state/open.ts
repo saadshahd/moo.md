@@ -11,7 +11,7 @@ import { MergedCase } from "../measure/cases.ts";
 import { OpKeys } from "./ops.ts";
 import { Records } from "./records.ts";
 import { RunRecords } from "./runs.ts";
-import { EngineUpdate, FiledFollowUp, FiledPart, ItemKind, Landing, Learned, Limit, Parked, PullRequestText, QueuedQuestion, ReadyList, SavedPlan, SavedRepro, SavedTalk, SettledAnswer, Slot, Spent, Verdict } from "./saved.ts";
+import { EngineUpdate, FiledFollowUp, FiledPart, ItemKind, Landing, Learned, Limit, Parked, PullRequestText, QueuedQuestion, ReadyList, SavedPlan, SavedRepro, SavedTalk, Review, SettledAnswer, Slot, Spent, Verdict } from "./saved.ts";
 
 /** Names under the state folder that other modules address by name. */
 export const STATUS_FILE = "status.json";
@@ -70,6 +70,8 @@ export const openState = (dir: string, { now, ...codec }: StateOptions) => {
 		/** What the owner settled in each item's ideate and shape rows, by item. */
 		talks: new Records(join(dir, "talks"), SavedTalk),
 		verdicts: new Records(join(dir, "verdicts"), Verdict),
+		/** Every review run's answer on each item's change, by its run's name or, at landing, by when it answered. */
+		reviews: new Records(join(dir, "reviews"), Review),
 		/** The pull request text the latest build or fix run wrote, by item. */
 		pullRequests: new Records(join(dir, "pull-requests"), PullRequestText),
 		/** Questions by item, waiting for room under the daily cap or asked within the day. */
