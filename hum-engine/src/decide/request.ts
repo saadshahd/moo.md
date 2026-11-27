@@ -40,15 +40,14 @@ export const requestRefusal = ({ kind, step }: OwnerRequest, { at, controls }: R
 };
 
 /**
- * Why the local status file refuses a request before it is written, or undefined where it lets the request go on to
- * the worker. With no status file, as where the state lives only in CI, the worker's check alone decides.
+ * Why the item's row in the local status file refuses a request before it is written, or undefined where it lets the
+ * request go on to the worker. Where no row names the item, as where its state lives only in CI, the worker's check
+ * alone decides.
  */
-export const statusRefusal = (request: OwnerRequest, item: string, status: Pick<Status, "open"> | undefined): string | undefined => {
-	if (status === undefined) return undefined;
+export const statusRefusal = (request: OwnerRequest, item: string, open: Status["open"]): string | undefined => {
+	const row = open.find((found) => found.item === item);
 
-	const row = status.open.find((open) => open.item === item);
-
-	return row === undefined ? `${item} has no open step in the status file` : requestRefusal(request, row);
+	return row === undefined ? undefined : requestRefusal(request, row);
 };
 
 /** Where an item stands for the requests on its thread, as its saved state says. */

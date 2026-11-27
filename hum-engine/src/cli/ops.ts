@@ -100,7 +100,7 @@ const requestOf =
 
 		if (!read.ok && read.reason === "unreadable") throw new PermanentError(read.message);
 
-		const refusal = statusRefusal(request, id, read.ok ? read.status : undefined);
+		const refusal = statusRefusal(request, id, read.ok ? read.status.open : []);
 
 		if (refusal !== undefined) throw new PermanentError(`refused: ${refusal}`);
 

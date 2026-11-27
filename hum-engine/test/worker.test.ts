@@ -649,6 +649,10 @@ test("the owner's skip takes a wait its kind file lets them skip where the skip 
 
 	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
 	expect(w.shim.calls().filter(({ itemId }) => itemId === "a")).toHaveLength(1);
+
+	const status = readStatus(w.state.statusPath);
+
+	expect(status.ok && status.status.questions).toEqual([]);
 	expect((await w.adapter.workSource!.read(a)).thread.map(({ text }) => text)).toEqual(
 		expect.arrayContaining(["Request 1 refused: the item is at asking now, not building.", "Request 2 applied: the item leaves asking where its kind file's skip leads."]),
 	);

@@ -1,13 +1,15 @@
 import type { Choice, Question } from "./format.ts";
-import type { QueuedQuestion, SettledAnswer } from "../state/saved.ts";
+import type { QueuedQuestion, SettledAnswer, SettledRequest } from "../state/saved.ts";
 
-const hasAnswerAfter = (answers: readonly SettledAnswer[], item: string, asked: number): boolean =>
-	answers.some((answer) => answer.item === item && answer.disposition === "applied" && answer.at >= asked);
+/** What the owner sent an item that hum applied: an answer, or a request that moved it on from its wait. */
+type Applied = Pick<SettledAnswer | SettledRequest, "item" | "disposition" | "at">;
 
-/** A question stays open from the moment it is asked until an answer to its item is applied. */
-export const openQuestions = (queued: readonly QueuedQuestion[], answers: readonly SettledAnswer[]): Question[] =>
+const hasAppliedAfter = (applied: readonly Applied[], item: string, asked: number): boolean => applied.some((sent) => sent.item === item && sent.disposition === "applied" && sent.at >= asked);
+
+/** A question stays open from the moment it is asked until an answer or a request to its item is applied. */
+export const openQuestions = (queued: readonly QueuedQuestion[], applied: readonly Applied[]): Question[] =>
 	queued
-		.flatMap(({ item, text, options = [], askedAt }) => (askedAt !== undefined && !hasAnswerAfter(answers, item, askedAt) ? [{ item, text, options, since: askedAt }] : []))
+		.flatMap(({ item, text, options = [], askedAt }) => (askedAt !== undefined && !hasAppliedAfter(applied, item, askedAt) ? [{ item, text, options, since: askedAt }] : []))
 		.sort((a, b) => a.since - b.since);
 
 /** The newest `shown` choices, newest first. */

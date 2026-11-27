@@ -100,7 +100,7 @@ test("hum list-ready, claim, watch, answer and read work end to end on a temp re
 	expect(json(worker, "read", id).thread).toMatchObject([{ kind: "answer", text: "looks good", option: "approve" }]);
 });
 
-test("hum skip and hum run-now write a request only where the local status row allows it, and where no status file is the worker alone decides", () => {
+test("hum skip and hum run-now write a request only where the item's local status row allows it, and where no row names the item the worker alone decides", () => {
 	const repo = new WorkRepo();
 	const worker = repo.worker("w");
 	const id = repo.seed("requests");
@@ -113,8 +113,12 @@ test("hum skip and hum run-now write a request only where the local status row a
 	expect(inboxOf(worker)).toContain(id);
 
 	const controls = { choices: [], answer: true, skip: false, runNow: true, noteTo: [] };
+	const statusFile = join(worker, ".git", "hum", "status.json");
 
-	writeStatus(join(worker, ".git", "hum", "status.json"), { ...emptyStatus("0.0.0", 0), open: [{ item: id, kind: "fix", flowVersion: "1", steps: [], at: "objecting", since: 0, running: false, controls }] });
+	writeStatus(statusFile, emptyStatus("0.0.0", 0));
+	expect(json(worker, "skip", id, "objecting")).toEqual({ ok: true });
+
+	writeStatus(statusFile, { ...emptyStatus("0.0.0", 0), open: [{ item: id, kind: "fix", flowVersion: "1", steps: [], at: "objecting", since: 0, running: false, controls }] });
 
 	const refused = hum(worker, "skip", id, "objecting");
 	const late = hum(worker, "run-now", id, "building");
@@ -123,7 +127,7 @@ test("hum skip and hum run-now write a request only where the local status row a
 	expect(refused.err).toContain("hum skip: refused: objecting is not a step the owner may skip");
 	expect(late.err).toContain("hum run-now: refused: the item is at objecting now, not building");
 	expect(json(worker, "run-now", id, "objecting")).toEqual({ ok: true });
-	expect(requests().map(({ kind }: { kind: string }) => kind)).toEqual(["skip", "run-now"]);
+	expect(requests().map(({ kind }: { kind: string }) => kind)).toEqual(["skip", "skip", "run-now"]);
 });
 
 test("hum claim without --ttl lasts claimExpirySeconds from the repo's hum.json", () => {

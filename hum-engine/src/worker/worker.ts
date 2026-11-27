@@ -990,7 +990,7 @@ export class Worker {
 
 		this.#showRefusedMemory(memory.refused);
 		const open = this.#openItems();
-		const questions = openQuestions(state.questions.list(), state.answers.list());
+		const questions = openQuestions(state.questions.list(), [...state.answers.list(), ...state.requests.list()]);
 		await this.#keepFeeds(open.map(({ item }) => item));
 
 		const [latest, ci, links] = await Promise.all([this.#latest(), this.#ciTick(), this.#links([...new Set([...open.map(({ item }) => item), ...questions.map(({ item }) => item)])])]);
