@@ -26,13 +26,26 @@ export const choicesAnswer = (pickRoles: readonly string[]) => {
 	return z.strictObject({ choices: z.array(first === undefined ? picked : z.union([picked, z.strictObject({ title: text, detail: text, role: z.enum([first, ...rest]) })])) });
 };
 
-/** What the owner settled at ideate and shape. */
-export type Talked = { readonly order?: WorkOrder; readonly choices?: readonly BuildChoice[] };
+/** One of hum's questions and the owner's answer to it. */
+export type QuestionAnswer = { readonly question: string; readonly answer: string };
+
+/** What the owner settled: at ideate and shape, and in answers to hum's questions. */
+export type Talked = { readonly order?: WorkOrder; readonly choices?: readonly BuildChoice[]; readonly answers?: readonly QuestionAnswer[] };
 
 const orderText = ({ title, ask, done, limits }: WorkOrder): string => [`**${title}**`, `Ask: ${ask}`, `Done: ${done}`, ["Limits:", ...limits.map((limit) => `- ${limit}`)].join("\n")].join("\n\n");
 
 const pickText = ({ title, pick, found }: BuildChoice): string => `- ${title}: ${pick === undefined ? "not picked yet" : [pick, found].filter(Boolean).join(". ")}`;
 
-/** The item's words as each run after ideate reads them: the work order the owner took, then the owner's pick on each choice. */
-export const talkedBody = (body: string, { order, choices = [] }: Talked): string =>
-	[body, order && `## The work order the owner took\n\n${orderText(order)}`, choices.length > 0 && `## The owner's picks\n\n${choices.map(pickText).join("\n")}`].filter(Boolean).join("\n\n");
+/** A question and its answer as a run reads them. */
+export const answerText = ({ question, answer }: QuestionAnswer): string => `Question: ${question}\nAnswer: ${answer}`;
+
+/** The item's words as each run reads them: the work order the owner took, the owner's pick on each choice, then the owner's answers to hum's questions. */
+export const talkedBody = (body: string, { order, choices = [], answers = [] }: Talked): string =>
+	[
+		body,
+		order && `## The work order the owner took\n\n${orderText(order)}`,
+		choices.length > 0 && `## The owner's picks\n\n${choices.map(pickText).join("\n")}`,
+		answers.length > 0 && `## The owner's answers\n\n${answers.map(answerText).join("\n\n")}`,
+	]
+		.filter(Boolean)
+		.join("\n\n");

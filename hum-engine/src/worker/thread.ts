@@ -5,7 +5,8 @@ type Thread = readonly ThreadEntry[];
 /** Whether hum wrote the entry. A source that marks no authors holds only entries hum wrote or applied. */
 export const isFromHum = (entry: ThreadEntry): boolean => entry.author !== "person";
 
-const isHumQuestion = (entry: ThreadEntry): boolean => entry.kind === "question" && isFromHum(entry);
+/** Whether the entry is a question hum asked. */
+export const isHumQuestion = (entry: ThreadEntry): boolean => entry.kind === "question" && isFromHum(entry);
 
 /** Where hum's latest question sits on the thread; -1 when it asked none. */
 export const latestQuestionAt = (thread: Thread): number => thread.findLastIndex(isHumQuestion);

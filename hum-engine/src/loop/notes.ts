@@ -2,7 +2,7 @@ import type { HumConfig } from "../config/schema.ts";
 import { humOptions } from "../decide/answer.ts";
 import type { PastChange } from "../decide/labels.ts";
 import { breakOf, type LabelRules } from "../decide/labels.ts";
-import { optionOf, type SettledAnswer } from "../state/saved.ts";
+import { changesPlan, type SettledAnswer } from "../state/saved.ts";
 import type { State } from "../state/open.ts";
 import { BREAK_NOTES, type NoteSource, noteKey, type ReviewNote } from "./records.ts";
 
@@ -35,13 +35,9 @@ export const ownerNotes = (raw: readonly RawComment[], owners: readonly string[]
 export const planChangingNotes = (answers: readonly SettledAnswer[], hum: Pick<HumConfig, "kinds" | "levels">): ReviewNote[] => {
 	const steering = humOptions(hum);
 
-	return answers.flatMap((answer): ReviewNote[] => {
-		const option = optionOf(answer);
-
-		return answer.disposition === "applied" && (option === undefined || !steering.has(option))
-			? [{ source: "plan-answer", sourceId: `${answer.item}:${answer.ordinal}`, change: answer.item, item: answer.item, hunk: "", text: answer.text, at: answer.at }]
-			: [];
-	});
+	return answers.flatMap((answer): ReviewNote[] =>
+		changesPlan(answer, steering) ? [{ source: "plan-answer", sourceId: `${answer.item}:${answer.ordinal}`, change: answer.item, item: answer.item, hunk: "", text: answer.text, at: answer.at }] : [],
+	);
 };
 
 /** The revert or fix commit behind each broken change, with the hunk it made. */

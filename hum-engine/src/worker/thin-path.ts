@@ -27,12 +27,12 @@ import { checkLimits, firstFailing, runChecks } from "./checks.ts";
 import { BASE_CONTENDED, carriedVerdict, changeOn, declaredChange, type LandContext, patchOf, placementOf, rebaseOnto, type ReviewOutcome, tierOf } from "./land.ts";
 import { OWNER_APPROVAL, REVIEW_APPROVAL } from "../decide/merge.ts";
 import { askDecision, askedQuestion, isOverCapStop, isWaitQuestion, OVER_CAP_OPTIONS, PLAIN_QUESTIONS, type PlainQuestion, RunReason } from "../decide/question.ts";
-import { PARK_OPTIONS, RUN_AGAIN, type Stage } from "../decide/answer.ts";
+import { humOptions, PARK_OPTIONS, RUN_AGAIN, type Stage } from "../decide/answer.ts";
 import { type ItemText, type ReadFile, reviewInput } from "../decide/review.ts";
-import { IdeateAnswer, PickAnswer, type BuildChoice, choicesAnswer, talkedBody } from "../decide/talk.ts";
+import { answerText, IdeateAnswer, PickAnswer, type BuildChoice, choicesAnswer, talkedBody } from "../decide/talk.ts";
 import { NO_REVIEW_FILES, readReviewFiles } from "./review-files.ts";
 import { forgetProgress, keepKind, kindAnswered, pickKind } from "./kind.ts";
-import { settleAnswers } from "./answers.ts";
+import { type OwnerAnswer, planChangingAnswers, settleAnswers } from "./answers.ts";
 import { queueQuestion } from "./questions.ts";
 import { answerToLatest, latestQuestionAt, openQuestion } from "./thread.ts";
 import { memorySection, readMemory, rulesUsed } from "../loop/memory.ts";
@@ -133,7 +133,7 @@ export type ThinResult =
 	| { readonly outcome: "limited"; readonly item: string; readonly until: number }
 	| { readonly outcome: "held"; readonly item: string; readonly why: string };
 
-type Answered = { readonly question: string; readonly answer: string; readonly option: string | undefined; readonly plan: string; readonly at: number };
+type Answered = OwnerAnswer & { readonly option: string | undefined; readonly plan: string };
 
 /** The question, the answer to it and the plan, once the owner has answered the latest question from `since` on. */
 export const answerTo = (item: Item, since = 0): Answered | undefined => {
@@ -237,6 +237,8 @@ export type Gathered = {
 	readonly onSnapshot: boolean;
 	readonly asking: boolean;
 	readonly answered: ReturnType<typeof answerTo>;
+	/** The owner's answers on the thread that changed the plan. */
+	readonly ownerAnswers: readonly OwnerAnswer[];
 	/** The saved owner wait whose timeout passed with no answer. */
 	readonly timedOut: SavedSnapshot | undefined;
 };
@@ -274,7 +276,8 @@ export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gather
 	const onSnapshot = saved.value !== undefined;
 	const ownerWait = knownKind && isWaitingOnOwner(knownKind, at) ? ownerWaitStage(knownKind, at) : undefined;
 	const stage: Stage = o.state.landings.get(id) ? "approval" : (ownerWait ?? (onSnapshot ? "running" : "waiting"));
-	const item = await settleAnswers({ state: o.state, workSource: o.workSource, judge, now }, await o.workSource.read(id), { stage });
+	const read = await o.workSource.read(id);
+	const item = await settleAnswers({ state: o.state, workSource: o.workSource, judge, now }, read, { stage });
 	const named = known && kindAnswered(known, item, o.config.hum.kinds);
 
 	if (named) o.state.itemKinds.put(id, named);
@@ -311,7 +314,7 @@ export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gather
 	/* The owner's rejection at the approval wait ends the landing saved for it, so only a new change lands. */
 	if (isApprovalWait(kind, at) && answered !== undefined && answered.option !== OWNER_APPROVAL) o.state.landings.remove(id);
 
-	return { item, kindName, kind, judge, onSnapshot, asking, answered: stopped ? undefined : answered, timedOut };
+	return { item, kindName, kind, judge, onSnapshot, asking, answered: stopped ? undefined : answered, ownerAnswers: planChangingAnswers(o.state, read, humOptions(o.config.hum)), timedOut };
 };
 
 export const isGathered = (gathered: Gathered | ThinResult): gathered is Gathered => "kindName" in gathered;
@@ -326,7 +329,7 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 
 	if (!isGathered(gathered)) return gathered;
 
-	const { item, kindName, kind, judge, onSnapshot, asking, answered, timedOut } = gathered;
+	const { item, kindName, kind, judge, onSnapshot, asking, answered, ownerAnswers, timedOut } = gathered;
 	const landing = o.state.landings.get(id);
 	/** Nothing saved is left to go on from: a new item, one that moved to another kind, or one the owner ran again. */
 	const isFresh = !onSnapshot && landing === undefined;
@@ -354,7 +357,7 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 		try {
 			const outbox = new Outbox(id);
 			const ownChecks = ownChecksOf(o.state, id);
-			const driven: Driven = { ...o, checks: [...o.checks, ...ownChecks], ownChecks, base, baseSha: gathered.baseSha, dir: o.dir ?? o.config.hum.itemsDir, kindName, kind, judge, id, item, branch, clone, evidence, env, readyFailure, g, git, answered, resume: asking, timedOut, restarted: isFresh, outbox };
+			const driven: Driven = { ...o, checks: [...o.checks, ...ownChecks], ownChecks, base, baseSha: gathered.baseSha, dir: o.dir ?? o.config.hum.itemsDir, kindName, kind, judge, id, item, branch, clone, evidence, env, readyFailure, g, git, answered, ownerAnswers, resume: asking, timedOut, restarted: isFresh, outbox };
 
 			/* A change already finished lands again from its pushed branch; no run is spent on it. One saved at the owner's approval wait goes on from the wait. */
 			const worked = landing && !asking ? await handToPublish(driven) : await drive(driven);
@@ -464,6 +467,8 @@ type Driven = ThinPathOptions & {
 	readonly g: (args: readonly string[]) => Promise<string>;
 	readonly git: Git;
 	readonly answered: Answered | undefined;
+	/** The owner's answers on the thread that changed the plan, which every run reads with the item. */
+	readonly ownerAnswers: readonly OwnerAnswer[];
 	/** The base commit the pass started from, which a landing is checked on. */
 	readonly baseSha: string;
 	/** What the pass asks publish to do. */
@@ -554,8 +559,8 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	/** Keeps what the owner settled, over what the item kept before. */
 	const keepTalk = (settled: Omit<SavedTalk, "item">): void => state.talks.put(id, { ...savedTalk(), ...settled });
 
-	/** The item as its runs read it: its own words, then what the owner settled in its ideate and shape rows. */
-	const talked = (): ItemText => ({ id, title: item.title, body: talkedBody(item.body, savedTalk()) });
+	/** The item as its runs read it: its own words, then what the owner settled in its ideate and shape rows and in answers before the one this pass goes on from. */
+	const talked = (): ItemText => ({ id, title: item.title, body: talkedBody(item.body, { ...savedTalk(), answers: d.ownerAnswers.filter(({ at }) => at !== d.answered?.at) }) });
 
 	const prompt = async (role: string, change: StepKind): Promise<string> => {
 		const plan = state.plans.get(id);
@@ -572,7 +577,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 				? `## The branch so far\nIt starts again at origin/${base}: the earlier work on this item was discarded, and no file it made is here.`
 				: `## The plan so far\n${d.answered.plan || "(none saved)"}\n\n## The branch so far\n${(await branchDiff()).slice(0, config.hum.diffLimit)}`;
 
-			parts.push(`## The owner answered\nQuestion: ${d.answered.question}\nAnswer: ${d.answered.answer}\n\n${soFar}`);
+			parts.push(`## The owner answered\n${answerText(d.answered)}\n\n${soFar}`);
 		}
 
 		if (change === "fix") parts.push(`## What to fix\n${lastFailure.slice(-config.hum.failureTail)}\nFix the cause.`);
