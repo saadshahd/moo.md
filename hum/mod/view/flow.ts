@@ -1,20 +1,20 @@
 import type { Controls, OpenItem, Question } from "../../../hum-engine/src/status/format.ts";
 import { FREE_ANSWER } from "../item.ts";
 import { button, buttonRows } from "./buttons.ts";
-import { type Labeled, questionButtons } from "./cards.ts";
+import type { Labeled } from "./cards.ts";
 import { cells, ellipsize, rowCells, spaces, wrap } from "./cells.ts";
 import { fitting } from "./fit.ts";
 import { sinceText } from "./freshness.ts";
 import { GLYPHS, SEPARATOR } from "./glyphs.ts";
 import type { ViewInput } from "./input.ts";
-import { runRows } from "./links.ts";
+import { type AnswerPlace, answeringButtons, runRows } from "./links.ts";
 import { listRows } from "./lists.ts";
 import { type NotePick, type Request, type Row, type Span, span } from "./row.ts";
 
 type Step = OpenItem["steps"][number];
 
 /** What an item's flow is drawn from: the clock, the width, the rows the owner unfolded, and the question the item asks, where one is open. */
-export type FlowInput = Pick<ViewInput, "now" | "width"> & { readonly unfolded: ReadonlySet<string>; readonly question?: Question };
+export type FlowInput = Pick<ViewInput, "now" | "width"> & { readonly unfolded: ReadonlySet<string>; readonly question?: Question; readonly answering: AnswerPlace };
 
 /** Where the card stands on the rail: the step, absent in a condition the item fell into before passing any, and what the condition says. */
 type Place = { readonly step?: string; readonly condition?: string };
@@ -97,14 +97,12 @@ const framed = (row: Row, inner: number): Row => [span(`${GLYPHS.frame.side} `, 
  * question's options where it has some, or each choice of the step the engine gives an answer word; then a written
  * answer where the step or a question without options takes one.
  */
-const answerButtons = ({ item, controls }: OpenItem, question: Question | undefined): Labeled[] => {
-	if (question?.row !== undefined) return questionButtons(question);
-
+const answerButtons = ({ item, controls }: OpenItem, question: Question | undefined, answering: AnswerPlace): Labeled[] => {
 	const fill = (label: string, word: string): Labeled => ({ label, press: { kind: "fill", item, word } });
 	const picks = question !== undefined && question.options.length > 0 ? question.options.map((option) => fill(option, option)) : controls.choices.flatMap(({ label, answer }) => (answer === undefined ? [] : [fill(label, answer)]));
 	const isWritten = controls.answer || (question !== undefined && question.options.length === 0);
 
-	return isWritten ? [...picks, fill(FREE_ANSWER, FREE_ANSWER)] : picks;
+	return answeringButtons(answering, isWritten ? [...picks, fill(FREE_ANSWER, FREE_ANSWER)] : picks);
 };
 
 const requestButtons = ({ item, at, controls }: OpenItem): Labeled[] =>
@@ -118,8 +116,8 @@ const pickSpan = (pick: NotePick, inner: number): Span => {
 };
 
 /** The controls: buttons right-aligned, the main one first and filled; the note picker at the left of their first row, or on a row of its own where they leave no room. */
-const controlRows = (item: OpenItem, question: Question | undefined, inner: number): Row[] => {
-	const labeled = [...answerButtons(item, question), ...requestButtons(item)];
+const controlRows = (item: OpenItem, { question, answering }: Pick<FlowInput, "question" | "answering">, inner: number): Row[] => {
+	const labeled = [...answerButtons(item, question, answering), ...requestButtons(item)];
 	const rows = buttonRows(labeled.map(({ label, press }, index) => button({ label, press, isPrimary: index === 0 })), inner);
 	const { noteTo } = item.controls;
 
@@ -135,11 +133,11 @@ const controlRows = (item: OpenItem, question: Question | undefined, inner: numb
 };
 
 /** The step now, as a bordered card on the rail: the open question, then the controls. */
-const cardRows = (item: OpenItem, place: Place, { now, width, question }: FlowInput): Row[] => {
+const cardRows = (item: OpenItem, place: Place, { now, width, question, answering }: FlowInput): Row[] => {
 	const outer = width - cells(RAIL);
 	const inner = Math.max(1, outer - FRAME_CELLS);
 	const asked = question === undefined ? [] : wrap(question.text, inner).map((line): Row => [span(line)]);
-	const body = [...asked, ...controlRows(item, question, inner)].map((row) => framed(row, inner));
+	const body = [...asked, ...controlRows(item, { question, answering }, inner)].map((row) => framed(row, inner));
 
 	return [topEdge(place, sinceText(item.since, now), outer), ...body, bottomEdge(outer)].map((row): Row => [span(RAIL), ...row]);
 };

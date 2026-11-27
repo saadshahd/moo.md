@@ -8,7 +8,7 @@ import { shortenings } from "./fit.ts";
 import type { ViewInput } from "./input.ts";
 import { GLYPHS, SEPARATOR } from "./glyphs.ts";
 import { dismissalsOf } from "./faults.ts";
-import { OPEN, opening } from "./links.ts";
+import { type AnswerPlace, answeringButtons, IN_PROMPT } from "./links.ts";
 import { type Press, type Row, type Tone, span } from "./row.ts";
 
 const RULE_LEAD = 2;
@@ -31,7 +31,11 @@ const paragraph = (text: string, width: number, tone: Tone): Row[] => wrap(text,
 export type Labeled = { readonly label: string; readonly press: Press };
 
 /** Where the owner answers a question: in the row that asks it, which the one button opens, else here, where each button fills the prompt with an answer to finish. */
-export const questionButtons = ({ item, options, row }: Question): Labeled[] => (row === undefined ? buttonWords({ options }).map((word) => ({ label: word, press: { kind: "fill", item, word } })) : [{ label: OPEN, press: opening(row) }]);
+export const questionButtons = ({ item, options, row }: Question): Labeled[] =>
+	answeringButtons(
+		row === undefined ? IN_PROMPT : { kind: "row", row },
+		buttonWords({ options }).map((word) => ({ label: word, press: { kind: "fill", item, word } })),
+	);
 
 /** A question card: the question is never cut, only wrapped; then where the owner answers it. */
 export const questionCardRows = (question: Question, { now, width }: CardInput): Row[] => [
@@ -59,16 +63,20 @@ const noticeRows = ({ title, cause, fix, buttons }: Notice, { width }: CardInput
 /** Where a card was raised: its item, or its code where it names none. */
 const placeOf = ({ item, code }: Card): string => displayId(item ?? code);
 
-const actionButtons = ({ item, action }: Card): Labeled[] => (action === undefined || item === undefined ? [] : [{ label: action.label, press: { kind: "fill", item, word: action.answer } }]);
+/** A card's action, where its item answers. */
+const actionButtons = ({ item, action }: Card, place: AnswerPlace): Labeled[] => (action === undefined || item === undefined ? [] : answeringButtons(place, [{ label: action.label, press: { kind: "fill", item, word: action.answer } }]));
+
+/** Where the item a card names answers. */
+export type AnswerPlaces = (item: string | undefined) => AnswerPlace;
 
 /** A waiting or limited card, with at most one action. */
-export const noticeCardRows = (card: Card, input: CardInput): Row[] =>
-	noticeRows({ title: [placeOf(card), card.kind, sinceText(card.since, input.now)], cause: card.cause, fix: card.fix, buttons: actionButtons(card) }, input);
+export const noticeCardRows = (card: Card, input: CardInput, places: AnswerPlaces): Row[] =>
+	noticeRows({ title: [placeOf(card), card.kind, sinceText(card.since, input.now)], cause: card.cause, fix: card.fix, buttons: actionButtons(card, places(card.item)) }, input);
 
 const DISMISS = "Dismiss";
 
 /** One fault card for every place a code hit: the places in the title, then the earliest card's age, cause and fix. A card of one place keeps its action; every fault card can be dismissed. */
-export const faultCardRows = (group: readonly Card[], input: CardInput): Row[] => {
+export const faultCardRows = (group: readonly Card[], input: CardInput, places: AnswerPlaces): Row[] => {
 	const earliest = group.reduce((kept, card) => (card.since < kept.since ? card : kept));
 
 	return noticeRows(
@@ -76,7 +84,7 @@ export const faultCardRows = (group: readonly Card[], input: CardInput): Row[] =
 			title: [group.map(placeOf).join(", "), earliest.kind, sinceText(earliest.since, input.now)],
 			cause: earliest.cause,
 			fix: earliest.fix,
-			buttons: [...(group.length === 1 ? actionButtons(earliest) : []), { label: DISMISS, press: { kind: "dismiss", cards: dismissalsOf(group) } }],
+			buttons: [...(group.length === 1 ? actionButtons(earliest, places(earliest.item)) : []), { label: DISMISS, press: { kind: "dismiss", cards: dismissalsOf(group) } }],
 		},
 		input,
 	);

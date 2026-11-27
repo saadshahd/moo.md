@@ -19,6 +19,7 @@ import {
 	isAmber,
 } from "../../../hum/mod/view/freshness.ts";
 import { headerRow, measureRow } from "../../../hum/mod/view/header.ts";
+import { IN_PROMPT } from "../../../hum/mod/view/links.ts";
 import { listRows } from "../../../hum/mod/view/lists.ts";
 import { openingRows, paneRows } from "../../../hum/mod/view/pane.ts";
 import {
@@ -161,7 +162,7 @@ test("a question is never cut: every character comes back at every width", () =>
 
 test("a card's title loses parts from the end and keeps its item", () => {
 	const card = fullStatus.cards[0];
-	const title = (width: number) => textOf(card === undefined ? [] : (faultCardRows([card], { now: NOW, width })[0] ?? []));
+	const title = (width: number) => textOf(card === undefined ? [] : (faultCardRows([card], { now: NOW, width }, () => IN_PROMPT)[0] ?? []));
 
 	expect(title(60)).toContain("71 · fault · 5 m");
 	expect(title(20)).toContain("71 · fault");
@@ -171,7 +172,7 @@ test("a card's title loses parts from the end and keeps its item", () => {
 test("a notice card gives the cause, then the fix, then its one action whole, which fills an answer to its item, at every width", () => {
 	for (const card of fullStatus.cards) {
 		for (const width of WIDTHS) {
-			const rows = noticeCardRows(card, { now: NOW, width });
+			const rows = noticeCardRows(card, { now: NOW, width }, () => IN_PROMPT);
 
 			for (const row of rows)
 				expect(rowCells(row), `${card.key} at ${width}`).toBeLessThanOrEqual(
