@@ -1,22 +1,12 @@
 import { createServer, type Socket } from "node:net";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
+import { JSONRPCClient, JSONRPCErrorException, JSONRPCServer, JSONRPCServerAndClient } from "json-rpc-2.0";
 import { HUM_EXT } from "../../src/adapters/roundup-rpc.ts";
-import type { Json } from "../../src/config/json.ts";
 import { settleAtTestEnd, tempDir } from "./temp.ts";
 
-/** roundup's JSON-RPC codes for a subject that does not exist and for a method it does not serve. */
+/** roundup's JSON-RPC code for a subject that does not exist. */
 const NOT_FOUND = -32001;
-const NO_METHOD = -32601;
-
-class Refusal extends Error {
-	constructor(
-		readonly code: number,
-		message: string,
-	) {
-		super(message);
-	}
-}
 
 type Todo = { id: number; title: string; body: string; done: boolean; blocked: boolean; home: string | null };
 
@@ -39,7 +29,7 @@ export const fakeRoundup = async () => {
 	const nodes: Node[] = [];
 	const comments = new Map<number, Comment[]>();
 	const calls: { readonly method: string; readonly params: Params }[] = [];
-	const conns = new Set<Socket>();
+	const peers = new Map<Socket, JSONRPCServerAndClient>();
 	const refusals = new Map<string, number>();
 	let seq = 0;
 	let nextId = 1;
@@ -47,7 +37,7 @@ export const fakeRoundup = async () => {
 	const todoOf = (id: Params["id"]): Todo => {
 		const found = todos.get(Number(id));
 
-		if (!found) throw new Refusal(NOT_FOUND, `not found: todo ${id}`);
+		if (!found) throw new JSONRPCErrorException(`not found: todo ${id}`, NOT_FOUND);
 
 		return found;
 	};
@@ -89,46 +79,38 @@ export const fakeRoundup = async () => {
 				return {};
 			},
 			"agent.stop": ({ id }) => {
-				throw new Refusal(NOT_FOUND, `not found: Agent "${id}"`);
+				throw new JSONRPCErrorException(`not found: Agent "${id}"`, NOT_FOUND);
 			},
 		}),
 	);
 
+	const server = new JSONRPCServer({ errorListener: () => {} });
 
-	const answer = (method: string, params: Params): Json => {
-		const served = methods.get(method);
-		const refused = refusals.get(method);
+	for (const [name, served] of methods) server.addMethod(name, (params: Params | null) => served(params ?? {}));
 
-		if (refused !== undefined) throw new Refusal(refused, `refused ${method}`);
+	server.applyMiddleware((next, request, serverParams) => {
+		const refused = refusals.get(request.method);
 
-		if (!served) throw new Refusal(NO_METHOD, `method not found: ${method}`);
+		calls.push({ method: request.method, params: request.params ?? {} });
 
-		return JSON.parse(JSON.stringify(served(params) ?? null));
-	};
+		if (refused !== undefined) throw new JSONRPCErrorException(`refused ${request.method}`, refused);
+
+		return next(request, serverParams);
+	});
 
 	const daemon = createServer((conn) => {
-		conns.add(conn);
-		conn.on("close", () => conns.delete(conn));
-		createInterface({ input: conn }).on("line", (line) => {
-			const { id, method, params } = JSON.parse(line);
+		const peer = new JSONRPCServerAndClient(server, new JSONRPCClient((request) => void conn.write(`${JSON.stringify(request)}\n`)));
 
-			calls.push({ method, params: params ?? {} });
-
-			try {
-				conn.write(`${JSON.stringify({ jsonrpc: "2.0", id, result: answer(method, params ?? {}) })}\n`);
-			} catch (error) {
-				const { code, message } = error instanceof Refusal ? error : new Refusal(-32603, String(error));
-
-				conn.write(`${JSON.stringify({ jsonrpc: "2.0", id, error: { code, message } })}\n`);
-			}
-		});
+		peers.set(conn, peer);
+		conn.on("close", () => peers.delete(conn));
+		createInterface({ input: conn }).on("line", (line) => void peer.receiveAndSend(JSON.parse(line), undefined, undefined));
 	});
 
 	await new Promise<void>((resolve) => daemon.listen(socket, resolve));
 
 	const close = (): Promise<void> =>
 		new Promise((resolve) => {
-			for (const conn of conns) conn.destroy();
+			for (const conn of peers.keys()) conn.destroy();
 
 			daemon.close(() => resolve());
 		});
@@ -148,7 +130,7 @@ export const fakeRoundup = async () => {
 
 			const event = { seq: ++seq, name: "todo.deleted", actor: { kind: "user", id: "owner" }, data: { id: Number(id) } };
 
-			for (const conn of conns) conn.write(`${JSON.stringify({ jsonrpc: "2.0", method: "event", params: event })}\n`);
+			for (const peer of peers.values()) peer.notify("event", event, undefined);
 		},
 		/** How many calls of `method` named the Todo `id`. */
 		callsOn: (method: string, id: string) => calls.filter((call) => call.method === method && String(call.params.id) === id).length,
