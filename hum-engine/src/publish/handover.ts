@@ -121,7 +121,7 @@ export const inboxIntegrations = (inbox: Inbox, now: () => number): WorkIntegrat
 			fileFollowUp: writes,
 			finish: writes,
 		},
-		questions: { ask: writes, decide: writes },
+		questions: { ask: writes, decide: writes, close: writes },
 	};
 };
 

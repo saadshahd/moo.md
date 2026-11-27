@@ -5,7 +5,7 @@ import type { FaultInput } from "./state/faults.ts";
 export type { FaultInput };
 
 /** Bumped on every change to the API an adapter implements; a breaking change bumps the engine's major version. */
-export const ADAPTER_API_VERSION = 5;
+export const ADAPTER_API_VERSION = 6;
 
 /** Failure that retrying cannot fix: a reply of the wrong shape, a refused push. The engine surfaces it at once, as it does a `failed: "now"` answer. */
 export class PermanentError extends Error {
@@ -55,7 +55,7 @@ export const REQUEST_KINDS = ["skip", "run-now"] as const;
 
 export type RequestKind = (typeof REQUEST_KINDS)[number];
 
-export const THREAD_KINDS = ["comment", "question", "answer", "decision", ...REQUEST_KINDS] as const;
+export const THREAD_KINDS = ["comment", "question", "answer", "decision", "close", ...REQUEST_KINDS] as const;
 
 /** Who wrote a thread entry: hum, which marks its comments, or a person typing without a marker. */
 export const THREAD_AUTHORS = ["hum", "person"] as const;
@@ -162,6 +162,8 @@ export interface Questions {
 	ask(id: ItemId, question: Question): Promise<void>;
 	/** Records a choice made without the owner. */
 	decide(id: ItemId, text: string): Promise<void>;
+	/** Closes the item's open question, saying why in `text`: the wait it asked about ended without the owner's answer, so no answer to it applies. */
+	close(id: ItemId, text: string): Promise<void>;
 }
 
 /** Where the owner's answers arrive. */

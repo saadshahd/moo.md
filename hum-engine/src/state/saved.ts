@@ -142,6 +142,8 @@ export const QueuedQuestion = z.object({
 	footprint: z.array(name).optional(),
 	queuedAt: time,
 	askedAt: time.optional(),
+	/** When hum closed the asked question, as its wait ended without the owner's answer. */
+	closedAt: time.optional(),
 });
 
 export type QueuedQuestion = z.infer<typeof QueuedQuestion>;

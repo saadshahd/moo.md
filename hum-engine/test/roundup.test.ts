@@ -1,11 +1,13 @@
 import { expect, test } from "bun:test";
-import { existsSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Holder, ItemGone, ItemId } from "../src/adapter-api.ts";
 import { guarded } from "../src/adapters/guard.ts";
 import { roundupAdapter } from "../src/adapters/roundup.ts";
+import { askName } from "../src/adapters/rail.ts";
 import { RoundupRefusal } from "../src/adapters/roundup-rpc.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
+import { slug } from "../src/state/fs.ts";
 import { openState } from "../src/state/open.ts";
 import { type FakeRoundup, fakeRoundup } from "./fixtures/fake-roundup.ts";
 import { tempDir } from "./fixtures/temp.ts";
@@ -23,7 +25,7 @@ const claimedTodo = async () => {
 
 	await adapter.workSource.claim(id, HOLDER, 60_000);
 
-	return { daemon, adapter, id, claim: join(stateDir, "roundup", "claims", `${id}.json`) };
+	return { daemon, adapter, id, stateDir, claim: join(stateDir, "roundup", "claims", `${id}.json`) };
 };
 
 test("a Todo roundup no longer holds reads as a gone item, and the adapter lets go of its claim", async () => {
@@ -80,5 +82,27 @@ test("a request posts on the Todo as hum's own marked comment and reads back on 
 	await adapter.answers.request(id, { kind: "skip", step: "owner-review" });
 
 	expect((await adapter.workSource.read(id)).thread).toMatchObject([{ kind: "skip", step: "owner-review", author: "hum" }]);
+	await adapter.close();
+});
+
+test("a question hum closed takes no late answer from its row, which it stopped, and is never asked again: the thread reads it closed", async () => {
+	const { daemon, adapter, id, stateDir } = await claimedTodo();
+
+	await adapter.questions.ask(id, { text: "Ship it?", options: ["yes", "no"] });
+
+	const [row] = daemon.rows();
+
+	if (row === undefined) throw new Error("asking started no row");
+
+	daemon.waitOnOwner(row.id);
+	await adapter.workSource.read(id);
+	await adapter.questions.close(id, "This question closed: its wait timed out. An answer to it no longer applies.");
+
+	const late = { hook_event_name: "PostToolUse", tool_name: "AskUserQuestion", tool_response: { answers: { "Ship it?": "yes" } } };
+
+	writeFileSync(join(stateDir, "roundup", "questions", slug(askName(id, 1)), "hooks", "late.json"), JSON.stringify(late));
+
+	expect((await adapter.workSource.read(id)).thread.map(({ kind }) => kind)).toEqual(["question", "close"]);
+	expect(daemon.rows().map(({ status }) => status?.kind)).toEqual(["done"]);
 	await adapter.close();
 });

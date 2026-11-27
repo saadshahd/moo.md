@@ -20,6 +20,7 @@ const WRITES: readonly Write[] = [
 	{ name: "comment", kind: "comment", call: (a, id, text) => a.workSource!.comment(ItemId.parse(id), text) },
 	{ name: "ask", kind: "question", call: (a, id, text) => a.questions!.ask(ItemId.parse(id), { text }) },
 	{ name: "decide", kind: "decision", call: (a, id, text) => a.questions!.decide(ItemId.parse(id), text) },
+	{ name: "close", kind: "close", call: (a, id, text) => a.questions!.close(ItemId.parse(id), text) },
 	{ name: "answer", kind: "answer", call: (a, id, text) => a.answers!.answer(ItemId.parse(id), { text }) },
 ];
 
@@ -34,7 +35,7 @@ const dying = (real: Integrations, { writeFirst }: { readonly writeFirst: boolea
 	return {
 		apiVersion: real.apiVersion,
 		workSource: { ...real.workSource!, comment: (id, text) => die(() => real.workSource!.comment(id, text)) },
-		questions: { ask: (id, q) => die(() => real.questions!.ask(id, q)), decide: (id, t) => die(() => real.questions!.decide(id, t)) },
+		questions: { ask: (id, q) => die(() => real.questions!.ask(id, q)), decide: (id, t) => die(() => real.questions!.decide(id, t)), close: (id, t) => die(() => real.questions!.close(id, t)) },
 		answers: { ...real.answers!, answer: (id, a) => die(() => real.answers!.answer(id, a)) },
 	};
 };

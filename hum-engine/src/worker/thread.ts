@@ -14,15 +14,23 @@ export const hasReplyOn = (thread: Thread, stem: string): boolean => thread.some
 /** Where hum's latest question sits on the thread; -1 when it asked none. */
 export const latestQuestionAt = (thread: Thread): number => thread.findLastIndex(isHumQuestion);
 
-/** The applied answer to hum's latest question: the first answer after it. */
-export const answerToLatest = (thread: Thread): ThreadEntry | undefined => {
+/** Where hum closed its latest question, as the wait it asked about ended without the owner's answer; -1 while it stands open, or when hum asked none. */
+export const latestCloseAt = (thread: Thread): number => {
 	const asked = latestQuestionAt(thread);
 
-	return asked < 0 ? undefined : thread.slice(asked + 1).find((entry) => entry.kind === "answer");
+	return asked < 0 ? -1 : thread.findIndex((entry, index) => index > asked && entry.kind === "close" && isFromHum(entry));
 };
 
-/** Hum's latest question, while no applied answer follows it. */
-export const openQuestion = (thread: Thread): ThreadEntry | undefined => (answerToLatest(thread) === undefined ? thread[latestQuestionAt(thread)] : undefined);
+/** The applied answer to hum's latest question: the first answer after it, before hum closed it. */
+export const answerToLatest = (thread: Thread): ThreadEntry | undefined => {
+	const asked = latestQuestionAt(thread);
+	const closed = latestCloseAt(thread);
+
+	return asked < 0 ? undefined : thread.slice(asked + 1, closed < 0 ? undefined : closed).find((entry) => entry.kind === "answer");
+};
+
+/** Hum's latest question, while neither an applied answer nor hum's close follows it. */
+export const openQuestion = (thread: Thread): ThreadEntry | undefined => (answerToLatest(thread) === undefined && latestCloseAt(thread) < 0 ? thread[latestQuestionAt(thread)] : undefined);
 
 /** The latest applied answer that picks one of `options`, from `since` on. */
 export const pickedAnswer = (thread: Thread, options: readonly string[], since = 0): ThreadEntry | undefined =>

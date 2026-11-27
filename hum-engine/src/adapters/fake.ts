@@ -154,6 +154,7 @@ export class FakeProvider {
 			questions: {
 				ask: async (id, question) => spend(() => this.#push(id, { kind: "question", text: questionText(question) })),
 				decide: async (id, text) => spend(() => this.#push(id, { kind: "decision", text })),
+				close: async (id, text) => spend(() => this.#push(id, { kind: "close", text })),
 			},
 			answers: {
 				answer: async (id, { text, option }) => spend(() => this.#push(id, option === undefined ? { kind: "answer", text } : { kind: "answer", text, option })),

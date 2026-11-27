@@ -303,7 +303,7 @@ export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gather
 	const asking = isWaitingOnOwner(kind, at);
 	const wait = asking ? o.state.items.savedOf(id) : undefined;
 	const answered = asking ? answerTo(item, wait?.savedAt) : onSnapshot ? undefined : answerTo(item);
-	const requested = await settleRequests({ state: o.state, workSource: o.workSource, now }, item, standOf(kind, o.state.items.savedOf(id), { answered: answered !== undefined, parked: false }));
+	const requested = await settleRequests({ state: o.state, workSource: o.workSource, questions: o.questions, now }, item, standOf(kind, o.state.items.savedOf(id), { answered: answered !== undefined, parked: false }));
 	const isHeldAtWait = asking && answered === undefined && requested === undefined;
 	const timedOut = isHeldAtWait && wait !== undefined && isDue(o.state, { kind, saved: wait }, now()) ? wait : undefined;
 

@@ -4,7 +4,9 @@ import { join } from "node:path";
 import { markdownAdapter } from "../src/adapters/markdown.ts";
 import { openState } from "../src/state/open.ts";
 import { HOUR_MS } from "../src/time.ts";
-import { queueQuestion, releaseQuestions } from "../src/worker/questions.ts";
+import { settleAnswers } from "../src/worker/answers.ts";
+import { endWait, queueQuestion, releaseQuestions } from "../src/worker/questions.ts";
+import { answerTo } from "../src/worker/thin-path.ts";
 import { configWith } from "./fixtures/config.ts";
 import { scriptedJudge, SOUND } from "./fixtures/judge.ts";
 import { type Decided, READY_PLAN } from "./fixtures/shim.ts";
@@ -208,4 +210,42 @@ test("a CI run with an empty state reads the question's age from the thread: it 
 	await late.idle();
 	expect(w.results.at(-1)).toMatchObject({ outcome: "stuck", item: "a" });
 	expect(await questionsOn(w, "a")).toHaveLength(1);
+});
+
+test("an answer after hum closed its question applies to no later wait: it is dropped with its reason, and no model call reads it", async () => {
+	const w = await workerWorld({});
+	const a = ItemId.parse("a");
+
+	const judge = async (): Promise<never> => {
+		throw new Error("no model call reads an answer to a closed question");
+	};
+
+	w.item("a");
+	await w.adapter.questions!.ask(a, { text: "Which title?", options: ["Plain", "Bold"] });
+	await w.adapter.questions!.close(a, "This question closed: its wait timed out. An answer to it no longer applies.");
+	w.clock.at += 1000;
+	await w.adapter.answers!.answer(a, { text: "Plain", option: "Plain" });
+
+	const item = await settleAnswers({ state: w.state, workSource: w.adapter.workSource!, judge, now: () => w.clock.at }, await w.adapter.workSource!.read(a), { stage: "waiting" });
+
+	expect(answerTo(item)).toBeUndefined();
+	expect(await repliesOn(w, "a")).toEqual(["Answer 1 dropped: hum closed the question before this answer, as its wait ended without one."]);
+});
+
+test("a wait that ends without the owner's answer drops its held questions and closes its asked one once, which the status file no longer lists", async () => {
+	const w = await workerWorld({}, { settings: { dailyQuestionCap: 1 } });
+	const a = ItemId.parse("a");
+	const ctx = { state: w.state, config: w.config, workSource: w.adapter.workSource!, questions: w.adapter.questions!, now: () => w.clock.at };
+
+	w.item("a");
+	queueQuestion(ctx, await w.adapter.workSource!.read(a), { text: "Which title?" }, "unsure");
+	await releaseQuestions(ctx);
+	w.clock.at += 1000;
+	queueQuestion(ctx, await w.adapter.workSource!.read(a), { text: "Which tone?" }, "unsure");
+
+	await endWait(ctx, await w.adapter.workSource!.read(a), "skip");
+	await endWait(ctx, await w.adapter.workSource!.read(a), "skip");
+
+	expect((await threadOf(w, "a")).filter(({ kind }) => kind === "close").map(({ text }) => text)).toEqual(["This question closed: you skipped its wait. An answer to it no longer applies."]);
+	expect(w.state.questions.list()).toEqual([expect.objectContaining({ text: "Which title?", closedAt: w.clock.at })]);
 });

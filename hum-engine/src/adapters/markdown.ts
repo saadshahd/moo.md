@@ -381,6 +381,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 		questions: {
 			ask: (id, question) => appendTo(id, { kind: "question" }, questionText(question)),
 			decide: (id, text) => appendTo(id, { kind: "decision" }, text),
+			close: (id, text) => appendTo(id, { kind: "close" }, text),
 		},
 		answers: {
 			answer: (id, { text, option }) => appendTo(id, answerMarker(option), text),

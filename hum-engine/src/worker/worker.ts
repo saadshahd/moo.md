@@ -47,7 +47,7 @@ import type { SlotPool } from "../slots/pool.ts";
 import { type AnswerScope, settleAnswers } from "./answers.ts";
 import { settleRequests, standOf } from "./requests.ts";
 import { PARK_OPTIONS, RUN_AGAIN } from "../decide/answer.ts";
-import { queueQuestion, recentlyAsked, releaseQuestions } from "./questions.ts";
+import { endWait, queueQuestion, recentlyAsked, releaseQuestions } from "./questions.ts";
 import type { Parked } from "../state/saved.ts";
 import { answerTo, type Checkout, doesStartOver, ownerWaitStage, claimTtlMs, DEFAULT_BASE, gatherItem, hasEndedStuck, isGathered, isTalking, park, parkQuestion, rememberKinds, runThinPath, type TalkCopy, talkWaits, type ThinPathOptions, type ThinResult } from "./thin-path.ts";
 import { ownerAnswered } from "../state/item-log.ts";
@@ -154,6 +154,9 @@ const LOOP_CODE = "review-loop";
 
 /** The card for queued questions a tick could not ask. */
 const RELEASE_CODE = "question-release";
+
+/** The card for the open question of a wait that timed out, which hum could not close. */
+const CLOSE_CODE = "question-close";
 
 /** The card for an item's pass that threw. */
 const RUN_ERROR_CODE = "run-error";
@@ -360,8 +363,9 @@ export class Worker {
 	}
 
 	/**
-	 * A saved wait whose deadline has passed fires now. One that ends stuck is saved and parked here; one that goes on to
-	 * work is left as it was saved, and a pass restores it and fires its timeout with the real sources.
+	 * A saved wait whose deadline has passed fires now. A timeout that leaves the wait ends it first, and one that could
+	 * not fires again next tick. One that ends stuck is saved and parked here; one that goes on to work is left as it was
+	 * saved, and a pass restores it and fires its timeout with the real sources.
 	 */
 	async #fireDue(wait: SavedWait, t: number): Promise<void> {
 		const { state } = this.#o;
@@ -379,13 +383,36 @@ export class Worker {
 		await Bun.sleep(0);
 
 		const value = String(actor.getSnapshot().value);
+		const leaves = value !== saved.state;
+
+		if (leaves && !(await this.#endTimedOut(saved.itemId))) return actor.stop();
 
 		if (hasEndedStuck(kind, value)) {
 			state.items.save(saved.itemId, kind, persistedSnapshot(actor), passedOnto(saved.passed, saved.state, value));
 			park({ state, now: this.#now }, { outcome: "stuck", item: saved.itemId, detail: `its wait in ${saved.state} timed out` });
-		} else if (value !== saved.state) this.#timedOut.add(saved.itemId);
+		} else if (leaves) this.#timedOut.add(saved.itemId);
 
 		actor.stop();
+	}
+
+	/** Ends the wait a timeout left, and says whether it did; a question it could not close raises a card. A work job writes nothing, so it leaves the wait for gather to end. */
+	async #endTimedOut(id: string): Promise<boolean> {
+		const { state, adapters, ciJob } = this.#o;
+
+		if (ciJob?.kind === "work") return true;
+
+		try {
+			await endWait({ state, workSource: adapters.workSource, questions: adapters.questions, now: this.#now }, await adapters.workSource.read(ItemId.parse(id)), "timeout");
+			state.faults.clear({ code: CLOSE_CODE, item: id });
+
+			return true;
+		} catch (error) {
+			if (error instanceof Error && (await this.#endIfGone(error))) return false;
+
+			state.faults.raise({ code: CLOSE_CODE, item: id, cause: `The question of ${id} stays open though its wait timed out: ${error instanceof Error ? error.message : String(error)}`.slice(0, ERROR_EXCERPT), fix: "Leave it unanswered: hum closes it and moves the item on at the next tick." });
+
+			return false;
+		}
 	}
 
 	/** Shows on a card who already works on an item hum has not started, and takes the card down once no one does. */
@@ -564,7 +591,7 @@ export class Worker {
 		const saved = state.items.savedOf(item.id);
 		const kind = saved && this.#kindNamed(saved.kind)?.kind;
 
-		return settleRequests({ state, workSource: adapters.workSource, now: this.#now }, item, standOf(kind, saved, flags));
+		return settleRequests({ state, workSource: adapters.workSource, questions: adapters.questions, now: this.#now }, item, standOf(kind, saved, flags));
 	}
 
 	/** Runs one item's read; a failure raises the card that names the item, and the item is read again next tick. */
