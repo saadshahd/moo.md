@@ -389,6 +389,7 @@ export const githubAdapter = (options: GitHubOptions, { now, env }: AdapterConte
 		questions: {
 			ask: (id, question) => commentMarked(id, questionMarker(question.options), questionText(question)),
 			decide: (id, text) => commentMarked(id, { kind: "decision" }, text),
+			close: (id, text) => commentMarked(id, { kind: "close" }, text),
 		},
 		answers: {
 			answer: (id, { text, option }) => commentMarked(id, answerMarker(option), text),

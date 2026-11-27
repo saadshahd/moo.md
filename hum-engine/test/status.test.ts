@@ -10,8 +10,8 @@ import type { QueuedQuestion, SettledAnswer } from "../src/state/saved.ts";
 const asked = (item: string, askedAt?: number, options?: string[]): QueuedQuestion => ({ item, text: `Which for ${item}?`, options, priority: 0, queuedAt: 1, askedAt });
 const answer = (item: string, at: number, disposition: SettledAnswer["disposition"]): SettledAnswer => ({ item, ordinal: 1, text: "yes", source: "free", disposition, why: "ok", at });
 
-test("a question is open from the time it is asked until an answer or a request to its item is applied", () => {
-	const queued = [asked("a", 30), asked("b", 10, ["keep", "drop"]), asked("c", 20), asked("d"), asked("e", 50), asked("f", 30)];
+test("a question is open from the time it is asked until an answer or a request to its item is applied, or hum closes it", () => {
+	const queued = [asked("a", 30), asked("b", 10, ["keep", "drop"]), asked("c", 20), asked("d"), asked("e", 50), asked("f", 30), { ...asked("g", 30), closedAt: 40 }];
 	const answers = [answer("a", 40, "applied"), answer("c", 25, "held"), answer("e", 40, "applied")];
 	const requests = [{ item: "f", ordinal: 1, kind: "skip", step: "asking", disposition: "applied", why: "ok", at: 35 } as const];
 
@@ -55,13 +55,21 @@ test("at a wait, the flow names every step it shows, which of them wait on the o
 	});
 });
 
-test("a step allows a skip and a timer run now only where it waits on the owner, which a pass restores, and a run now only where its earliest timer leads on to work, not to a stuck step", () => {
+test("a step allows a skip and a timer run now only where it waits on the owner, which a pass restores, and only where they leave the wait: a run now only where its earliest timer leads on to work, not to a stuck step", () => {
 	const flow = flowOf(fixWith((states) => (states.building.meta = { skip: { target: "checking" } })));
 	const toStuck = flowOf(fixWith((states) => (states.objecting.after = { "3600000": { target: "stuck" }, "86400000": { target: "building" } })));
+
+	const toItself = flowOf(
+		fixWith((states) => {
+			states.objecting.meta.skip = { target: "objecting" };
+			states.objecting.after = { "3600000": { target: "objecting" } };
+		}),
+	);
 
 	expect(flow("building", [])?.controls).toMatchObject({ skip: false, runNow: false });
 	expect(flow("objecting", [])?.controls).toMatchObject({ skip: false, runNow: true });
 	expect(toStuck("objecting", [])?.controls).toMatchObject({ runNow: false });
+	expect(toItself("objecting", [])?.controls).toMatchObject({ skip: false, runNow: false });
 });
 
 test("a wait a run stops at past its token cap is a step only while the item is in it, and a final step has no flow", () => {

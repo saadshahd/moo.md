@@ -66,19 +66,21 @@ export const isWaitingOnOwner = (kind: Kind, state: string | undefined): boolean
 /** Where the owner's skip takes the state: only a wait on the owner, which a pass restores, skips; undefined where the state does not. */
 export const skipTargetOf = (node: StateNodeJSON | undefined): string | undefined => (isOwnerWait(node) ? node?.meta?.skip?.target : undefined);
 
-/** Whether the owner may run the state's timer now: a wait on the owner whose earliest `after` timeout leads to no stuck state, so running it moves the item on to work. */
-const canRunNow = (kind: Kind, node: StateNodeJSON | undefined): boolean => {
+/** Whether the owner may run the wait's timer now: its earliest `after` timeout leads only to other states, none stuck, so running it moves the item on to work. */
+const canRunNow = (kind: Kind, state: string, node: StateNodeJSON | undefined): boolean => {
 	const [earliest] = timeoutsOf(node);
-	const isStuck = (state: string): boolean => kind.machine.states[state]?.tags?.includes(STUCK_TAG) ?? false;
+	const transitions = earliest === undefined ? [] : [earliest.transitions].flat();
+	const isStuck = (target: string): boolean => kind.machine.states[target]?.tags?.includes(STUCK_TAG) ?? false;
 
-	return isOwnerWait(node) && earliest !== undefined && !targetsOf([earliest.transitions].flat()).some(isStuck);
+	return isOwnerWait(node) && transitions.length > 0 && transitions.every(({ target }) => target !== undefined && target !== state && !isStuck(target));
 };
 
-/** The requests the item's state lets the owner make: a skip, and running its timer now. */
+/** The requests the item's state lets the owner make: a skip, and running its timer now. Each takes the item off the wait, so it ends the wait. */
 export const requestsAllowed = (kind: Kind, state: string | undefined) => {
 	const node = state === undefined ? undefined : kind.machine.states[state];
+	const skip = skipTargetOf(node);
 
-	return { skip: skipTargetOf(node) !== undefined, runNow: canRunNow(kind, node) };
+	return { skip: skip !== undefined && skip !== state, runNow: state !== undefined && canRunNow(kind, state, node) };
 };
 
 /** Whether the state waits for the owner's approval of a change: one of its options sends that approval. */

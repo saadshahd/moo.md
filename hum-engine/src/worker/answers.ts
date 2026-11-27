@@ -7,7 +7,7 @@ import type { QuestionAnswer } from "../decide/talk.ts";
 import { visibleText } from "../adapters/marked.ts";
 import type { State } from "../state/open.ts";
 import { changesPlan, optionOf, type SettledAnswer } from "../state/saved.ts";
-import { hasReplyOn, isFromHum, isHumQuestion, latestQuestionAt } from "./thread.ts";
+import { hasReplyOn, isFromHum, isHumQuestion, latestCloseAt, latestQuestionAt } from "./thread.ts";
 
 export type AnswerContext = {
 	readonly state: State;
@@ -93,14 +93,16 @@ const SUPERSEDED: Disposition = { disposition: "dropped", why: "A newer question
 
 type Settling = { readonly ctx: AnswerContext; readonly item: Item; readonly question: string; readonly options: readonly string[]; readonly stage: Stage };
 
-/** One reply's record: kept once final, else decided again from where the item stands now. */
-const settleOne = async ({ ctx, item, question, options, stage }: Settling, { reply, answeredBefore }: { readonly reply: Reply; readonly answeredBefore: boolean }): Promise<{ record: SettledAnswer; resolution: Resolution }> => {
+const CLOSED: Disposition = { disposition: "dropped", why: "hum closed the question before this answer, as its wait ended without one." };
+
+/** One reply's record: kept once final, else decided again from where the item stands now; a reply to a question hum closed is dropped. */
+const settleOne = async ({ ctx, item, question, options, stage }: Settling, { reply, answeredBefore, closed }: { readonly reply: Reply; readonly answeredBefore: boolean; readonly closed: boolean }): Promise<{ record: SettledAnswer; resolution: Resolution }> => {
 	const saved = ctx.state.answers.get(keyOf(item.id, reply.ordinal));
 	const resolution = saved ? resolutionOf(saved) : await resolveReply(ctx, { itemId: item.id, question, options, stage, reply });
 
 	if (saved && isFinal(saved)) return { record: saved, resolution };
 
-	const outcome = dispose({ resolution, answeredBefore, stage, question });
+	const outcome = closed ? CLOSED : dispose({ resolution, answeredBefore, stage, question });
 	const record = saved?.disposition === outcome.disposition ? saved : recordOf(item.id, reply, resolution, outcome, ctx.now());
 
 	if (record !== saved) ctx.state.answers.put(keyOf(item.id, reply.ordinal), record);
@@ -120,7 +122,7 @@ const dropSuperseded = async ({ ctx, item }: Settling, current: ReadonlySet<numb
 
 /**
  * D4: every answer on the item's thread is saved with what became of it, and gets one reply: applied, held, or
- * dropped and why. An answer's option comes from its marker, else its first word, else the cheap model call.
+ * dropped and why. A reply after hum closed its question answers nothing, unless a card asks for one. An answer's option comes from its marker, else its first word, else the cheap model call.
  * Returns the item with its thread as the engine reads it: an applied reply is an answer carrying its option, any
  * other is a comment.
  */
@@ -131,15 +133,18 @@ export const settleAnswers = async (ctx: AnswerContext, item: Item, { stage, opt
 	const calls = onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource: ctx.workSource }, ctx.state.ops, { run: "answer-reply", attempt: 0 });
 	const settled = new Map<number, SettledAnswer>();
 	const replies = repliesOn(item.thread, asked);
+	const closedAt = latestCloseAt(item.thread);
 
 	for (const reply of replies) {
 		const answeredBefore = [...settled].some(([index, { disposition }]) => disposition === "applied" && (since === undefined || (item.thread[index]?.at ?? since) > since));
-		const { record, resolution } = await settleOne(settling, { reply, answeredBefore });
+		const toClosed = cardOptions === undefined && closedAt >= 0 && reply.index > closedAt;
+		const reading = toClosed ? { ...settling, options: [] } : settling;
+		const { record, resolution } = await settleOne(reading, { reply, answeredBefore, closed: toClosed });
 		const outcome = { disposition: record.disposition, why: record.why };
 
 		settled.set(reply.index, record);
 
-		if (!hasReplyOn(item.thread, replyStem(reply.ordinal, outcome))) await calls.workSource?.comment(item.id, replyText(reply.ordinal, outcome, resolution, settling.options, reply.entry.text));
+		if (!hasReplyOn(item.thread, replyStem(reply.ordinal, outcome))) await calls.workSource?.comment(item.id, replyText(reply.ordinal, outcome, resolution, reading.options, reply.entry.text));
 	}
 
 	await dropSuperseded(settling, new Set(replies.map(({ ordinal }) => ordinal)));

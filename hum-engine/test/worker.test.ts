@@ -589,7 +589,7 @@ test("a saved deadline fires on the next event, not only on a tick: a question t
 	expect(status.ok && w.clock.at - (status.status.workers.ci ?? 0)).toBe(pastTheWait);
 });
 
-test("an item in an owner wait whose timeout goes on to work sleeps through it, and once it passes the next tick restores the wait and goes on", async () => {
+test("an item in an owner wait whose timeout goes on to work sleeps through it, and once it passes the next tick closes the wait's question, restores the wait and goes on", async () => {
 	const repro = { write: { "docs/repro.sh": "grep -q fixed docs/note.md\n" }, structured: { status: "done", repro: { command: "sh docs/repro.sh" } } };
 	const w = await workerWorld({ script: [{}, repro, { write: { "docs/note.md": "fixed\n" } }] }, { worker: { judge: scriptedJudge({ kind: { kind: "fix" }, alignment: SOUND }) } });
 
@@ -608,6 +608,48 @@ test("an item in an owner wait whose timeout goes on to work sleeps through it, 
 	await w.worker.idle();
 	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
 	expect(w.shim.calls()).toHaveLength(3);
+	expect((await w.adapter.workSource!.read(ItemId.parse("a"))).thread.map(({ text }) => text)).toContain("This question closed: its wait timed out. An answer to it no longer applies.");
+});
+
+test("a timeout whose wait's question hum could not close raises a card and leaves the item at its wait, and the next tick closes it and goes on", async () => {
+	const repro = { write: { "docs/repro.sh": "grep -q fixed docs/note.md\n" }, structured: { status: "done", repro: { command: "sh docs/repro.sh" } } };
+	const w = await workerWorld({ script: [{}, repro, { write: { "docs/note.md": "fixed\n" } }] }, { worker: { judge: scriptedJudge({ kind: { kind: "fix" }, alignment: SOUND }) } });
+	const questions = w.adapter.questions!;
+	let refusals = 1;
+
+	const worker = w.workerWith({
+		adapters: {
+			workSource: w.adapter.workSource!,
+			answers: w.adapter.answers,
+			questions: {
+				...questions,
+				close: async (id, text) => {
+					if (refusals-- > 0) throw new Error("the provider is down");
+
+					await questions.close(id, text);
+				},
+			},
+		},
+	});
+
+	const step = async () => {
+		await worker.tick();
+		await worker.idle();
+	};
+
+	w.item("a", "docs/note.md");
+	await step();
+	expect(w.results.at(-1)).toMatchObject({ outcome: "asked", item: "a" });
+
+	w.clock.at += DAY_MS;
+	await step();
+	expect(w.state.faults.list().map(({ code }) => code)).toContain("question-close");
+	expect(w.state.items.savedOf("a")?.state).toBe("objecting");
+	expect(w.shim.calls()).toHaveLength(2);
+
+	await step();
+	expect(w.state.faults.list().map(({ code }) => code)).not.toContain("question-close");
+	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
 });
 
 test("the owner's run now fires the timer of the wait an item is at though the daily cap still holds its question, which it drops", async () => {
@@ -632,7 +674,7 @@ test("the owner's run now fires the timer of the wait an item is at though the d
 	expect((await w.adapter.workSource!.read(ItemId.parse("a"))).thread.map(({ text }) => text)).toContain("Request 1 applied: the timer of objecting fires now.");
 });
 
-test("the owner's skip takes a wait its kind file lets them skip where the skip leads, and a request at a step the item is not at is refused on the thread", async () => {
+test("the owner's skip takes a wait its kind file lets them skip where the skip leads and closes the question it asked, and a request at a step the item is not at is refused on the thread", async () => {
 	const config = configWith((raw) => void (raw.kinds.docs.machine.states.asking.meta.skip = { target: "checking" }));
 	const w = await workerWorld({ items: { a: { writeForItem: true, askUnlessAnswered: "Which?" } } }, { config });
 	const a = ItemId.parse("a");
@@ -654,7 +696,7 @@ test("the owner's skip takes a wait its kind file lets them skip where the skip 
 
 	expect(status.ok && status.status.questions).toEqual([]);
 	expect((await w.adapter.workSource!.read(a)).thread.map(({ text }) => text)).toEqual(
-		expect.arrayContaining(["Request 1 refused: the item is at asking now, not building.", "Request 2 applied: the item leaves asking where its kind file's skip leads."]),
+		expect.arrayContaining(["Request 1 refused: the item is at asking now, not building.", "Request 2 applied: the item leaves asking where its kind file's skip leads.", "This question closed: you skipped its wait. An answer to it no longer applies."]),
 	);
 });
 

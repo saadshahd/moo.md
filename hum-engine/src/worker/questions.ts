@@ -1,4 +1,4 @@
-import { ADAPTER_API_VERSION, type Item, ItemId, type Question, type Questions, type ThreadEntry, type WorkSource } from "../adapter-api.ts";
+import { ADAPTER_API_VERSION, type Item, ItemId, type Question, type Questions, type RequestKind, type ThreadEntry, type WorkSource } from "../adapter-api.ts";
 import { visibleText } from "../adapters/marked.ts";
 import { onceCalls } from "../adapters/once.ts";
 import type { Config } from "../config/load.ts";
@@ -68,8 +68,36 @@ const waitingOrder = (queue: readonly QueuedQuestion[]): QueuedQuestion[] => {
 };
 
 /** Drops the item's questions still waiting for room under the daily cap: the wait they ask about has ended. */
-export const dropWaitingQuestions = (state: Pick<State, "questions">, item: string): void => {
+const dropWaitingQuestions = (state: Pick<State, "questions">, item: string): void => {
 	for (const queued of state.questions.list()) if (queued.item === item && isWaiting(queued)) state.questions.remove(queuedKey(queued));
+};
+
+/** What ends a wait on the owner without their answer: their skip, their run now, or its timeout. */
+export type WaitEnd = RequestKind | "timeout";
+
+/** What a closed question tells the owner, by what ended its wait. */
+const CLOSED_BECAUSE = {
+	skip: "you skipped its wait",
+	"run-now": "you ran its wait's timer now",
+	timeout: "its wait timed out",
+} as const satisfies Record<WaitEnd, string>;
+
+/**
+ * The wait the item stood in ended without the owner's answer: its questions still waiting for room are dropped, and
+ * hum closes its open question, so no answer to it applies to a later wait.
+ */
+export const endWait = async (ctx: Pick<QuestionContext, "state" | "workSource" | "questions" | "now">, item: Item, end: WaitEnd): Promise<void> => {
+	dropWaitingQuestions(ctx.state, item.id);
+
+	const open = openQuestion(item.thread);
+
+	if (open === undefined) return;
+
+	for (const asked of ctx.state.questions.list()) if (asked.item === item.id && asked.askedAt !== undefined && asked.closedAt === undefined) ctx.state.questions.put(queuedKey(asked), { ...asked, closedAt: ctx.now() });
+
+	const calls = onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource: ctx.workSource, questions: ctx.questions }, ctx.state.ops, { run: "close", attempt: open.at });
+
+	await calls.questions?.close(ItemId.parse(item.id), `This question closed: ${CLOSED_BECAUSE[end]}. An answer to it no longer applies.`);
 };
 
 /** What the daily question cap has room for now: the questions asked and the follow-ups filed within the day take theirs, and older ones are dropped. */

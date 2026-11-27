@@ -17,7 +17,7 @@ const hasEntry = (thread: readonly ThreadEntry[], { kind, text, option }: Entry)
 	thread.some((found) => found.kind === kind && found.option === option && (found.text === text || found.text.startsWith(`${text}\n`)));
 
 /**
- * `comment`, `ask`, `decide` and `answer` are never retried by the guard, so each runs under an op key. A key a
+ * `comment`, `ask`, `decide`, `close` and `answer` are never retried by the guard, so each runs under an op key. A key a
  * crash left started is settled by reading the item's thread: when the entry is there, the write is skipped.
  */
 export const onceCalls = (adapter: Integrations, ops: OpKeys, scope: CallScope): Integrations => {
@@ -36,6 +36,7 @@ export const onceCalls = (adapter: Integrations, ops: OpKeys, scope: CallScope):
 		questions: questions && {
 			ask: (id, question) => once(id, { kind: "question", text: question.text }, () => questions.ask(id, question)),
 			decide: (id, text) => once(id, { kind: "decision", text }, () => questions.decide(id, text)),
+			close: (id, text) => once(id, { kind: "close", text }, () => questions.close(id, text)),
 		},
 		answers: answers && {
 			...answers,

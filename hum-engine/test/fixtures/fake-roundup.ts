@@ -20,18 +20,19 @@ class Refusal extends Error {
 
 type Todo = { id: number; title: string; body: string; done: boolean; blocked: boolean; home: string | null };
 
-type Node = { id: string; name: string; kind: string; parent: string | null };
+type Node = { id: string; name: string; kind: string; parent: string | null; status?: { kind: string; since: number } };
 
 type Comment = { author: { id: string }; body: string; created_at: number };
 
-type Params = { id?: number | string; title?: string; body?: string; home?: string | null; name?: string };
+type Params = { id?: number | string; title?: string; body?: string; home?: string | null; name?: string; parent?: string };
 
 /** One method the Daemon serves: what it answers `params` with. */
 type Method = (params: Params) => object;
 
 /**
- * roundup's Daemon on a Unix socket, holding the Todos, Workstreams and comments hum's roundup adapter reads, as the
- * Daemon answers it: a Todo, Agent or node it does not hold is refused as not found. Every call is kept, in order.
+ * roundup's Daemon on a Unix socket, holding the Todos, Workstreams, comments and question rows hum's roundup adapter
+ * reads, as the Daemon answers it: a Todo, Agent or node it does not hold is refused as not found. A row starts
+ * working and runs nothing. Every call is kept, in order.
  */
 export const fakeRoundup = async () => {
 	const socket = join(tempDir("roundup"), "rupd.sock");
@@ -58,6 +59,14 @@ export const fakeRoundup = async () => {
 		nodes.push(node);
 
 		return node;
+	};
+
+	const nodeOf = (id: Params["id"]): Node => {
+		const found = nodes.find((node) => node.id === String(id));
+
+		if (!found) throw new Refusal(NOT_FOUND, `not found: Agent "${id}"`);
+
+		return found;
 	};
 
 	const create = (title: string, body = "", home: string | null = null): Todo => {
@@ -88,9 +97,18 @@ export const fakeRoundup = async () => {
 
 				return {};
 			},
-			"agent.stop": ({ id }) => {
-				throw new Refusal(NOT_FOUND, `not found: Agent "${id}"`);
+			"project.get": () => ({ models: { roles: [] } }),
+			"pad.create": ({ name = "" }) => ({ name, home: null }),
+			"pad.move": ({ name = "", home = null }) => ({ name, home }),
+			"agent.spawn": ({ name = "", parent = null }) => {
+				const node = { id: String(nextId++), name, kind: "agent", parent, status: { kind: "working", since: Date.now() } };
+
+				nodes.push(node);
+
+				return node;
 			},
+			"rail.rename": ({ id, name = "" }) => Object.assign(nodeOf(id), { name }),
+			"agent.stop": ({ id }) => Object.assign(nodeOf(id), { status: { kind: "done", since: Date.now() } }),
 		}),
 	);
 
@@ -150,6 +168,10 @@ export const fakeRoundup = async () => {
 
 			for (const conn of conns) conn.write(`${JSON.stringify({ jsonrpc: "2.0", method: "event", params: event })}\n`);
 		},
+		/** The rows started, in order. */
+		rows: () => nodes.filter((node) => node.kind === "agent"),
+		/** Shows the row `id` waiting on the owner, as roundup does once its question is on screen. */
+		waitOnOwner: (id: string) => void Object.assign(nodeOf(id), { status: { kind: "needs-you", since: Date.now() } }),
 		/** How many calls of `method` named the Todo `id`. */
 		callsOn: (method: string, id: string) => calls.filter((call) => call.method === method && String(call.params.id) === id).length,
 		/** Refuses every call of `method` with `code`. */

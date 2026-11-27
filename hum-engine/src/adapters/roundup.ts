@@ -60,6 +60,9 @@ const Kept = z.strictObject({ holder: Holder, expiresAt: z.number() });
 /** The owner's answer hum took from a question row. */
 const Taken = z.strictObject({ text: z.string(), option: z.string().optional(), at: z.number() });
 
+/** Why hum closed a question row with no answer, and when: the wait it asked about ended without one. */
+const Closed = z.strictObject({ text: z.string(), at: z.number() });
+
 /** A question hum asked as a row, named `name`. */
 const Asked = z.strictObject({ item: z.string(), name: z.string(), text: z.string(), at: z.number(), handoff: z.strictObject({ name: z.string(), link: z.string() }).optional() });
 
@@ -270,11 +273,27 @@ export const roundupAdapter = (options: RoundupOptions, { now, env, report }: Ad
 
 	const takenOf = ({ root }: Pick<Asking, "root">) => readJson(Taken, join(root, "taken.json"));
 
+	const closedOf = ({ root }: Pick<Asking, "root">) => readJson(Closed, join(root, "closed.json"));
+
+	/** A question stays open until hum takes the owner's answer from its row or closes it. */
+	const isOpenAsking = (asking: Pick<Asking, "root">): boolean => takenOf(asking) === undefined && closedOf(asking) === undefined;
+
 	const questionsOf = (id: string) => questionFolders().filter(({ asked }) => asked.item === id);
+
+	const openQuestionsOf = (id: string) => questionsOf(id).filter(isOpenAsking);
 
 	/** An item has one open question, the newest: asking another stops the rows of those before it. */
 	const stopOpen = async (id: string): Promise<void> => {
-		for (const open of questionsOf(id).filter((asking) => takenOf(asking) === undefined)) await stop(open.row);
+		for (const open of openQuestionsOf(id)) await stop(open.row);
+	};
+
+	/** Closes the item's open questions, then stops their rows: none takes an answer or is asked again. */
+	const close = async (id: string, text: string): Promise<void> => {
+		const open = openQuestionsOf(id);
+
+		for (const { root } of open) atomicWrite(join(root, "closed.json"), JSON.stringify({ text, at: now() }));
+
+		for (const { row } of open) await stop(row);
 	};
 
 	/** Drops what hum keeps for the item and roundup holds for no Ext: its question folders and its claim. */
@@ -317,12 +336,12 @@ export const roundupAdapter = (options: RoundupOptions, { now, env, report }: Ad
 	const endedUnanswered = (asking: Asking, nodes: readonly RailNode[]): boolean => {
 		const node = nodes.find(({ id }) => id === asking.row);
 
-		return asking.row !== undefined && takenOf(asking) === undefined && askedSince(asking.folder) !== undefined && (node === undefined || node.status?.kind === ENDED);
+		return asking.row !== undefined && isOpenAsking(asking) && askedSince(asking.folder) !== undefined && (node === undefined || node.status?.kind === ENDED);
 	};
 
 	/** Takes each open question's answer the owner gave once roundup showed its row waiting on them, and stops the row; the newest question, where its row ended unanswered, is asked again in a new row. */
 	const takeAnswers = async (id: string, nodes: readonly RailNode[]): Promise<void> => {
-		for (const asking of questionsOf(id).filter((open) => takenOf(open) === undefined)) {
+		for (const asking of openQuestionsOf(id)) {
 			const status = nodes.find((node) => node.id === asking.row)?.status;
 
 			if (status?.kind === NEEDS_YOU && status.since !== undefined) markAsked(asking.folder, status.since);
@@ -350,8 +369,13 @@ export const roundupAdapter = (options: RoundupOptions, { now, env, report }: Ad
 			...comments.flatMap((comment): ThreadEntry[] => (comment.author.id === HUM_EXT ? [{ ...parseComment(comment.body, comment.created_at), author: "hum" }] : [])),
 			...questionsOf(id).flatMap((asking): ThreadEntry[] => {
 				const taken = takenOf(asking);
+				const closed = closedOf(asking);
 
-				return [{ kind: "question", text: asking.asked.text, at: asking.asked.at, author: "hum" }, ...(taken ? [{ kind: "answer", ...taken, author: "person" } as const] : [])];
+				return [
+					{ kind: "question", text: asking.asked.text, at: asking.asked.at, author: "hum" },
+					...(taken ? [{ kind: "answer", ...taken, author: "person" } as const] : []),
+					...(closed ? [{ kind: "close", ...closed, author: "hum" } as const] : []),
+				];
 			}),
 		].sort((one, other) => one.at - other.at);
 	};
@@ -483,6 +507,7 @@ export const roundupAdapter = (options: RoundupOptions, { now, env, report }: Ad
 		questions: {
 			ask,
 			decide: (id, text) => postMarked(id, { kind: "decision" }, text),
+			close,
 		},
 		answers: {
 			onlyToQuestions: true,
@@ -490,8 +515,8 @@ export const roundupAdapter = (options: RoundupOptions, { now, env, report }: Ad
 			answer: async (id) => {
 				const key = await projectKeyOf(call);
 
-				const open = questionsOf(id)
-					.filter((asking) => takenOf(asking) === undefined && asking.row !== undefined)
+				const open = openQuestionsOf(id)
+					.filter((asking) => asking.row !== undefined)
 					.toSorted((one, other) => one.asked.at - other.asked.at)
 					.at(-1);
 

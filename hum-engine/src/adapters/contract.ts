@@ -196,6 +196,20 @@ const questionChecks = (target: ContractTarget, source: WorkSource, questions: Q
 			);
 		},
 	},
+	{
+		name: "questions: a close lands on the thread after the question it closes",
+		run: async () => {
+			const id = await target.seed("closed");
+
+			await questions.ask(id, { text: "Which way?", options: ["left", "right"] });
+			await questions.close(id, "This question closed: its wait timed out.");
+
+			assert.deepEqual(
+				Item.parse(await source.read(id)).thread.map((entry) => entry.kind),
+				["question", "close"],
+			);
+		},
+	},
 ];
 
 const answerChecks = (target: ContractTarget, source: WorkSource, answers: Answers): Check[] => [

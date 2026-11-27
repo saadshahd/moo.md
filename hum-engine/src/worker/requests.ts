@@ -1,4 +1,4 @@
-import { ADAPTER_API_VERSION, type Item, type RequestKind, type WorkSource } from "../adapter-api.ts";
+import { ADAPTER_API_VERSION, type Item, type Questions, type RequestKind, type WorkSource } from "../adapter-api.ts";
 import { onceCalls } from "../adapters/once.ts";
 import { requestsAllowed } from "../config/machine.ts";
 import type { Kind } from "../config/schema.ts";
@@ -6,10 +6,10 @@ import { decideRequest, isCurrent, pendingRequest, requestReplyStem, requestRepl
 import type { SavedSnapshot } from "../state/items.ts";
 import type { State } from "../state/open.ts";
 import type { SettledRequest } from "../state/saved.ts";
-import { dropWaitingQuestions } from "./questions.ts";
+import { endWait } from "./questions.ts";
 import { hasReplyOn } from "./thread.ts";
 
-export type RequestContext = { readonly state: State; readonly workSource: WorkSource; readonly now: () => number };
+export type RequestContext = { readonly state: State; readonly workSource: WorkSource; readonly questions: Questions; readonly now: () => number };
 
 const keyOf = (item: string, ordinal: number): string => `${item}#${ordinal}`;
 
@@ -37,8 +37,7 @@ const recordOf = (item: string, { ordinal, entry }: ThreadRequest, settled: Pick
 
 /**
  * Every request on the item's thread is saved with what became of it, once, and gets one reply: applied, or refused
- * and why. Returns the request that acts on the item now; one that acts drops the question the daily cap still holds
- * for the wait it ends.
+ * and why. Returns the request that acts on the item now; one that acts ends the wait it stands in.
  */
 export const settleRequests = async (ctx: RequestContext, item: Item, stand: RequestStand): Promise<RequestKind | undefined> => {
 	const calls = onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource: ctx.workSource }, ctx.state.ops, { run: "request-reply", attempt: 0 });
@@ -58,7 +57,7 @@ export const settleRequests = async (ctx: RequestContext, item: Item, stand: Req
 
 	const pending = savedPendingRequest(ctx.state, item, stand);
 
-	if (pending !== undefined) dropWaitingQuestions(ctx.state, item.id);
+	if (pending !== undefined) await endWait(ctx, item, pending);
 
 	return pending;
 };

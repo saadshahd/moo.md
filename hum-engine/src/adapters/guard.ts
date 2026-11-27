@@ -170,6 +170,7 @@ export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoff
 		questions: questions && {
 			ask: (id, question) => once("ask", () => questions.ask(id, question), none),
 			decide: (id, text) => once("decide", () => questions.decide(id, text), none),
+			close: (id, text) => once("close", () => questions.close(id, text), none),
 		},
 		answers: answers && {
 			...answers,
