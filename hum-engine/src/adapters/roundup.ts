@@ -10,11 +10,12 @@ import { atomicWrite, dropInto, listFiles, orMissing, slug } from "../state/fs.t
 import { INBOX_DIR } from "../state/open.ts";
 import { parseArgument } from "./argument.ts";
 import { claimer, isHeldBy, isLive } from "./claim.ts";
-import { commentText, cutLine, followUpBody, isFollowUpOf, type Marker, markedLine, parseComment, questionText } from "./marked.ts";
-import { itemWorkstream, NEEDS_YOU, type RailNode, railTree, rootWorkstream } from "./rail.ts";
+import { ownerAnswers } from "./hooked-run.ts";
+import { commentText, cutLine, followUpBody, isFollowUpOf, type Marker, markedLine, optionsIn, parseComment, questionOf, questionText } from "./marked.ts";
+import { ENDED, itemWorkstream, NEEDS_YOU, type RailNode, railName, railTree, rootWorkstream } from "./rail.ts";
 import { type RowConfig, startRow } from "./rail-rows.ts";
 import { HUM_EXT, type RoundupEvent, RoundupRefusal, roundupRpc } from "./roundup-rpc.ts";
-import { askedSince, keepSchema, markAsked, type RunFolder, runFolderAt, runKey, takeAnswer } from "./run-answer.ts";
+import { askedSince, markAsked, type RunFolder, runFolderAt } from "./run-answer.ts";
 
 /** The name `hum.json` gives the roundup adapter. */
 export const ROUNDUP = "roundup";
@@ -31,8 +32,11 @@ const COMMENT_LIMIT = 280;
 /** The digest in a Pad's name, so the same text posts to the same Pad name. */
 const PAD_DIGEST_LENGTH = 8;
 
-/** A question row only asks and hands the answer over. */
+/** A question row only asks. */
 const QUESTION_EFFORT = "low";
+
+/** The card for an answer a question row's hook reported that hum cannot take as one answer to its question. */
+const UNREAD_ANSWER_CODE = "question-answer-unread";
 
 /** Two workers that take the same item one after another wait this long for each other. */
 const CLAIM_LOCK = { retries: { retries: 20, minTimeout: 5, maxTimeout: 50 }, realpath: false } as const;
@@ -64,8 +68,6 @@ const RowRecord = z.looseObject({ id: z.string() });
 
 const StatusEvent = z.looseObject({ id: z.string(), status: z.looseObject({ kind: z.string(), since: z.number() }) });
 
-const Picked = z.looseObject({ text: z.string(), option: z.string().optional() });
-
 const Ping = z.looseObject({ projectKey: z.string() });
 
 export type RoundupOptions = {
@@ -91,21 +93,12 @@ type Whole = Integrations & {
 
 const readJson = <T>(schema: z.ZodType<T>, path: string): T | undefined => orMissing(() => schema.parse(JSON.parse(readFileSync(path, "utf8"))), undefined);
 
-/** The answer a question row hands over: the owner's words, and the option they picked where it offered some. */
-const answerSchema = (options: Question["options"] = []): object => {
-	const [first, ...rest] = options;
-	const text = z.string().min(1);
-
-	return z.toJSONSchema(first === undefined ? z.strictObject({ text }) : z.strictObject({ text, option: z.enum([first, ...rest]).optional() }));
-};
-
 const askPrompt = ({ text, options, detail }: Question): string =>
 	[
-		"Ask the owner the question below with your AskUserQuestion tool, in its words, and wait for their answer. Never answer it yourself, and do nothing else.",
+		"Ask the owner the question below with your AskUserQuestion tool, in its words: one call that holds only this question. Never answer it yourself, and do nothing else. hum takes the owner's answer from the tool, and your turn ends there.",
 		`## The question\n\n${text}`,
-		options?.length ? `Offer each of these as an option: ${options.join(", ")}. The owner may answer in their own words instead.` : "",
+		[options?.length ? `Offer each of these as an option, labeled exactly so: ${options.join(", ")}.` : "", "The tool takes two to four options: add options that fit the question until it has two. The owner may answer in their own words instead."].filter(Boolean).join(" "),
 		detail ? `## Why hum asks\n\n${detail}\n\nUse it only to explain the question when the owner asks why.` : "",
-		'Then hand hum the answer: "text" holds what the owner said, and "option" the option they picked, if any.',
 	]
 		.filter(Boolean)
 		.join("\n\n");
@@ -121,11 +114,12 @@ const isOneLine = (text: string): boolean => !text.includes("\n") && text.length
  * an item's Workstream is never one. The first claim moves the Todo into its own Workstream, and roundup holds no
  * claim an Ext could write, so the holder and expiry stay in hum's state. Finishing completes the Todo, moves it back
  * where the owner put it, and removes its Workstream with every row and Pad in it. The thread is hum's own comments on
- * the Todo, the questions hum asked as rows, and each answer a row saved after roundup showed it waiting on the owner;
- * the owner answers only there, never in a Todo comment or through `hum answer`. The watch follows roundup's Event
- * log, and each change to an item or a question row wakes the worker.
+ * the Todo, the questions hum asked as rows, and each answer the owner gave in a row's AskUserQuestion after roundup
+ * showed the row waiting on them, as the row's answer hook reported it; the owner answers only there, never in a Todo
+ * comment or through `hum answer`. The watch follows roundup's Event log, and each change to an item or a question row
+ * wakes the worker.
  */
-export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterContext): Whole => {
+export const roundupAdapter = (options: RoundupOptions, { now, env, report }: AdapterContext): Whole => {
 	const socket = options.socket ?? env.RUPD_SOCKET;
 
 	if (!socket) throw new PermanentError("the roundup adapter runs only where roundup serves the Project: RUPD_SOCKET is not set");
@@ -278,7 +272,6 @@ export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterCon
 
 	const questionsOf = (id: string) => questionFolders().filter(({ asked }) => asked.item === id);
 
-	/** Takes each open question's answer that its row saved after roundup showed it waiting on the owner, and stops the row. */
 	/** An item has one open question, the newest: asking another stops the rows of those before it. */
 	const stopOpen = async (id: string): Promise<void> => {
 		for (const open of questionsOf(id).filter((asking) => takenOf(asking) === undefined)) await stop(open.row);
@@ -297,6 +290,37 @@ export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterCon
 		dropKept(id);
 	};
 
+	/**
+	 * The owner's answer in the first report of a question row's answer hook from `since` on that holds one answer: what
+	 * they picked or typed, and the option of hum's question it names. A report that holds none, or several, raises a card.
+	 */
+	const answerOf = (id: string, { folder, asked }: Asking, since: number): { readonly text: string; readonly option: string | undefined } | undefined => {
+		const row = railName(asked.name);
+
+		for (const { file, answers } of ownerAnswers(folder.hooks).filter(({ at }) => at >= since)) {
+			const [text, ...more] = Object.values(answers ?? {});
+
+			if (text !== undefined && more.length === 0) return { text, option: optionsIn(asked.text).find((option) => option.toLowerCase() === text.trim().toLowerCase()) };
+
+			report({
+				code: UNREAD_ANSWER_CODE,
+				item: id,
+				cause: answers === undefined ? `the row "${row}" reported your answer in a shape hum does not read: ${file}` : `the row "${row}" asked ${Object.keys(answers).length} questions in one dialog, so hum cannot tell your answer to its own`,
+				fix: `Ask the row "${row}" to ask you hum's question again, alone.`,
+			});
+		}
+
+		return undefined;
+	};
+
+	/** Whether a question's row asked the owner and then ended, as when they stopped it, with no answer hum took. */
+	const endedUnanswered = (asking: Asking, nodes: readonly RailNode[]): boolean => {
+		const node = nodes.find(({ id }) => id === asking.row);
+
+		return asking.row !== undefined && takenOf(asking) === undefined && askedSince(asking.folder) !== undefined && (node === undefined || node.status?.kind === ENDED);
+	};
+
+	/** Takes each open question's answer the owner gave once roundup showed its row waiting on them, and stops the row; the newest question, where its row ended unanswered, is asked again in a new row. */
 	const takeAnswers = async (id: string, nodes: readonly RailNode[]): Promise<void> => {
 		for (const asking of questionsOf(id).filter((open) => takenOf(open) === undefined)) {
 			const status = nodes.find((node) => node.id === asking.row)?.status;
@@ -304,15 +328,17 @@ export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterCon
 			if (status?.kind === NEEDS_YOU && status.since !== undefined) markAsked(asking.folder, status.since);
 
 			const since = askedSince(asking.folder);
-			const answer = since === undefined ? undefined : takeAnswer(asking.folder, runKey(options.stateDir, asking.asked.name), asking.asked.name, since);
+			const answer = since === undefined ? undefined : answerOf(id, asking, since);
 
 			if (answer === undefined) continue;
 
-			const { text, option } = Picked.parse(answer);
-
-			atomicWrite(join(asking.root, "taken.json"), JSON.stringify({ text, option, at: now() }));
+			atomicWrite(join(asking.root, "taken.json"), JSON.stringify({ ...answer, at: now() }));
 			await stop(asking.row);
 		}
+
+		const newest = questionsOf(id).toSorted((one, other) => other.asked.at - one.asked.at)[0];
+
+		if (newest !== undefined && endedUnanswered(newest, nodes)) await ask(ItemId.parse(id), questionOf(newest.asked.text));
 	};
 
 	const threadOf = async (id: string, nodes: readonly RailNode[]): Promise<ThreadEntry[]> => {
@@ -352,18 +378,16 @@ export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterCon
 		const name = `hum ${id} ask ${questionsOf(id).length + 1}`;
 		const root = join(dirs.questions, slug(name));
 		const folder: RunFolder = runFolderAt(root);
-		const schema = answerSchema(question.options);
 		const todo = await todoOf(id);
 
-		keepSchema(folder, { schema });
 		/* The row's hooks write into this folder and do not make it. */
 		mkdirSync(folder.hooks, { recursive: true });
 
-		const request = { prompt: askPrompt(question), schema, cwd: options.repo, model: options.config.models.light, effort: QUESTION_EFFORT } as const;
+		const request = { prompt: askPrompt(question), cwd: options.repo, model: options.config.models.light, effort: QUESTION_EFFORT } as const;
 
 		await stopOpen(id);
 
-		const row = await startRow(call, { repo: options.repo, stateDir: options.stateDir, config: options.config }, { name, folder, request, workstream: await itemWorkstream(call, { id, title: todo.title }) });
+		const row = await startRow(call, { repo: options.repo, stateDir: options.stateDir, config: options.config }, { name, folder, request, answer: { by: "question" }, workstream: await itemWorkstream(call, { id, title: todo.title }) });
 
 		/* Asked when roundup started the row, on the clock its comments carry, so the thread keeps their order. */
 		atomicWrite(join(root, "question.json"), JSON.stringify({ item: id, name, text: questionText(question), at: row.status?.since ?? now() }));

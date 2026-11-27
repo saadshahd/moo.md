@@ -10,7 +10,7 @@ import { Json } from "../src/config/json.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { RUN_AGAIN } from "../src/decide/answer.ts";
 import { INBOX_DIR } from "../src/state/open.ts";
-import { ITEMS_DRIVER, PREPARE_STEP, ROUNDUP_APP, type Rig, SLOTS_DIR, startRig } from "./fixtures/rows-rig.ts";
+import { ITEMS_DRIVER, OWN_WORDS, PREPARE_STEP, ROUNDUP_APP, type Rig, SLOTS_DIR, startRig } from "./fixtures/rows-rig.ts";
 
 const live = process.env.HUM_LIVE === "1" && existsSync(ROUNDUP_APP);
 
@@ -142,19 +142,33 @@ const withWorktreesOn = async (check: () => Promise<void>): Promise<void> => {
 	}
 };
 
-/** Runs a question scenario on a new question item: its answer counts only once its row asked the owner, and one through hum is refused. */
-const expectQuestion = async (scenario: string): Promise<void> => {
+/**
+ * Runs a question scenario on a new question item: its answer is what the owner picked or typed in the row's
+ * AskUserQuestion, counted only once roundup showed the row waiting on them, and one through hum is refused.
+ */
+const expectQuestion = async (scenario: string, answer: { readonly text: string; readonly option: string | undefined }): Promise<void> => {
 	await todoIn("question item", hum);
 
 	const { thread = [], refusal } = await run(scenario);
 
-	expect(thread.filter(({ kind }) => kind === "answer")).toEqual([expect.objectContaining({ text: "after", option: "b" })]);
+	expect(thread.filter(({ kind }) => kind === "answer").map(({ text, option }) => ({ text, option }))).toEqual([answer]);
 	expect(refusal).toMatch(/roundup:\/\/agent\/\d+\?project=/u);
 };
 
-test.skipIf(!live)("a question row's answer counts only once roundup showed the row waiting on the owner, and an answer through hum is refused with the row's link", () => expectQuestion("question"), RIG_MS);
+test.skipIf(!live)("a question row takes the option the owner picked in its AskUserQuestion only once roundup showed the row waiting on them, and an answer through hum is refused with the row's link", () => expectQuestion("question", { text: "b", option: "b" }), RIG_MS);
 
-test.skipIf(!live)("with the Project's Worktrees on, a question row still starts in the Project's folder and its answer counts", () => withWorktreesOn(() => expectQuestion("question-worktrees")), RIG_MS);
+test.skipIf(!live)("a question row takes the words the owner typed in its AskUserQuestion as their answer, naming no option", () => expectQuestion("question-words", { text: OWN_WORDS, option: undefined }), RIG_MS);
+
+test.skipIf(!live)("a question row the owner stops after it asked them is asked again in a new row, whose answer counts", async () => {
+	await todoIn("question item", hum);
+
+	const { thread = [] } = await run("question-stopped");
+
+	expect(thread.filter(({ kind }) => kind === "question")).toHaveLength(2);
+	expect(thread.filter(({ kind }) => kind === "answer").map(({ text, option }) => ({ text, option }))).toEqual([{ text: "b", option: "b" }]);
+}, RIG_MS);
+
+test.skipIf(!live)("with the Project's Worktrees on, a question row still starts in the Project's folder and its answer counts", () => withWorktreesOn(() => expectQuestion("question-worktrees", { text: "b", option: "b" })), RIG_MS);
 
 test.skipIf(!live)("a parked item asks a row with the owner's park actions, and the row's Run it again runs the item again", async () => {
 	const { outcomes = [], asked = [], runs = [] } = await run("park");

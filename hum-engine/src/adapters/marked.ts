@@ -63,6 +63,16 @@ export const optionsIn = (text: string): string[] => (OPTIONS_LINE.exec(text)?.[
 /** The part of a thread entry's text the owner reads: what comes before the options line and the fold. */
 export const visibleText = (text: string): string => text.split(/\n\n(?:Options: |<details>)/)[0] ?? text;
 
+const FOLDED = new RegExp(`${FOLD_OPEN}\\n\\n([\\s\\S]*)\\n\\n${FOLD_CLOSE}`);
+
+/** The question a thread shows as `text`, read back: what `questionText` wrote it from. */
+export const questionOf = (text: string): Question => {
+	const options = optionsIn(text);
+	const detail = FOLDED.exec(text)?.[1];
+
+	return { text: visibleText(text), ...(options.length > 0 && { options }), ...(detail !== undefined && { detail }) };
+};
+
 /** A comment's text; a provider that refuses an empty comment gets a placeholder. */
 export const commentText = (text: string): string => text.trim() || EMPTY_COMMENT;
 

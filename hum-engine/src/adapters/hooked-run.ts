@@ -47,6 +47,37 @@ export const hookReports = (folder: string): HookReport[] =>
 		return reported?.success ? [{ file, at: statSync(file).mtimeMs, event: reported.data.hook_event_name, sessionId: reported.data.session_id, transcriptPath: reported.data.transcript_path }] : [];
 	});
 
+/** The tool a run asks the owner with; Claude Code hands its hooks the owner's answers once they gave them. */
+const QUESTION_TOOL = "AskUserQuestion";
+
+const ANSWERED_EVENT = "PostToolUse";
+
+/** What the answer hook prints once it reported the answer: Claude Code ends the run's turn there, so the run acts on none of the owner's words. */
+const END_TURN = JSON.stringify({ continue: false, stopReason: "hum has your answer" });
+
+/** The hooks of a run that asks the owner with AskUserQuestion: each answer they give is reported into `hooksFolder`, and the run's turn ends with it. */
+export const answerHooks = (hooksFolder: string) => ({
+	[ANSWERED_EVENT]: [{ matcher: QUESTION_TOOL, hooks: [{ type: "command", command: `${dropInto(hooksFolder)} && echo ${shellQuote(END_TURN)}` }] }],
+});
+
+const AnswerReport = z.looseObject({ hook_event_name: z.literal(ANSWERED_EVENT), tool_name: z.literal(QUESTION_TOOL) });
+
+/** The answers Claude Code hands the hook: what the owner picked or typed, under each question's words. */
+const Answered = z.looseObject({ tool_response: z.looseObject({ answers: z.record(z.string(), z.string()) }) });
+
+/** The owner's answers to one AskUserQuestion call, as the answer hook reported them; `answers` is undefined where the report has no shape hum reads. */
+export type OwnerAnswers = { readonly file: string; readonly at: number; readonly answers: Readonly<Record<string, string>> | undefined };
+
+/** The owner's answers in a hooks folder, oldest first; a report of another hook or tool holds none. */
+export const ownerAnswers = (folder: string): OwnerAnswers[] =>
+	listRecords(folder)
+		.flatMap((file) => {
+			const report: unknown = orMissing(() => JSON.parse(readFileSync(file, "utf8")), undefined);
+
+			return AnswerReport.safeParse(report).success ? [{ file, at: statSync(file).mtimeMs, answers: Answered.safeParse(report).data?.tool_response.answers }] : [];
+		})
+		.toSorted((one, other) => one.at - other.at);
+
 /** What the run billed: its transcript's tokens, and the output tokens its job counts beyond them. */
 export const tokensOf = (transcript: RunTranscript, jobOutputTokens = 0): number => billedTokens(transcript) + Math.max(0, jobOutputTokens - outputTokens(transcript));
 
