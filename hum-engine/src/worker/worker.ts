@@ -5,7 +5,7 @@ import pMemoize from "p-memoize";
 import PQueue from "p-queue";
 import pTimeout from "p-timeout";
 import { createAsyncLogic } from "xstate";
-import { ADAPTER_API_VERSION, type Answers, type Holder, type Item, ItemId, type ItemRef, type Questions, type ThreadEntry, type WorkSource } from "../adapter-api.ts";
+import { ADAPTER_API_VERSION, type Answers, type Holder, type Item, ItemGone, ItemId, type ItemRef, type Questions, type ThreadEntry, type WorkSource } from "../adapter-api.ts";
 import type { Runner } from "../adapters/claude-p.ts";
 import type { Config } from "../config/load.ts";
 import { invokedSources } from "../config/machine.ts";
@@ -49,7 +49,7 @@ import { queueQuestion, recentlyAsked, releaseQuestions } from "./questions.ts";
 import type { Parked } from "../state/saved.ts";
 import { answerTo, type Checkout, doesStartOver, ownerWaitStage, claimTtlMs, DEFAULT_BASE, gatherItem, hasEndedStuck, isGathered, isTalking, park, parkQuestion, rememberKinds, runThinPath, type TalkCopy, talkWaits, type ThinPathOptions, type ThinResult, isWaitingOnOwner } from "./thin-path.ts";
 import { ownerAnswered } from "../state/item-log.ts";
-import { hasProgress } from "./kind.ts";
+import { forgetItem, hasProgress } from "./kind.ts";
 
 export type { TickResult } from "./lifecycle.ts";
 
@@ -154,6 +154,9 @@ const RELEASE_CODE = "question-release";
 
 /** The card for an item's pass that threw. */
 const RUN_ERROR_CODE = "run-error";
+
+/** The card for an item that left its source while hum could not stop its runs. */
+const END_CODE = "item-end";
 
 /** Runs one step of a longer job; a failure names the step it failed in. */
 const during = async <T>(step: string, run: () => Promise<T>): Promise<T> => {
@@ -542,6 +545,8 @@ export class Worker {
 			this.#unread.delete(id);
 			faults.clear({ code: UNREAD_CODE, item: id });
 		} catch (error) {
+			if (error instanceof Error && (await this.#endIfGone(error))) return;
+
 			this.#unread.add(id);
 			faults.raise({ code: UNREAD_CODE, item: id, cause: `The thread of ${id} could not be read: ${error instanceof Error ? error.message : String(error)}`.slice(0, ERROR_EXCERPT), fix: "hum reads it again each tick and goes on with the other items." });
 		}
@@ -570,7 +575,7 @@ export class Worker {
 
 		await Promise.all(
 			[...this.#inFlight].map(async ([id, run]) => {
-				const claim = await adapters.workSource.renew(ItemId.parse(id), holder, claimTtlMs(config)).catch(() => undefined);
+				const claim = await adapters.workSource.renew(ItemId.parse(id), holder, claimTtlMs(config)).catch(async (error: Error) => void (await this.#endIfGone(error)));
 
 				if (claim?.won === false) run.abort.abort();
 			}),
@@ -886,17 +891,46 @@ export class Worker {
 		});
 	}
 
-	#failed(id: string, error: Error): void {
+	async #failed(id: string, error: Error): Promise<void> {
 		this.#inFlight.delete(id);
 
 		if (this.#o.ciJob) this.#handled.add(id);
-		this.#o.state.faults.raise({
-			code: RUN_ERROR_CODE,
-			item: id,
-			cause: `The run for ${id} failed: ${error.message}`.slice(0, ERROR_EXCERPT),
-			fix: "hum tries the item again when its claim lapses; look at the cause if this card stays.",
-		});
+
+		if (!(await this.#endIfGone(error)))
+			this.#o.state.faults.raise({
+				code: RUN_ERROR_CODE,
+				item: id,
+				cause: `The run for ${id} failed: ${error.message}`.slice(0, ERROR_EXCERPT),
+				fix: "hum tries the item again when its claim lapses; look at the cause if this card stays.",
+			});
+
 		this.wake();
+	}
+
+	/**
+	 * Ends the item `error` names where its source no longer holds it, and says whether it did: its pass and runs stop,
+	 * and nothing hum kept for it starts work or shows a card again. Every other item stays as it was.
+	 */
+	async #endIfGone(error: Error): Promise<boolean> {
+		if (!(error instanceof ItemGone)) return false;
+
+		const { state, runner } = this.#o;
+		const { item } = error;
+
+		this.#inFlight.get(item)?.abort.abort();
+		this.#inFlight.delete(item);
+
+		for (const held of [this.#resuming, this.#answered, this.#timedOut, this.#unread]) held.delete(item);
+
+		forgetItem(state, item);
+
+		for (const card of state.faults.list()) if (card.item === item) state.faults.clear(card);
+
+		await runner.forget?.(state.runs.list(item).map(({ name }) => name)).catch((cause: Error) => {
+			state.faults.raise({ code: END_CODE, item, cause: `${item} left its source, and hum could not stop its runs: ${cause.message}`.slice(0, ERROR_EXCERPT), fix: "Stop the item's rows yourself; hum starts nothing more for it." });
+		});
+
+		return true;
 	}
 
 	/** Stops the worker's work: nothing new starts, every pass and measurement in flight stops, and it resolves once they and the tick in flight have ended. */
@@ -994,7 +1028,7 @@ export class Worker {
 		const asleep = new Set(sleeping.map((s) => s.itemId));
 		const isFresh = (id: string) => !this.#inFlight.has(id) && !parked.has(id) && !asleep.has(id) && !this.#handled.has(id);
 		const isWokenAndIdle = (id: string) => (this.#answered.has(id) || this.#timedOut.has(id)) && !this.#inFlight.has(id);
-		const learned = (id: string) => this.#learn(id).catch(() => undefined);
+		const learned = (id: string) => this.#learn(id).catch(async (error: Error) => void (await this.#endIfGone(error)));
 
 		const fresh = ready.flatMap((ref) => (isFresh(ref.id) && !this.#isWaitingOnParts(ref.id) ? [learned(ref.id).then((known) => ({ id: ref.id, answered: false, known }))] : []));
 
@@ -1086,7 +1120,9 @@ export class Worker {
 			await this.#askParked();
 			await releaseQuestions({ state, config, workSource: this.#o.adapters.workSource, questions: this.#o.adapters.questions, now: this.#now }).then(
 				() => state.faults.clear({ code: RELEASE_CODE }),
-				(error: Error) => {
+				async (error: Error) => {
+					if (await this.#endIfGone(error)) return;
+
 					state.faults.raise({ code: RELEASE_CODE, cause: `Queued questions could not be asked: ${error.message}`.slice(0, ERROR_EXCERPT), fix: "hum asks them again on the next tick." });
 				},
 			);

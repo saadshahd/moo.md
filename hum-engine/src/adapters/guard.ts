@@ -1,6 +1,6 @@
 import pRetry, { AbortError, type RetryContext } from "p-retry";
 import { z } from "zod";
-import { type Adapter, ClaimResult, Failed, type Fallible, type Integrations, Item, ItemId, ItemRef, PermanentError, Watch, type WorkSource } from "../adapter-api.ts";
+import { type Adapter, ClaimResult, Failed, type Fallible, type Integrations, Item, ItemGone, ItemId, ItemRef, PermanentError, Watch, type WorkSource } from "../adapter-api.ts";
 import { type HumConfig, SHIPPED_DEFAULTS } from "../config/schema.ts";
 import type { Faults } from "../state/faults.ts";
 import { SECOND_MS } from "../time.ts";
@@ -117,8 +117,15 @@ export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoff
 	const { workSource, questions, answers, release } = adapter;
 	let lastReadyIds: ItemId[] = (remembered?.load() ?? []).flatMap((id) => ItemId.safeParse(id).data ?? []);
 
+	/** An item its source no longer holds is no longer ready. */
+	const isStillReady = (source: Fallible<WorkSource>, id: ItemId): Promise<boolean> =>
+		retried("read", () => source.read(id), Item).then(
+			({ ready }) => ready,
+			(error: Error) => (error instanceof ItemGone ? false : Promise.reject(error)),
+		);
+
 	const firstStillReady = async (source: Fallible<WorkSource>, ids: readonly ItemId[]): Promise<ItemId | undefined> => {
-		for (const id of ids) if ((await retried("read", () => source.read(id), Item)).ready) return id;
+		for (const id of ids) if (await isStillReady(source, id)) return id;
 
 		return undefined;
 	};

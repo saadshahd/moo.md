@@ -514,6 +514,23 @@ export const railRunner = ({ call, repo, state, config, fallback, now, signal }:
 		return readings.reduce((items, { item, waits }) => items.set(item, (items.get(item) ?? true) && waits), new Map<string, boolean>());
 	};
 
+	/** A run whose row could not be stopped still loses its folder, so no watch or talk copy holds on to it. */
+	const forgetRun = async (folder: RunFolder): Promise<void> => {
+		const row = recordOf(folder)?.id;
+
+		try {
+			if (row !== undefined) await stop(row);
+		} finally {
+			rmSync(folder.root, { recursive: true, force: true });
+		}
+	};
+
+	const forget = async (names: readonly string[]): Promise<void> => {
+		const failed = (await Promise.allSettled(names.map((name) => forgetRun(runFolder(state.dir, name))))).find((settled) => settled.status === "rejected");
+
+		if (failed) throw failed.reason;
+	};
+
 	/** The names of the runs whose rows are alive in a run slot; a run the owner talks to holds none. */
 	const liveRuns = async (): Promise<ReadonlySet<string>> => {
 		const live = new Set((await tree()).filter((node) => node.status?.kind !== ENDED).map(({ id }) => id));
@@ -527,7 +544,7 @@ export const railRunner = ({ call, repo, state, config, fallback, now, signal }:
 		return new Set(rows.filter(({ id }) => live.has(id)).map(({ name }) => name));
 	};
 
-	return { run, limitedUntil: fallback.limitedUntil, liveRuns, talking, talks: true };
+	return { run, limitedUntil: fallback.limitedUntil, liveRuns, talking, forget, talks: true };
 };
 
 /**

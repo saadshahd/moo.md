@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { rmSync } from "node:fs";
+import { rmSync, writeFileSync } from "node:fs";
 import { railRunner, refusalCard, TALK_WATCH_CODE } from "../src/adapters/rail-rows.ts";
 import type { Runner } from "../src/adapters/claude-p.ts";
 import { type RoundupCall, RoundupRefusal } from "../src/adapters/roundup-rpc.ts";
@@ -24,6 +24,35 @@ test("the card of a Rail read that failed while hum watched a row the owner talk
 	rmSync(talk.root, { recursive: true, force: true });
 	await runner.talking?.();
 	expect(state.faults.list()).toEqual([]);
+});
+
+test("forgetting an item's runs stops each recorded row, drops every run's folder though a stop fails, and leaves the item no talk to keep", async () => {
+	const state = openState(tempDir("rail-rows"), { now: Date.now });
+	const stopped: string[] = [];
+
+	const call: RoundupCall = async (method, params) => {
+		if (method !== "agent.stop") throw new Error(`no ${method} here`);
+
+		stopped.push(String(params?.id));
+
+		if (params?.id === "1") throw new Error("roundup is not running");
+
+		return null;
+	};
+
+	const runner = railRunner({ call, repo: tempDir("repo"), state, config: SHIPPED_DEFAULTS, fallback: unused, now: Date.now });
+	const names = ["hum a ideate #0", "hum a shape #0"];
+
+	for (const [index, name] of names.entries()) {
+		const folder = runFolder(state.dir, name);
+
+		keepTalkRun(folder, { item: "a" });
+		writeFileSync(folder.row, JSON.stringify({ id: String(index + 1), name }));
+	}
+
+	await expect(runner.forget!(names)).rejects.toThrow("roundup is not running");
+	expect(stopped.toSorted()).toEqual(["1", "2"]);
+	expect(await runner.talking?.()).toEqual(new Map());
 });
 
 /** roundup's refusals of a row's start, by JSON-RPC code, method and words, as the live rig measured them; the last stands for any refusal hum reads no reason in. */

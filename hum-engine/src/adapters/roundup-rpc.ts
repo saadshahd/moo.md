@@ -92,17 +92,21 @@ export const roundupRpc = (socket: string, ext: string | null = HUM_EXT, follow?
 				if (event.success) handOver(event.data);
 			});
 
-			createInterface({ input: conn }).on("line", (line) => {
-				const message = messageOf(line);
+			/* readline re-emits its input's error, and throws it where nothing listens here, so the socket's error fails the call here. */
+			createInterface({ input: conn })
+				.on("line", (line) => {
+					const message = messageOf(line);
 
-				if (message !== undefined) void peer.receiveAndSend(message, undefined, undefined);
-			});
+					if (message !== undefined) void peer.receiveAndSend(message, undefined, undefined);
+				})
+				.on("error", reject);
 
+			/* The Daemon never half-closes; on Bun, a socket its far end closed while a write waited never closes on its own. */
+			conn.on("end", () => conn.destroy());
 			conn.on("close", () => {
 				open = undefined;
 				peer.rejectAllPendingRequests(`roundup's socket ${socket} closed`);
 			});
-			conn.once("error", reject);
 			conn.once("connect", () => {
 				const identified = ext === null ? Promise.resolve() : peer.request("daemon.identify", { actor: { kind: "ext", id: ext, parent: null } }, undefined);
 				const subscribed = async (after: number | undefined) => Subscribed.parse(await peer.request("events.subscribe", after === undefined ? {} : { after }, undefined)).head;

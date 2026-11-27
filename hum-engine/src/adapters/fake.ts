@@ -1,4 +1,4 @@
-import { ADAPTER_API_VERSION, type Claim, type Integrations, ItemId, type ItemRef, PermanentError, type ThreadEntry, type Watch } from "../adapter-api.ts";
+import { ADAPTER_API_VERSION, type Claim, type Integrations, ItemGone, ItemId, type ItemRef, type ThreadEntry, type Watch } from "../adapter-api.ts";
 import { claimer, isHeldBy, isLive } from "./claim.ts";
 import { questionText } from "./marked.ts";
 
@@ -57,6 +57,12 @@ export class FakeProvider {
 		return id;
 	}
 
+	/** Deletes the item, as an owner deletes an issue or a Todo hum may hold. */
+	remove(id: string): void {
+		this.#items.delete(id);
+		this.#version++;
+	}
+
 	#call<T>(spend: boolean, body: () => T): T {
 		if (this.#failures > 0) {
 			this.#failures--;
@@ -71,7 +77,7 @@ export class FakeProvider {
 	#get(id: string): Stored {
 		const found = this.#items.get(id);
 
-		if (!found) throw new PermanentError(`no item "${id}"`);
+		if (!found) throw new ItemGone(id);
 
 		return found;
 	}

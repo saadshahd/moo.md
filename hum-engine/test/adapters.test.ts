@@ -21,7 +21,7 @@ import { markDone, newItemFile, parseItemFile } from "../src/adapters/item-file.
 import { filedFollowUp, followUpKey } from "../src/adapters/marked.ts";
 import { WorkRepo, itemFile, markdownSettings } from "./fixtures/work-repo.ts";
 import { tempDir } from "./fixtures/temp.ts";
-import { type Failed, type Fallible, Holder, ItemId, type WorkSource } from "../src/adapter-api.ts";
+import { type Failed, type Fallible, Holder, ItemGone, ItemId, type WorkSource } from "../src/adapter-api.ts";
 
 const stateIn = (now: () => number): State => openState(tempDir("adapter"), { now });
 
@@ -233,6 +233,23 @@ describe("provider failures and empty lists", () => {
 
 		provider.emptyList = false;
 		expect((await adapter.workSource?.listReady())?.length).toBe(2);
+		expect(state.faults.list()).toEqual([]);
+	});
+
+	test("an item its source no longer holds fails its read once, with no card, and an empty list after it is no work", async () => {
+		const provider = new FakeProvider();
+		const state = stateIn(provider.now);
+		const adapter = guardWith(provider, state);
+		const id = provider.seed("a");
+
+		await adapter.workSource?.listReady();
+		provider.remove(id);
+
+		const spent = provider.spent();
+
+		await expect(adapter.workSource?.read(id)).rejects.toBeInstanceOf(ItemGone);
+		expect(provider.spent() - spent).toBe(1);
+		expect(await adapter.workSource?.listReady()).toEqual([]);
 		expect(state.faults.list()).toEqual([]);
 	});
 

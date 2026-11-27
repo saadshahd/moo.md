@@ -21,6 +21,9 @@ import { OWNER_APPROVAL } from "../src/decide/merge.ts";
 import { isTrusted } from "../src/decide/prose.ts";
 import type { Measured, Measurement } from "../src/measure/remeasure.ts";
 import { configWith, trustedScores } from "./fixtures/config.ts";
+import { type FakeRoundup, fakeRoundup } from "./fixtures/fake-roundup.ts";
+import { roundupAdapter } from "../src/adapters/roundup.ts";
+import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 
 /** The work order the owner takes in a talk row. */
 const WORK_ORDER = { title: "Write the note", ask: "Write docs/a.md.", done: "docs/a.md exists.", limits: ["Change no other file."] };
@@ -77,12 +80,59 @@ test("an item whose thread cannot be read raises a card naming it, and the other
 	const w = await workerWorld({ items: { a: { writeForItem: true } } });
 
 	w.item("a", "docs/a.md");
-	w.state.parked.put("gone", { item: "gone", why: "stuck", cause: "c", since: NOW });
+	w.repo.add("broken", "no item file");
+	w.state.parked.put("broken", { item: "broken", why: "stuck", cause: "c", since: NOW });
 
 	expect(await w.worker.tick()).toEqual({ kind: "ran", started: ["a"] });
-	expect(w.state.faults.list().map(({ code, item }) => ({ code, item }))).toContainEqual({ code: "item-unread", item: "gone" });
+	expect(w.state.faults.list().map(({ code, item }) => ({ code, item }))).toContainEqual({ code: "item-unread", item: "broken" });
 
 	await w.worker.idle();
+});
+
+/** The roundup adapter on `daemon`, as a worker world's work source. */
+const roundupOn = (daemon: FakeRoundup) => (context: AdapterContext, clone: string) =>
+	roundupAdapter({ socket: daemon.socket, workstream: SHIPPED_DEFAULTS.roundupWorkstream, stateDir: tempDir("roundup-state"), repo: clone, config: SHIPPED_DEFAULTS }, context);
+
+test("a taken Todo the owner deletes ends its item: no card names it and no tick reads it again, and the other item stays as it was", async () => {
+	const daemon = await fakeRoundup();
+	const hum = daemon.workstream(SHIPPED_DEFAULTS.roundupWorkstream);
+	const filed = (name: string) => daemon.todo(name, hum, `touches: docs/${name}.md\n\nDo the work.`);
+	const gone = filed("a");
+	const kept = filed("b");
+	const w = await workerWorld({ items: { [gone]: { writeForItem: true }, [kept]: { writeForItem: true } } }, { checks: ["false"], settings: { maxFixRuns: 1 }, source: roundupOn(daemon) });
+	const cardsOf = (item: string) => w.state.faults.list().filter((card) => card.item === item);
+
+	await w.worker.tick();
+	await w.worker.idle();
+
+	expect(w.results.map(({ outcome, item }) => ({ outcome, item })).sort((one, other) => (one.item ?? "").localeCompare(other.item ?? ""))).toEqual([
+		{ outcome: "stuck", item: gone },
+		{ outcome: "stuck", item: kept },
+	]);
+
+	const keptBefore = { parked: w.state.parked.get(kept), saved: w.state.items.savedOf(kept), cards: cardsOf(kept) };
+
+	expect(keptBefore.saved).toBeDefined();
+	expect(keptBefore.cards).not.toEqual([]);
+
+	daemon.remove(gone);
+	w.clock.at += 1000;
+	await w.worker.tick();
+	await w.worker.idle();
+
+	const reads = daemon.callsOn("todo.get", gone);
+
+	for (let tick = 0; tick < 2; tick++) {
+		w.clock.at += TTL + 1;
+		await w.worker.tick();
+		await w.worker.idle();
+	}
+
+	expect(daemon.callsOn("todo.get", gone)).toBe(reads);
+	expect(cardsOf(gone)).toEqual([]);
+	expect(w.state.faults.list().map(({ code }) => code)).not.toContain("provider-unavailable");
+	expect({ parked: w.state.parked.get(gone), saved: w.state.items.savedOf(gone) }).toEqual({ parked: undefined, saved: undefined });
+	expect({ parked: w.state.parked.get(kept), saved: w.state.items.savedOf(kept), cards: cardsOf(kept) }).toEqual(keptBefore);
 });
 
 test("items that touch one file go one after the other, and an item that says nothing goes alone", async () => {
@@ -800,6 +850,8 @@ test("a path raised while its change's pull request is armed: the next worker di
 
 test("the status file lists the open questions and the newest choices from what the engine saved", async () => {
 	const w = await workerWorld({}, { settings: { choicesShown: 1 } });
+
+	for (const id of ["a", "b"]) w.repo.add(id, itemFile(id, { state: "done" }));
 
 	w.state.questions.put("a@1", { item: "a", text: "Which title?", priority: 0, queuedAt: NOW - 2, askedAt: NOW - 1 });
 	w.state.choices.put("b@old", { item: "b", text: "old", at: 3 });
