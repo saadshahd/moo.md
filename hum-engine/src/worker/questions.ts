@@ -67,6 +67,11 @@ const waitingOrder = (queue: readonly QueuedQuestion[]): QueuedQuestion[] => {
 	return ranked.sort(questionOrder).map(({ queued }) => queued);
 };
 
+/** Drops the item's questions still waiting for room under the daily cap: the wait they ask about has ended. */
+export const dropWaitingQuestions = (state: Pick<State, "questions">, item: string): void => {
+	for (const queued of state.questions.list()) if (queued.item === item && isWaiting(queued)) state.questions.remove(queuedKey(queued));
+};
+
 /** What the daily question cap has room for now: the questions asked and the follow-ups filed within the day take theirs, and older ones are dropped. */
 export const roomToday = ({ state, config, now }: Pick<QuestionContext, "state" | "config" | "now">): number => {
 	for (const old of state.questions.list()) if (old.askedAt !== undefined && !isKept(old.askedAt, config, now())) state.questions.remove(queuedKey(old));

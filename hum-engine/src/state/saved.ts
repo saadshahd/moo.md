@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { AlignmentAnswer } from "../decide/alignment.ts";
+import { REQUEST_KINDS } from "../adapter-api.ts";
 import { DISPOSITIONS, RESOLUTION_SOURCES } from "../decide/answer.ts";
+import { REQUEST_DISPOSITIONS } from "../decide/request.ts";
 import { Cite, PlanFile } from "../decide/prose.ts";
 import { Change } from "../decide/risk.ts";
 import { BuildChoice, WorkOrder } from "../decide/talk.ts";
@@ -179,6 +181,21 @@ export const SettledAnswer = z.discriminatedUnion("source", [
 ]);
 
 export type SettledAnswer = z.infer<typeof SettledAnswer>;
+
+/** What became of one owner's request on an item's thread, saved before its reply is posted. */
+export const SettledRequest = z.object({
+	item: name,
+	/** The request's number among the thread's requests. */
+	ordinal: z.int().positive(),
+	kind: z.enum(REQUEST_KINDS),
+	/** The step it named; a hand-written marker may name none. */
+	step: name.optional(),
+	disposition: z.enum(REQUEST_DISPOSITIONS),
+	why: name,
+	at: time,
+});
+
+export type SettledRequest = z.infer<typeof SettledRequest>;
 
 /** The option a settled answer picked, when its source names one. */
 export const optionOf = (answer: SettledAnswer): string | undefined => ("option" in answer ? answer.option : undefined);

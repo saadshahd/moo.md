@@ -1,6 +1,7 @@
 import { ADAPTER_API_VERSION, type Claim, type Integrations, ItemGone, ItemId, type ItemRef, type ThreadEntry, type Watch } from "../adapter-api.ts";
 import { claimer, isHeldBy, isLive } from "./claim.ts";
 import { questionText } from "./marked.ts";
+import { requestEntry } from "./request-entry.ts";
 
 type Stored = { id: ItemId; title: string; body: string; ready: boolean; thread: ThreadEntry[]; claim?: Claim; from?: string };
 
@@ -156,6 +157,7 @@ export class FakeProvider {
 			},
 			answers: {
 				answer: async (id, { text, option }) => spend(() => this.#push(id, option === undefined ? { kind: "answer", text } : { kind: "answer", text, option })),
+				request: async (id, request) => spend(() => this.#push(id, { kind: request.kind, text: requestEntry(request).text, step: request.step })),
 				watch: async (since): Promise<Watch> => this.#call(false, () => ({ token: String(this.#version), changed: String(this.#version) !== since })),
 			},
 			release: {

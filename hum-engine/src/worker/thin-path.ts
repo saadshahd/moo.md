@@ -4,7 +4,7 @@ import { join } from "node:path";
 import PQueue from "p-queue";
 import { z } from "zod";
 import { type AnyActor, type AnyActorLogic, createActor, createAsyncLogic } from "xstate";
-import type { Holder, Item, ItemId, Question, Questions, ThreadEntry, WorkSource } from "../adapter-api.ts";
+import type { Holder, Item, ItemId, Question, Questions, RequestKind, ThreadEntry, WorkSource } from "../adapter-api.ts";
 import { type Finished, type Paused, type RunOutcome, type Runner, hasSucceeded, isPaused } from "../adapters/claude-p.ts";
 import { configuredModelCall, type ModelCall } from "../adapters/model-call.ts";
 import { visibleText } from "../adapters/marked.ts";
@@ -12,7 +12,7 @@ import { filesBetween, type Git, gitIn, isAncestor, PATCH, withConfigPinned } fr
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import { pickTier } from "../config/checks.ts";
 import type { Config } from "../config/load.ts";
-import { earliestTimeout, interactionAt, invokedSources, isApprovalWait, isWaitingOnOwner, kindMachine, OWNER_APPROVED, OWNER_REJECTED, TOKEN_CAP } from "../config/machine.ts";
+import { earliestTimeout, interactionAt, invokedSources, isApprovalWait, isWaitingOnOwner, kindMachine, OWNER_APPROVED, OWNER_REJECTED, SKIP, TOKEN_CAP } from "../config/machine.ts";
 import { type Kind, type Naming, PURPOSES, STUCK_TAG, TALK_PURPOSES } from "../config/schema.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { doesLeaveDocs } from "../decide/kind.ts";
@@ -33,6 +33,7 @@ import { answerText, IdeateAnswer, PickAnswer, type BuildChoice, choicesAnswer, 
 import { NO_REVIEW_FILES, readReviewFiles } from "./review-files.ts";
 import { forgetProgress, keepKind, kindAnswered, pickKind } from "./kind.ts";
 import { type OwnerAnswer, planChangingAnswers, settleAnswers } from "./answers.ts";
+import { settleRequests, standOf } from "./requests.ts";
 import { queueQuestion } from "./questions.ts";
 import { answerToLatest, latestQuestionAt, openQuestion } from "./thread.ts";
 import { memorySection, readMemory, rulesUsed } from "../loop/memory.ts";
@@ -241,6 +242,8 @@ export type Gathered = {
 	readonly ownerAnswers: readonly OwnerAnswer[];
 	/** The saved owner wait whose timeout passed with no answer. */
 	readonly timedOut: SavedSnapshot | undefined;
+	/** The owner's request that acts on the wait the item is at. */
+	readonly requested: RequestKind | undefined;
 };
 
 export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gathered | ThinResult> => {
@@ -300,10 +303,11 @@ export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gather
 	const asking = isWaitingOnOwner(kind, at);
 	const wait = asking ? o.state.items.savedOf(id) : undefined;
 	const answered = asking ? answerTo(item, wait?.savedAt) : onSnapshot ? undefined : answerTo(item);
-	const isAwaitingAnswer = asking && answered === undefined;
-	const timedOut = isAwaitingAnswer && wait !== undefined && isDue(o.state, { kind, saved: wait }, now()) ? wait : undefined;
+	const requested = await settleRequests({ state: o.state, workSource: o.workSource, now }, item, standOf(kind, o.state.items.savedOf(id), { answered: answered !== undefined, parked: false }));
+	const isHeldAtWait = asking && answered === undefined && requested === undefined;
+	const timedOut = isHeldAtWait && wait !== undefined && isDue(o.state, { kind, saved: wait }, now()) ? wait : undefined;
 
-	if (isAwaitingAnswer && timedOut === undefined) return { outcome: "waiting", item: id };
+	if (isHeldAtWait && timedOut === undefined) return { outcome: "waiting", item: id };
 
 	if (isTalking(o.config, kind, at) && (await talkWaits(o.runner, id))) return { outcome: "waiting", item: id };
 
@@ -314,7 +318,7 @@ export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gather
 	/* The owner's rejection at the approval wait ends the landing saved for it, so only a new change lands. */
 	if (isApprovalWait(kind, at) && answered !== undefined && answered.option !== OWNER_APPROVAL) o.state.landings.remove(id);
 
-	return { item, kindName, kind, judge, onSnapshot, asking, answered: stopped ? undefined : answered, ownerAnswers: planChangingAnswers(o.state, read, humOptions(o.config.hum)), timedOut };
+	return { item, kindName, kind, judge, onSnapshot, asking, answered: stopped ? undefined : answered, ownerAnswers: planChangingAnswers(o.state, read, humOptions(o.config.hum)), timedOut, requested };
 };
 
 export const isGathered = (gathered: Gathered | ThinResult): gathered is Gathered => "kindName" in gathered;
@@ -329,7 +333,7 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 
 	if (!isGathered(gathered)) return gathered;
 
-	const { item, kindName, kind, judge, onSnapshot, asking, answered, ownerAnswers, timedOut } = gathered;
+	const { item, kindName, kind, judge, onSnapshot, asking, answered, ownerAnswers, timedOut, requested } = gathered;
 	const landing = o.state.landings.get(id);
 	/** Nothing saved is left to go on from: a new item, one that moved to another kind, or one the owner ran again. */
 	const isFresh = !onSnapshot && landing === undefined;
@@ -357,7 +361,7 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 		try {
 			const outbox = new Outbox(id);
 			const ownChecks = ownChecksOf(o.state, id);
-			const driven: Driven = { ...o, checks: [...o.checks, ...ownChecks], ownChecks, base, baseSha: gathered.baseSha, dir: o.dir ?? o.config.hum.itemsDir, kindName, kind, judge, id, item, branch, clone, evidence, env, readyFailure, g, git, answered, ownerAnswers, resume: asking, timedOut, restarted: isFresh, outbox };
+			const driven: Driven = { ...o, checks: [...o.checks, ...ownChecks], ownChecks, base, baseSha: gathered.baseSha, dir: o.dir ?? o.config.hum.itemsDir, kindName, kind, judge, id, item, branch, clone, evidence, env, readyFailure, g, git, answered, ownerAnswers, resume: asking, timedOut, requested, restarted: isFresh, outbox };
 
 			/* A change already finished lands again from its pushed branch; no run is spent on it. One saved at the owner's approval wait goes on from the wait. */
 			const worked = landing && !asking ? await handToPublish(driven) : await drive(driven);
@@ -479,6 +483,8 @@ type Driven = ThinPathOptions & {
 	readonly resume: boolean;
 	/** The saved owner wait whose timeout passed with no answer: the pass restores it and fires the timeout. */
 	readonly timedOut: SavedSnapshot | undefined;
+	/** The owner's request the pass carries out at the restored wait. */
+	readonly requested: RequestKind | undefined;
 	/** The run branch starts again at the base: earlier work on the item, and the plan written for it, are gone. */
 	readonly restarted: boolean;
 };
@@ -1056,8 +1062,15 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 	const reads = { touched: touchedNow, talks: runner.talks === true };
 
-	/** A wait that timed out restores on a clock that keeps its timers, so the pass fires the due ones with the real sources. */
-	const due = d.timedOut === undefined ? undefined : dueClock(state, { kind, saved: d.timedOut }, d.now());
+	/** A wait that timed out, or whose timer the owner runs now, restores on a clock that keeps its timers, so the pass fires them with the real sources. */
+	const timed = d.timedOut ?? (d.requested === "run-now" ? state.items.savedOf(id) : undefined);
+	const due = timed === undefined ? undefined : dueClock(state, { kind, saved: timed }, d.now());
+
+	/** What each request does to the restored wait. */
+	const carryOut = {
+		skip: () => actor.send({ type: SKIP }),
+		"run-now": () => due?.fireEarliest(),
+	} satisfies Record<RequestKind, () => void>;
 
 	if (d.resume) {
 		const restored = await state.items.restore(id, kind, { sources: invokedSources(kind, nothingRuns, sources), kindAt: earlierKinds(state, kind), clock: due?.clock, reads });
@@ -1136,7 +1149,8 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		if (resume === OWNER_REJECTED) lastFailure = d.answered.answer;
 
 		actor.send({ type: resume });
-	} else due?.fireDue();
+	} else if (d.requested !== undefined) carryOut[d.requested]();
+	else due?.fireDue();
 
 	return result.promise.finally(async () => {
 		actor.stop();

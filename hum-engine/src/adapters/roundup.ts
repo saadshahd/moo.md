@@ -16,6 +16,7 @@ import { commentText, cutLine, followUpBody, isFollowUpOf, type Marker, markedLi
 import { agentLink, askName, ENDED, isItemWorkstream, itemWorkstream, NEEDS_YOU, NOT_FOUND, padLink, projectKeyOf, putPad, type RailNode, railName, railTree, rootWorkstream } from "./rail.ts";
 import { type RowConfig, startRow } from "./rail-rows.ts";
 import { HUM_EXT, type RoundupEvent, RoundupRefusal, roundupRpc } from "./roundup-rpc.ts";
+import { requestEntry } from "./request-entry.ts";
 import { askedSince, markAsked, type RunFolder, runFolderAt } from "./run-answer.ts";
 
 /** The name `hum.json` gives the roundup adapter. */
@@ -406,6 +407,13 @@ export const roundupAdapter = (options: RoundupOptions, { now, env, report }: Ad
 
 	const postPlain = async (id: string, text: string): Promise<void> => (isOneLine(text) ? post(id, text) : postInPad(id, undefined, text));
 
+	/** A comment hum marks, on one line where it fits. */
+	const postMarked = async (id: string, marker: Marker, text: string): Promise<void> => {
+		const line = markedLine(marker, text);
+
+		return isOneLine(line) ? post(id, line) : postInPad(id, marker, text);
+	};
+
 	/** Asks `question` in a new row, naming the handoff Pad an earlier asking of it wrote, else the one its own handoff writes now. */
 	const ask = async (id: ItemId, question: Question, handoff?: Linked): Promise<void> => {
 		const name = askName(id, questionsOf(id).length + 1);
@@ -474,11 +482,7 @@ export const roundupAdapter = (options: RoundupOptions, { now, env, report }: Ad
 		},
 		questions: {
 			ask,
-			decide: async (id, text) => {
-				const line = markedLine({ kind: "decision" }, text);
-
-				return isOneLine(line) ? post(id, line) : postInPad(id, { kind: "decision" }, text);
-			},
+			decide: (id, text) => postMarked(id, { kind: "decision" }, text),
 		},
 		answers: {
 			onlyToQuestions: true,
@@ -492,6 +496,12 @@ export const roundupAdapter = (options: RoundupOptions, { now, env, report }: Ad
 					.at(-1);
 
 				throw new PermanentError(open?.row !== undefined ? `On roundup the owner answers in the question's row: ${agentLink(open.row, key)}` : `On roundup the owner answers only in a question's row, and #${id} has no open question`);
+			},
+			/** A request is not an answer to a question row: hum posts it on the Todo as its own marked comment, which the thread reads as it reads hum's. */
+			request: (id, request) => {
+				const { marker, text } = requestEntry(request);
+
+				return postMarked(id, marker, text);
 			},
 			/** The socket is local: none of this spends rate limit. */
 			watch: async (since?: string): Promise<Watch> => {

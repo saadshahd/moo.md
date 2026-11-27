@@ -214,6 +214,20 @@ const answerChecks = (target: ContractTarget, source: WorkSource, answers: Answe
 		},
 	},
 	{
+		name: "answers: a request lands on the thread with its kind and the step it names",
+		run: async () => {
+			const id = await target.seed("requested");
+
+			await answers.request(id, { kind: "run-now", step: "objecting" });
+
+			const [entry] = Item.parse(await source.read(id)).thread;
+
+			assert.equal(entry?.kind, "run-now");
+			assert.equal(entry?.step, "objecting");
+			assert.ok(entry?.text, "a request carries words the owner reads");
+		},
+	},
+	{
 		name: "answers: an idle watch costs nothing and a write flips it",
 		run: async () => {
 			const id = await target.seed("watched");

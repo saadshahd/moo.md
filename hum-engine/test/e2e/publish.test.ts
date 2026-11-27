@@ -204,6 +204,43 @@ test("publish takes a pass past the owner's wait gather settled their answer to,
 	expect(w.state.items.savedOf(id)?.state).toBe("merging");
 });
 
+test("publish takes a pass past the owner's wait at which gather applied the owner's request, and refuses the same pass without it", async () => {
+	const w = await workerWorld({});
+	const id = ItemId.parse(w.repo.seed("Write the note"));
+	const now = () => w.clock.at;
+	const feature = w.config.kinds.feature!;
+	const publisher = publisherOf(w.thinPath({ now }), docsJudge);
+	const thread = [{ kind: "run-now", text: "Run the timer of asking now.", at: now() + 1, step: "asking", author: "hum" } as const];
+
+	const wake = (work: ReturnType<typeof openState>) =>
+		publishWake({
+			publisher: { ...publisher, workSource: { ...publisher.workSource, read: async (item) => ({ ...(await publisher.workSource.read(item)), thread }) }, save: async () => {} },
+			gathered: { holder: publisher.holder, base: "main", baseSha: sh(w.repo.remote, ["rev-parse", "main"]).trim(), signs: false, heads: {}, claimed: [id] },
+			outbox: { passes: [{ item: id, result: { outcome: "waiting", item: id }, intents: [], bundle: undefined }], baseCheck: undefined, stateDir: tempDir("work-state"), bundleOf: () => undefined },
+			work,
+		});
+
+	const workedToBuilding = () => {
+		const work = openState(tempDir("work-state"), { now });
+
+		work.items.save(id, feature, { status: "active", value: "building", context: {} });
+
+		return work;
+	};
+
+	w.state.itemKinds.put(id, { item: id, kind: "feature", from: "source" });
+	w.state.items.save(id, feature, { status: "active", value: "asking", context: {} });
+	await publisher.workSource.claim(id, publisher.holder, claimTtlMs(w.config));
+
+	expect((await wake(workedToBuilding()))[0]).toMatchObject({ outcome: "stuck", item: id, detail: expect.stringContaining("no pass takes") });
+	expect(w.state.items.savedOf(id)?.state).toBe("asking");
+
+	w.state.requests.put(`${id}#1`, { item: id, ordinal: 1, kind: "run-now", step: "asking", disposition: "applied", why: "the timer of asking fires now", at: now() + 2 });
+
+	expect(await wake(workedToBuilding())).toEqual([{ outcome: "waiting", item: id }]);
+	expect(w.state.items.savedOf(id)?.state).toBe("building");
+});
+
 const KILL_LANDING = join(import.meta.dir, "../fixtures/kill-landing.ts");
 
 test("a Mac's publish killed once its push moved the base leaves the landing saved, and the next pass records the merge with its commits, paths and way of reaching done, and pushes nothing", async () => {

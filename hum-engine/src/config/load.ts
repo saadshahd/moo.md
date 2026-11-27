@@ -7,7 +7,7 @@ import { type Migrations, migrateConfig } from "./migrate.ts";
 import { invalidConfig, type Problem, type Result } from "./refusal.ts";
 import { orMissing, readJson } from "../state/fs.ts";
 import { Json } from "./json.ts";
-import { withOverCapWaits } from "./machine.ts";
+import { withOverCapWaits, withSkips } from "./machine.ts";
 import { KindFile } from "./kind-file.ts";
 import { HumConfig, type Kind } from "./schema.ts";
 
@@ -60,7 +60,7 @@ export const loadConfig = (raw: RawConfig, { env, ...migration }: LoadOptions): 
 		const kind = KindFile.safeParse(file);
 
 		if (!kind.success) return malformed(`kinds/${name}.json`, kind.error);
-		kinds[name] = withOverCapWaits(kind.data);
+		kinds[name] = withSkips(withOverCapWaits(kind.data));
 		listed[name] = file;
 	}
 

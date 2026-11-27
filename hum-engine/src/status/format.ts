@@ -52,7 +52,7 @@ export const Controls = z.object({
 	answer: z.boolean(),
 	/** The flow file lets the owner skip it. */
 	skip: z.boolean(),
-	/** It waits on a timer the owner may run now. */
+	/** It waits on a timer the owner may run now: its earliest timer leads on to work, never to a stuck step. */
 	runNow: z.boolean(),
 	/** The steps a note may go to: each the item can still reach. */
 	noteTo: z.array(name),

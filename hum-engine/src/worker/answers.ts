@@ -7,7 +7,7 @@ import type { QuestionAnswer } from "../decide/talk.ts";
 import { visibleText } from "../adapters/marked.ts";
 import type { State } from "../state/open.ts";
 import { changesPlan, optionOf, type SettledAnswer } from "../state/saved.ts";
-import { isFromHum, isHumQuestion, latestQuestionAt } from "./thread.ts";
+import { hasReplyOn, isFromHum, isHumQuestion, latestQuestionAt } from "./thread.ts";
 
 export type AnswerContext = {
 	readonly state: State;
@@ -84,8 +84,6 @@ const resolutionOf = (record: SettledAnswer): Resolution => {
 };
 
 const isFinal = ({ disposition }: SettledAnswer): boolean => disposition !== "held";
-
-const hasReplyOn = (thread: readonly ThreadEntry[], stem: string): boolean => thread.some((entry) => isFromHum(entry) && entry.kind === "comment" && entry.text.startsWith(stem));
 
 /** The answer as the engine reads it from here on: the option it picked, or no longer an answer at all. */
 const normalized = (entry: ThreadEntry, record: SettledAnswer): ThreadEntry =>

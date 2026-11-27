@@ -49,5 +49,8 @@ export const dueClock = (state: State, wait: SavedWait, t: number) => {
 		for (const timer of timers.toSorted((a, b) => a.ms - b.ms).slice(0, dueCount)) timer.fire();
 	};
 
-	return { clock, fireDue };
+	/** Fires the earliest timer as if it were due, however long the wait has run and whether or not its question was asked. */
+	const fireEarliest = (): void => timers.toSorted((a, b) => a.ms - b.ms)[0]?.fire();
+
+	return { clock, fireDue, fireEarliest };
 };

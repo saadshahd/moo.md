@@ -4,7 +4,7 @@ import { join } from "node:path";
 import slugify from "@sindresorhus/slugify";
 import PQueue from "p-queue";
 import pRetry from "p-retry";
-import { type Adapter, ADAPTER_API_VERSION, type AdapterContext, type Claim, type Failed, type Item, ItemGone, ITEM_ID_LENGTH, ItemId, type ItemRef, PermanentError, type ThreadEntry, type Watch } from "../adapter-api.ts";
+import { type Adapter, ADAPTER_API_VERSION, type AdapterContext, type Claim, type Failed, type Item, ItemGone, ITEM_ID_LENGTH, ItemId, type ItemRef, PermanentError, REQUEST_KINDS, type ThreadEntry, type Watch } from "../adapter-api.ts";
 import type { HumConfig, MergeMethod } from "../config/schema.ts";
 import { growthLabelsOf } from "../decide/growth.ts";
 import { parseArgument } from "./argument.ts";
@@ -13,6 +13,7 @@ import { type GitIdentity, gitIn, push, readOrAbsent } from "./git.ts";
 import { appendEntry, DONE_STATE, type ItemFile, markDone, newItemFile, parseItemFile, READY_STATE } from "./item-file.ts";
 import { answerMarker, followUpBody, followUpKey, questionText } from "./marked.ts";
 import { type CommitLanded, landOwnerCommit } from "./owner-commit.ts";
+import { requestEntry } from "./request-entry.ts";
 import type { PullRequests } from "./pull-requests.ts";
 
 const ITEM_EXTENSION = ".md";
@@ -24,6 +25,9 @@ const NO_BASE_TOKEN = "none";
 const REMOTE = "origin";
 const WRITE_RACE_BACKOFF_MS = 50;
 const FOLLOW_UP_SLUG_LENGTH = 40;
+
+/** The entries the owner writes, which land the way the base asks of an owner's commit. */
+const OWNERS_KINDS: ReadonlySet<ThreadEntry["kind"]> = new Set(["answer", ...REQUEST_KINDS]);
 
 export type MarkdownOptions = {
 	/** A clone of the work repo. The adapter never touches its working tree or its branches. */
@@ -258,7 +262,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 			base,
 			label,
 			title: message,
-			body: `The owner answered on item ${label}.`,
+			body: `The owner wrote on item ${label}.`,
 			branchPrefix: ownerBranchPrefix,
 			mergeMethod,
 			alwaysPullRequest,
@@ -308,7 +312,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 
 				return { path: pathOf(id), content: appendEntry(source, { ...entry, at: now() }, text) };
 			},
-			entry.kind === "answer" ? id : undefined,
+			OWNERS_KINDS.has(entry.kind) ? id : undefined,
 		);
 
 	const take = claimer<StandingClaim, Failed>(
@@ -380,6 +384,11 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 		},
 		answers: {
 			answer: (id, { text, option }) => appendTo(id, answerMarker(option), text),
+			request: (id, request) => {
+				const { marker, text } = requestEntry(request);
+
+				return appendTo(id, marker, text);
+			},
 			/** The token is the remote base branch's tip; reading one ref spends no rate limit. */
 			watch: async (since?: string): Promise<Watch> => {
 				const [token = NO_BASE_TOKEN] = (await git.raw(["ls-remote", REMOTE, baseBranch])).split(/\s/).filter(Boolean);

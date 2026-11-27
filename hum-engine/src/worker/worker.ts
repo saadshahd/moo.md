@@ -5,7 +5,7 @@ import pMemoize from "p-memoize";
 import PQueue from "p-queue";
 import pTimeout from "p-timeout";
 import { createAsyncLogic } from "xstate";
-import { ADAPTER_API_VERSION, type Answers, type Holder, type Item, ItemGone, ItemId, type ItemRef, type Questions, type ThreadEntry, type WorkSource } from "../adapter-api.ts";
+import { ADAPTER_API_VERSION, type Answers, type Holder, type Item, ItemGone, ItemId, type ItemRef, type Questions, type RequestKind, type ThreadEntry, type WorkSource } from "../adapter-api.ts";
 import type { Runner } from "../adapters/claude-p.ts";
 import type { Config } from "../config/load.ts";
 import { invokedSources, isWaitingOnOwner } from "../config/machine.ts";
@@ -45,6 +45,7 @@ import { adoptEngine, bumpEngine, type EngineHome, engineStep } from "./engine-u
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import type { SlotPool } from "../slots/pool.ts";
 import { type AnswerScope, settleAnswers } from "./answers.ts";
+import { settleRequests, standOf } from "./requests.ts";
 import { PARK_OPTIONS, RUN_AGAIN } from "../decide/answer.ts";
 import { queueQuestion, recentlyAsked, releaseQuestions } from "./questions.ts";
 import type { Parked } from "../state/saved.ts";
@@ -232,7 +233,7 @@ export class Worker {
 	readonly #titles = new Map<string, string>();
 	/** The flow of each kind an open item runs, by `<machine id>@<version>`, its graph read once. */
 	readonly #flows = new Map<string, Flow>();
-	/** Items the owner answered that have not started yet; kept across ticks, because the watch token moves on. */
+	/** Items the owner answered, or sent a request that acts on their wait, that have not started yet; kept across ticks, because the watch token moves on. */
 	readonly #answered = new Set<string>();
 	/** Items whose owner wait timed out into work: a pass restores each wait and fires its timeout. */
 	readonly #timedOut = new Set<string>();
@@ -514,7 +515,8 @@ export class Worker {
 	}
 
 	/**
-	 * Reads the threads that can have changed, settles each new answer, and releases a parked item the owner answered.
+	 * Reads the threads that can have changed, settles each new answer and each request of an item no pass runs on, and
+	 * releases a parked item the owner answered.
 	 * Each item is read on its own: one that fails raises a card naming it and is read again next tick, and the rest go on.
 	 * A work job reads only the items gather claimed, the only ones its source holds; gather read every thread.
 	 */
@@ -538,6 +540,9 @@ export class Worker {
 					const held = parked.find((p) => p.item === id);
 					const lastAnswer = item.thread.findLast((e) => e.kind === "answer");
 					const lastAnswerAt = lastAnswer?.at;
+					const wait = asleep.get(id);
+					const answered = wait !== undefined && answerTo(item, wait.savedAt) !== undefined;
+					const requested = await this.#settleRequests(item, { answered, parked: held !== undefined });
 
 					if (held) {
 						if (isAnsweredSince(lastAnswerAt, held.since)) this.#unpark(id, lastAnswer);
@@ -545,12 +550,21 @@ export class Worker {
 						return;
 					}
 
-					const wait = asleep.get(id);
-
-					if (wait && answerTo(item, wait.savedAt)) this.#answered.add(id);
+					if (wait && (answered || requested !== undefined)) this.#answered.add(id);
 				}),
 			),
 		);
+	}
+
+	/** Settles the requests on an item no pass runs on, where its saved state stands; a pass in flight settles its own when it gathers. */
+	async #settleRequests(item: Item, flags: { readonly answered: boolean; readonly parked: boolean }): Promise<RequestKind | undefined> {
+		if (this.#inFlight.has(item.id)) return undefined;
+
+		const { state, adapters } = this.#o;
+		const saved = state.items.savedOf(item.id);
+		const kind = saved && this.#kindNamed(saved.kind)?.kind;
+
+		return settleRequests({ state, workSource: adapters.workSource, now: this.#now }, item, standOf(kind, saved, flags));
 	}
 
 	/** Runs one item's read; a failure raises the card that names the item, and the item is read again next tick. */
@@ -976,7 +990,7 @@ export class Worker {
 
 		this.#showRefusedMemory(memory.refused);
 		const open = this.#openItems();
-		const questions = openQuestions(state.questions.list(), state.answers.list());
+		const questions = openQuestions(state.questions.list(), [...state.answers.list(), ...state.requests.list()]);
 		await this.#keepFeeds(open.map(({ item }) => item));
 
 		const [latest, ci, links] = await Promise.all([this.#latest(), this.#ciTick(), this.#links([...new Set([...open.map(({ item }) => item), ...questions.map(({ item }) => item)])])]);

@@ -1,7 +1,7 @@
 import { APP_TOKEN_MINUTES, WAKE_OWN_ENV } from "./wake-job.ts";
 import { isProsePurpose, PROSE_STATES } from "../decide/prose.ts";
 import { z } from "zod";
-import { GUARD_PARAMS, isOwnerWait, kindMachine, nextStates, reachedFrom, transitionsOf } from "./machine.ts";
+import { GUARD_PARAMS, isOwnerWait, kindMachine, nextStates, reachedFrom, SKIP, skipTargetOf, transitionsOf } from "./machine.ts";
 import type { Problem } from "./refusal.ts";
 import {
 	FIXED_PARTS,
@@ -77,7 +77,17 @@ const interactionEvents = (node: StateNodeJSON): string[] => {
 
 const OWNER_SOURCE = "owner";
 
-/** Every event a wait offers the owner is one the state takes and only the owner sends; a skip goes to a state there is. */
+/** Whether a state's `skip` transitions are only the one hum adds from its `meta.skip`. */
+const isOnlyHumsSkip = (node: StateNodeJSON): boolean => {
+	const target = skipTargetOf(node);
+
+	return target !== undefined && JSON.stringify(node.on?.[SKIP]) === JSON.stringify([{ target }]);
+};
+
+/**
+ * Every event a wait offers the owner is one the state takes and only the owner sends. A skip goes to a state there is,
+ * from a wait on the owner, where a pass restores the item, and only hum adds the skip transition.
+ */
 const controlProblems = (kind: string, { machine }: Kind, hum: HumConfig): Problem[] =>
 	Object.entries(machine.states).flatMap(([state, node]): Problem[] => [
 		...interactionEvents(node).flatMap((event): Problem[] => [
@@ -85,6 +95,8 @@ const controlProblems = (kind: string, { machine }: Kind, hum: HumConfig): Probl
 			...(hum.events[event]?.source === OWNER_SOURCE ? [] : [{ problem: "interaction-event-not-owner", kind, state, event } as const]),
 		]),
 		...(node.meta?.skip === undefined || node.meta.skip.target in machine.states ? [] : [{ problem: "unknown-state", kind, state: node.meta.skip.target, why: `the skip of "${state}"` } as const]),
+		...(node.meta?.skip === undefined || isOwnerWait(node) ? [] : [{ problem: "skip-not-at-wait", kind, state } as const]),
+		...(node.on?.[SKIP] === undefined || isOnlyHumsSkip(node) ? [] : [{ problem: "skip-event-reserved", kind, state, event: SKIP } as const]),
 	]);
 
 const kindProblems = (kind: string, config: Kind, hum: HumConfig): Problem[] => {
@@ -185,7 +197,7 @@ const eventProblems = (hum: HumConfig, kinds: Readonly<Record<string, Kind>>): P
 			...(handled.has(event) ? [] : [{ problem: "event-without-handler", event } as const]),
 		]),
 		...[...handled].flatMap((event): Problem[] =>
-			event in hum.events || isXstateEvent(event) ? [] : [{ problem: "event-without-source", event, source: undefined }],
+			event in hum.events || isXstateEvent(event) || event === SKIP ? [] : [{ problem: "event-without-source", event, source: undefined }],
 		),
 	];
 };

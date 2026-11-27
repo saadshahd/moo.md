@@ -11,7 +11,7 @@ import { MergedCase } from "../measure/cases.ts";
 import { OpKeys } from "./ops.ts";
 import { Records } from "./records.ts";
 import { RunRecords } from "./runs.ts";
-import { EngineUpdate, FiledFollowUp, FiledPart, ItemKind, Landing, Learned, Limit, Parked, PullRequestText, QueuedQuestion, ReadyList, SavedPlan, SavedRepro, SavedTalk, Review, SettledAnswer, Slot, Spent, Verdict } from "./saved.ts";
+import { EngineUpdate, FiledFollowUp, FiledPart, ItemKind, Landing, Learned, Limit, Parked, PullRequestText, QueuedQuestion, ReadyList, SavedPlan, SavedRepro, SavedTalk, Review, SettledAnswer, SettledRequest, Slot, Spent, Verdict } from "./saved.ts";
 
 /** Names under the state folder that other modules address by name. */
 export const STATUS_FILE = "status.json";
@@ -86,6 +86,8 @@ export const openState = (dir: string, { now, ...codec }: StateOptions) => {
 		choices: new Records(join(dir, "choices"), Choice),
 		/** Each answer's disposition, by item and ordinal. */
 		answers: new Records(join(dir, "answers"), SettledAnswer),
+		/** Each owner's request's disposition, by item and ordinal. */
+		requests: new Records(join(dir, "requests"), SettledRequest),
 		/** Review notes, by source and source id. */
 		notes: new Records(join(dir, "notes"), ReviewNote),
 		/** Notes that state one rule, by the key of the first. */
