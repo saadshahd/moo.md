@@ -4,7 +4,7 @@ import { join } from "node:path";
 import slugify from "@sindresorhus/slugify";
 import PQueue from "p-queue";
 import pRetry from "p-retry";
-import { type Adapter, ADAPTER_API_VERSION, type AdapterContext, type Claim, type Failed, type Item, ITEM_ID_LENGTH, ItemId, type ItemRef, PermanentError, type ThreadEntry, type Watch } from "../adapter-api.ts";
+import { type Adapter, ADAPTER_API_VERSION, type AdapterContext, type Claim, type Failed, type Item, ItemGone, ITEM_ID_LENGTH, ItemId, type ItemRef, PermanentError, type ThreadEntry, type Watch } from "../adapter-api.ts";
 import type { HumConfig, MergeMethod } from "../config/schema.ts";
 import { growthLabelsOf } from "../decide/growth.ts";
 import { parseArgument } from "./argument.ts";
@@ -304,7 +304,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 			async () => {
 				const source = await itemSource(id);
 
-				if (source === undefined) throw new PermanentError(`no item "${id}" under ${itemsDir}/`);
+				if (source === undefined) throw new ItemGone(id, `${itemsDir}/`);
 
 				return { path: pathOf(id), content: appendEntry(source, { ...entry, at: now() }, text) };
 			},
@@ -337,7 +337,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 		const item = parseArgument(ItemId, id);
 		const [source, claims] = await Promise.all([itemSource(item), claimsNow()]);
 
-		if (source === undefined) throw new PermanentError(`no item "${item}" under ${itemsDir}/`);
+		if (source === undefined) throw new ItemGone(item, `${itemsDir}/`);
 
 		const file = parseOrReport(item, source);
 
@@ -369,7 +369,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 				write(`hum: finish ${id}`, async () => {
 					const source = await itemSource(id);
 
-					if (source === undefined) throw new PermanentError(`no item "${id}" under ${itemsDir}/`);
+					if (source === undefined) throw new ItemGone(id, `${itemsDir}/`);
 
 					return parseItemFile(source).state === DONE_STATE ? undefined : { path: pathOf(id), content: markDone(source) };
 				}),

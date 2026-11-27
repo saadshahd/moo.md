@@ -338,6 +338,8 @@ export type Runner = {
 	 * hum has nothing to take from or do about. Only a runner whose runs are Rail rows keeps any.
 	 */
 	readonly talking?: () => Promise<ReadonlyMap<string, boolean>>;
+	/** Stops each named run where it still runs outside this process, and drops what the runner keeps of it. */
+	readonly forget?: (names: readonly string[]) => Promise<void>;
 };
 
 export type RunnerOptions = {

@@ -2,8 +2,9 @@ import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { lock } from "proper-lockfile";
 import { z } from "zod";
-import { ADAPTER_API_VERSION, type AdapterContext, type Answers, type Claim, Holder, type Integrations, type Item, ItemId, type ItemRef, PermanentError, type Question, type Questions, type ThreadEntry, type Watch, type WorkSource } from "../adapter-api.ts";
+import { ADAPTER_API_VERSION, type AdapterContext, type Answers, type Claim, Holder, type Integrations, type Item, ItemGone, ItemId, type ItemRef, PermanentError, type Question, type Questions, type ThreadEntry, type Watch, type WorkSource } from "../adapter-api.ts";
 import { hashJson } from "../config/hash.ts";
+import type { Json } from "../config/json.ts";
 import type { HumConfig } from "../config/schema.ts";
 import { atomicWrite, dropInto, listFiles, orMissing, slug } from "../state/fs.ts";
 import { INBOX_DIR } from "../state/open.ts";
@@ -20,6 +21,9 @@ export const ROUNDUP = "roundup";
 
 /** Whether any slot `integrations` names is served by roundup. */
 export const doesUseRoundup = (integrations: HumConfig["integrations"]): boolean => Object.values(integrations ?? {}).includes(ROUNDUP);
+
+/** roundup's JSON-RPC code for a call whose Todo, Pad or Agent does not exist. */
+const NOT_FOUND = -32001;
 
 /** An Agent's comment on a Todo is one line of at most this many characters. */
 const COMMENT_LIMIT = 280;
@@ -164,7 +168,17 @@ export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterCon
 
 	const { call } = client;
 
-	const todoOf = async (id: string) => Todo.parse(await call("todo.get", { id: parseArgument(TodoId, id) }));
+	/** A call on the item's Todo alone, so roundup's not-found means the owner deleted it, and hum lets go of the item. */
+	const onTodo = (method: string, id: string, params: Record<string, Json> = {}): Promise<Json> =>
+		call(method, { id: parseArgument(TodoId, id), ...params }).catch(async (error: Error) => {
+			if (!(error instanceof RoundupRefusal && error.code === NOT_FOUND)) throw error;
+
+			await letGo(id);
+
+			throw new ItemGone(id, ROUNDUP);
+		});
+
+	const todoOf = async (id: string) => Todo.parse(await onTodo("todo.get", id));
 
 	const todos = async () => z.array(Todo).parse(await call("todo.list"));
 
@@ -270,6 +284,19 @@ export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterCon
 		for (const open of questionsOf(id).filter((asking) => takenOf(asking) === undefined)) await stop(open.row);
 	};
 
+	/** Drops what hum keeps for the item and roundup holds for no Ext: its question folders and its claim. */
+	const dropKept = (id: string): void => {
+		for (const { root } of questionsOf(id)) rmSync(root, { recursive: true, force: true });
+
+		rmSync(claimFile(id), { force: true });
+	};
+
+	/** Lets go of an item whose Todo the owner deleted: its open question rows stop, and what hum kept for it goes. */
+	const letGo = async (id: string): Promise<void> => {
+		await stopOpen(id);
+		dropKept(id);
+	};
+
 	const takeAnswers = async (id: string, nodes: readonly RailNode[]): Promise<void> => {
 		for (const asking of questionsOf(id).filter((open) => takenOf(open) === undefined)) {
 			const status = nodes.find((node) => node.id === asking.row)?.status;
@@ -291,7 +318,7 @@ export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterCon
 	const threadOf = async (id: string, nodes: readonly RailNode[]): Promise<ThreadEntry[]> => {
 		await takeAnswers(id, nodes);
 
-		const comments = z.array(Comment).parse(await call("todo.comments", { id: parseArgument(TodoId, id) }));
+		const comments = z.array(Comment).parse(await onTodo("todo.comments", id));
 
 		return [
 			...comments.flatMap((comment): ThreadEntry[] => (comment.author.id === HUM_EXT ? [{ ...parseComment(comment.body, comment.created_at), author: "hum" }] : [])),
@@ -304,7 +331,7 @@ export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterCon
 	};
 
 	const post = async (id: string, text: string): Promise<void> => {
-		await call("todo.comment", { id: parseArgument(TodoId, id), body: text });
+		await onTodo("todo.comment", id, { body: text });
 	};
 
 	/** A text too long for one comment goes whole into a Pad in the item's Workstream; the comment holds its first words and the Pad's name. */
@@ -381,9 +408,7 @@ export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterCon
 						if (!(error instanceof RoundupRefusal)) throw error;
 					});
 
-				for (const { root } of questionsOf(id)) rmSync(root, { recursive: true, force: true });
-
-				rmSync(claimFile(id), { force: true });
+				dropKept(id);
 			},
 		},
 		questions: {

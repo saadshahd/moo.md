@@ -5,7 +5,7 @@ import { declaredKind, kindQuestion, UNSURE } from "../decide/kind.ts";
 import { PLAIN_QUESTIONS } from "../decide/question.ts";
 import type { State } from "../state/open.ts";
 import type { ItemKind } from "../state/saved.ts";
-import { queueQuestion } from "./questions.ts";
+import { queuedKey, queueQuestion } from "./questions.ts";
 import { pickedAnswer } from "./thread.ts";
 
 export type KindContext = {
@@ -70,4 +70,12 @@ export const forgetProgress = (state: State, id: string): void => {
 	state.plans.remove(id);
 	state.verdicts.remove(id);
 	state.repros.remove(id);
+};
+
+/** Drops all that takes an item up again: its progress, its park and its queued questions. */
+export const forgetItem = (state: State, id: string): void => {
+	forgetProgress(state, id);
+	state.parked.remove(id);
+
+	for (const queued of state.questions.list()) if (queued.item === id) state.questions.remove(queuedKey(queued));
 };

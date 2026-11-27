@@ -12,6 +12,18 @@ export class PermanentError extends Error {
 	override name: string = "PermanentError";
 }
 
+/** The source no longer holds the item, as a Todo its owner deleted: no retry finds it, and the engine ends the item. */
+export class ItemGone extends PermanentError {
+	override name = "ItemGone";
+
+	constructor(
+		readonly item: string,
+		where = "the work source",
+	) {
+		super(`${where} no longer holds item "${item}"`);
+	}
+}
+
 /** The most characters an item id holds. */
 export const ITEM_ID_LENGTH = 100;
 
