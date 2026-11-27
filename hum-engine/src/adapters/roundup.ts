@@ -11,9 +11,9 @@ import { INBOX_DIR } from "../state/open.ts";
 import { parseArgument } from "./argument.ts";
 import { claimer, isHeldBy, isLive } from "./claim.ts";
 import { handoffPadName, handoffText } from "./handoff-pad.ts";
-import { HUM_PLUGIN, ownerAnswers } from "./hooked-run.ts";
+import { ownerAnswers } from "./hooked-run.ts";
 import { commentText, cutLine, followUpBody, isFollowUpOf, type Marker, markedLine, optionsIn, parseComment, questionOf, questionText } from "./marked.ts";
-import { agentLink, askName, ENDED, FEED_ITEM_ENV, feedName, isItemWorkstream, itemWorkstream, NEEDS_YOU, NOT_FOUND, padLink, projectKeyOf, putPad, RailNode, railName, railTree, rootWorkstream } from "./rail.ts";
+import { agentLink, askName, ENDED, isItemWorkstream, itemWorkstream, NEEDS_YOU, NOT_FOUND, padLink, projectKeyOf, putPad, type RailNode, railName, railTree, rootWorkstream } from "./rail.ts";
 import { type RowConfig, startRow } from "./rail-rows.ts";
 import { HUM_EXT, type RoundupEvent, RoundupRefusal, roundupRpc } from "./roundup-rpc.ts";
 import { askedSince, markAsked, type RunFolder, runFolderAt } from "./run-answer.ts";
@@ -32,9 +32,6 @@ const PAD_DIGEST_LENGTH = 8;
 
 /** A question row only asks. */
 const QUESTION_EFFORT = "low";
-
-/** The card for an item whose feed row roundup would not start. */
-const FEED_REFUSED_CODE = "feed-refused";
 
 /** The card for an answer a question row's hook reported that hum cannot take as one answer to its question. */
 const UNREAD_ANSWER_CODE = "question-answer-unread";
@@ -234,38 +231,13 @@ export const roundupAdapter = (options: RoundupOptions, { now, env, report }: Ad
 		}
 	};
 
-	/**
-	 * Starts the item's feed row in its Workstream: a session with hum's plugin on and no prompt, so it spends nothing
-	 * until the owner types in it, whose hum pane shows the item alone. One stands once any row of its name does, ended
-	 * or not, so a feed row the owner stopped stays stopped. A refusal, as to a hum that is not the Project's Program,
-	 * raises a card and leaves the claim standing.
-	 */
-	const startFeed = async (id: ItemId, workstream: string, nodes: readonly RailNode[]): Promise<void> => {
-		const name = feedName(id);
-
-		if (nodes.some((node) => node.parent === workstream && node.name === name)) return;
-
-		const started = await call("agent.spawn", { cwd: options.repo, parent: workstream, name, settings: { enabledPlugins: { [HUM_PLUGIN]: true }, env: { [FEED_ITEM_ENV]: id } }, visibility: "shown" }).catch((error: Error) => {
-			if (!(error instanceof RoundupRefusal)) throw error;
-
-			report({ code: FEED_REFUSED_CODE, item: id, cause: `roundup would not start the feed row of #${id}: ${error.message}`, fix: "hum starts it at the item's next claim, once roundup takes this hum for the Project's Program." });
-
-			return undefined;
-		});
-
-		const row = started === undefined ? undefined : RailNode.parse(started);
-
-		if (row !== undefined && row.name !== name) await call("rail.rename", { id: row.id, name });
-	};
-
-	/** A won claim takes the Todo out of the owner's Workstream into its own, where the item's feed row starts. */
+	/** A won claim takes the Todo out of the owner's Workstream into its own. */
 	const takeIn = async (id: ItemId): Promise<void> => {
 		const [todo, nodes] = await Promise.all([todoOf(id), railTree(call)]);
-		const workstream = await itemWorkstream(call, { id, title: todo.title });
 
-		if (todo.home === humWorkstream(nodes).id) await call("todo.move", { id: todo.id, home: workstream });
+		if (todo.home !== humWorkstream(nodes).id) return;
 
-		await startFeed(id, workstream, nodes);
+		await call("todo.move", { id: todo.id, home: await itemWorkstream(call, { id, title: todo.title }) });
 	};
 
 	const take = claimer(

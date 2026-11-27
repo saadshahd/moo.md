@@ -340,6 +340,8 @@ export type Runner = {
 	readonly talking?: () => Promise<ReadonlyMap<string, boolean>>;
 	/** Stops each named run where it still runs outside this process, and drops what the runner keeps of it. */
 	readonly forget?: (names: readonly string[]) => Promise<void>;
+	/** Starts the row that shows each of `items` to the owner where it has none: only a runner whose runs are Rail rows keeps such rows. */
+	readonly keepFeeds?: (items: readonly string[]) => Promise<void>;
 	/** Where the owner opens each of `items` and its runs, by item: only a runner whose runs are Rail rows has such places. */
 	readonly links?: (items: readonly string[]) => Promise<ReadonlyMap<string, ItemLinks>>;
 };

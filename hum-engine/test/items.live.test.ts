@@ -284,7 +284,7 @@ test.skipIf(!live)("a part split from a talked feature item keeps the owner's wo
 	expect(talk).toMatchObject({ order: { title: "Write the note" }, choices: [{ pick: "the first" }, { pick: "the first" }, { pick: "the first" }, { pick: "plain" }] });
 }, RIG_MS);
 
-test.skipIf(!live)("a claimed item's feed row starts once, idle, with no prompt, and goes with the item's Workstream when it lands", async () => {
+test.skipIf(!live)("a held item's feed row starts once, idle, with no prompt, and goes with the item's Workstream when it lands", async () => {
 	const { feed } = await run("feed");
 
 	expect(feed?.rows.map(({ status }) => status?.kind)).toEqual(["idle"]);

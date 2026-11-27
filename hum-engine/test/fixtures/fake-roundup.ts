@@ -24,7 +24,7 @@ type Node = { id: string; name: string; kind: string; parent: string | null };
 
 type Comment = { author: { id: string }; body: string; created_at: number };
 
-type Params = { id?: number | string; title?: string; body?: string; home?: string | null; name?: string; parent?: string | null; cwd?: string; settings?: object; visibility?: string };
+type Params = { id?: number | string; title?: string; body?: string; home?: string | null; name?: string };
 
 /** One method the Daemon serves: what it answers `params` with. */
 type Method = (params: Params) => object;
@@ -88,14 +88,6 @@ export const fakeRoundup = async () => {
 
 				return {};
 			},
-			"agent.spawn": ({ name = "", parent = null }) => {
-				const node = { id: String(nextId++), name, kind: "agent", parent };
-
-				nodes.push(node);
-
-				return node;
-			},
-			"rail.rename": ({ id, name = "" }) => Object.assign(nodes.find((node) => node.id === id) ?? {}, { name }),
 			"agent.stop": ({ id }) => {
 				throw new Refusal(NOT_FOUND, `not found: Agent "${id}"`);
 			},

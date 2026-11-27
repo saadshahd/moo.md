@@ -309,8 +309,9 @@ const split = async (): Promise<object> => {
 };
 
 /**
- * Claims and renews an item as the Project's program, which starts its feed row once, reads that row once its claude
- * started, with the argv roundup started it with, then finishes the item and reads what of it is left on the Rail.
+ * Claims an item, which makes its Workstream, then keeps its feed row twice as the Project's program, which starts it
+ * once; reads that row once its claude started, with the argv roundup started it with, then finishes the item and reads
+ * what of it is left on the Rail.
  */
 const feed = async (): Promise<object> => {
 	const seeder = roundupRpc(socket);
@@ -325,9 +326,16 @@ const feed = async (): Promise<object> => {
 	const item = ItemId.parse(String(id));
 	const adapter = adapterOn("state-feed");
 	const argv = join(rig, "argv-feed.txt");
+	const state = openState(join(rig, "state-feed"), { now });
+	const program = await roundupProgram(process.env, state.faults);
+
+	if (!program) return { error: `roundup did not take this process as its program: ${JSON.stringify(state.faults.list())}` };
+
+	const runner = railRunner({ call: program.call, repo: join(rig, "repo"), state, config: SHIPPED_DEFAULTS, fallback: refusing, now });
 
 	await adapter.workSource.claim(item, Holder.parse("rig"), ANSWER_WAIT_MS);
-	await adapter.workSource.renew(item, Holder.parse("rig"), ANSWER_WAIT_MS);
+	await runner.keepFeeds?.([item]);
+	await runner.keepFeeds?.([item]);
 
 	for (const deadline = Date.now() + ANSWER_WAIT_MS; !existsSync(argv) && Date.now() < deadline; ) await Bun.sleep(100);
 
