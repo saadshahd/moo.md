@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { fullStatus, linkedStatus, NOW } from "../../../hum/fixtures/status.ts";
 import { flowRows } from "../../../hum/mod/view/flow.ts";
+import { type AnswerPlace, IN_PROMPT } from "../../../hum/mod/view/links.ts";
 import { openingRows, paneRows } from "../../../hum/mod/view/pane.ts";
 import type { Press, Row } from "../../../hum/mod/view/row.ts";
 import type { OpenItem, Question } from "../../src/status/format.ts";
@@ -19,8 +20,8 @@ const itemOf = (id: string, status = fullStatus): OpenItem => {
 
 const ITEM_74 = itemOf("74");
 
-const drawn = (item: OpenItem, { question, unfolded = [] }: { readonly question?: Question; readonly unfolded?: readonly string[] } = {}): Row[] =>
-	flowRows(item, { now: NOW, width: WIDTH, unfolded: new Set(unfolded), question });
+const drawn = (item: OpenItem, { question, unfolded = [], answering = IN_PROMPT }: { readonly question?: Question; readonly unfolded?: readonly string[]; readonly answering?: AnswerPlace } = {}): Row[] =>
+	flowRows(item, { now: NOW, width: WIDTH, unfolded: new Set(unfolded), question, answering });
 
 const lines = (rows: readonly Row[]): string[] => rows.map(textOf);
 
@@ -75,7 +76,7 @@ test("the card's buttons: each choice the engine gives an answer word, then a wr
 	]);
 });
 
-test("an open question puts its text on the card and its options, where it has some, in place of the step's choices, then a written answer; a question asked in a roundup row keeps its one open button", () => {
+test("an open question puts its text on the card and its options, where it has some, in place of the step's choices, then a written answer; an item on roundup answers only through the one button that opens its asking row, and has no answer button while no row asks", () => {
 	const question: Question = { item: "74", text: "Approve this change?", options: ["approve", "retry"], since: NOW };
 	const inRow = linkedStatus.questions.find(({ row }) => row !== undefined);
 	const labels = (asked?: Question) => buttonsOf(drawn(ITEM_74, { question: asked })).map(({ label }) => label);
@@ -83,7 +84,8 @@ test("an open question puts its text on the card and its options, where it has s
 	expect(lines(drawn(ITEM_74, { question }))).toContainEqual(expect.stringMatching(/│ Approve this change\? +│$/));
 	expect(labels(question)).toEqual(["approve", "retry", "answer"]);
 	expect(labels({ ...question, options: [] })).toEqual(["Approve", "answer"]);
-	expect(buttonsOf(drawn(ITEM_74, { question: inRow })).map(({ label, press }) => [label, press.kind])).toEqual([["open ↗", "link"]]);
+	expect(buttonsOf(drawn(ITEM_74, { question: inRow, answering: { kind: "row", row: inRow?.row } })).map(({ label, press }) => [label, press.kind])).toEqual([["open ↗", "link"]]);
+	expect(buttonsOf(drawn(ITEM_74, { question, answering: { kind: "row" } }))).toEqual([]);
 });
 
 test("the note picker offers the steps a note may go to, and the card leaves it out where none is", () => {

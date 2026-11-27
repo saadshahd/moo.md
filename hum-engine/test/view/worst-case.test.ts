@@ -5,6 +5,7 @@ import { hugeStatus, LONGEST_ID, worstStatus } from "../../../hum/fixtures/worst
 import { type BandInput, bandRow } from "../../../hum/mod/view/band.ts";
 import { noticeCardRows, questionCardRows } from "../../../hum/mod/view/cards.ts";
 import { rowCells } from "../../../hum/mod/view/cells.ts";
+import { IN_PROMPT } from "../../../hum/mod/view/links.ts";
 import { headerRow, measureRow, tokensText } from "../../../hum/mod/view/header.ts";
 import { openingRows, paneRows } from "../../../hum/mod/view/pane.ts";
 import type { ViewRead } from "../../../hum/mod/view/read.ts";
@@ -97,6 +98,7 @@ test("a tool's colour codes in a card show as the words they hold", () => {
 	const [cause] = noticeCardRows(
 		{ kind: "fault", key: "k", item: "72", code: "check-failed", cause: "\u001b[31mFAIL\u001b[0m test/a.test.ts > renders the pane\u001b[2K\r expected 1 to be 2", fix: "Fix it.", since: NOW },
 		{ now: NOW, width: 200 },
+		() => IN_PROMPT,
 	).slice(1);
 
 	expect(cause === undefined ? "" : drawn(cause)).toBe("FAIL test/a.test.ts > renders the pane expected 1 to be 2");

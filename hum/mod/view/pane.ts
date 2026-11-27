@@ -6,7 +6,7 @@ import { reportedUnread, sinceText } from "./freshness.ts";
 import { headerRow, measureRow } from "./header.ts";
 import type { ViewInput } from "./input.ts";
 import { flowRows } from "./flow.ts";
-import { handoffRow, itemTitle, runRows } from "./links.ts";
+import { answerPlaceOf, handoffRow, IN_PROMPT, itemTitle, runRows } from "./links.ts";
 import { type ListEntry, listRows } from "./lists.ts";
 import { innerWidth, padded, type Row, span } from "./row.ts";
 import { problemWords } from "./summary.ts";
@@ -37,7 +37,7 @@ const listSection = (title: string, entries: readonly ListEntry[], input: PaneIn
 const cardQuestionOf = ({ questions }: Status, item: string): Question | undefined => questions.findLast((question) => question.item === item);
 
 /** Each open item's flow, a block of its own, with the question its card asks. */
-const flowBlocks = (status: Status, input: PaneInput): Row[][] => status.open.map((item) => flowRows(item, { ...input, question: cardQuestionOf(status, item.item) }));
+const flowBlocks = (status: Status, input: PaneInput): Row[][] => status.open.map((item) => flowRows(item, { ...input, question: cardQuestionOf(status, item.item), answering: answerPlaceOf(status, item.item) }));
 
 /** The status without the questions open items' cards ask; an item's older questions stay cards. */
 const withoutCardQuestions = (status: Status): Status => {
@@ -71,12 +71,16 @@ const unreadBlocks = (input: ViewInput): Row[][] => {
 };
 
 /** The cards, the unread read first, then question cards, then waiting and limited, then the fault cards not dismissed. */
-const cardBlocks = (status: Status, input: ViewInput): Row[][] => [
-	...unreadBlocks(input),
-	...status.questions.map((question) => questionCardRows(question, input)),
-	...NOTICE_ORDER.flatMap((kind) => status.cards.filter((card) => card.kind === kind).map((card) => noticeCardRows(card, input))),
-	...shownFaultGroups(status, input.dismissed).map((group) => faultCardRows(group, input)),
-];
+const cardBlocks = (status: Status, input: ViewInput): Row[][] => {
+	const places = (item: string | undefined) => (item === undefined ? IN_PROMPT : answerPlaceOf(status, item));
+
+	return [
+		...unreadBlocks(input),
+		...status.questions.map((question) => questionCardRows(question, input)),
+		...NOTICE_ORDER.flatMap((kind) => status.cards.filter((card) => card.kind === kind).map((card) => noticeCardRows(card, input, places))),
+		...shownFaultGroups(status, input.dismissed).map((group) => faultCardRows(group, input, places)),
+	];
+};
 
 /** The status as the feed row of `item` shows it: only that item's questions and cards. */
 const ofItem = (status: Status, item: string): Status => ({ ...status, questions: status.questions.filter((question) => question.item === item), cards: status.cards.filter((card) => card.item === item) });

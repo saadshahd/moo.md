@@ -1,4 +1,6 @@
-import { expect, test } from "claude-code/testing";
+import type { On } from "claude-code";
+import { type Engine, expect, test } from "claude-code/testing";
+import type { Status } from "../../hum-engine/src/status/format.ts";
 import { PANE, engineWith, served, start } from "../fixtures/engine.tsx";
 import { linkedStatus } from "../fixtures/status.ts";
 
@@ -47,7 +49,30 @@ test("a question's open control opens the row that asks it in the roundup App, a
 		["open", "roundup://agent/22?project=key"],
 		["open", "roundup://agent/24?project=key"],
 		["open", "roundup://agent/24?project=key"],
+		["open", "roundup://agent/24?project=key"],
 		["open", "roundup://pad/%2374%20handoff?project=key"],
 	]);
 	await ui.unmount();
+});
+
+/** The labels of the feed pane's buttons over `status`. */
+const feedButtons = async ($: Engine, on: On, status: Status): Promise<string[]> => {
+	engineWith(on, served(status), () => undefined, FEED);
+	on("ui.open", () => ({ value: { isPlaced: true } }));
+	await start($);
+
+	const ui = await $.ui.mount({ ...PANE, props: { ...PANE.props, bodyColumns: WIDE }, surface: "terminal" });
+	const labels = (await ui.findAll({ type: "Button" })).map(({ text }) => (text ?? "").replaceAll(/[▐▌]/gu, "").trim());
+
+	await ui.unmount();
+
+	return labels;
+};
+
+test("on roundup a waiting card's action opens the row that asks the item, since hum takes no answer from the prompt there", async ($, on) => {
+	expect(await feedButtons($, on, linkedStatus)).toEqual(Array(6).fill("open ↗"));
+});
+
+test("on roundup a waiting card shows no action while no row asks the item", async ($, on) => {
+	expect(await feedButtons($, on, { ...linkedStatus, questions: linkedStatus.questions.filter(({ item }) => item !== "74") })).toEqual(Array(4).fill("open ↗"));
 });
