@@ -52,7 +52,8 @@ import { PARK_OPTIONS, RUN_AGAIN } from "../decide/answer.ts";
 import { endWait, queueQuestion, recentlyAsked, releaseQuestions } from "./questions.ts";
 import type { Parked } from "../state/saved.ts";
 import { answerTo, type Checkout, doesStartOver, ownerWaitStage, claimTtlMs, DEFAULT_BASE, gatherItem, hasEndedStuck, isGathered, isTalking, park, parkQuestion, rememberKinds, runThinPath, type TalkCopy, talkWaits, type ThinPathOptions, type ThinResult } from "./thin-path.ts";
-import { ownerAnswered } from "../state/item-log.ts";
+import { answerApplied } from "../state/item-log.ts";
+import { isGivenAt, keptAnswer, parkedWait, waitOf } from "./owner-answers.ts";
 import { forgetItem, hasProgress } from "./kind.ts";
 import { dropReviews } from "./owner-handoff.ts";
 
@@ -217,8 +218,6 @@ const readEvery = <T>(read: (() => Promise<T | undefined>) | undefined, { everyM
 
 /** Sources that never settle, so a restored item can be stepped by its timers without starting a run. */
 const neverSources = (kind: Kind) => invokedSources(kind, createAsyncLogic({ run: () => new Promise<never>(() => {}) }));
-
-const isAnsweredSince = (answeredAt: number | undefined, since: number): boolean => answeredAt !== undefined && answeredAt > since;
 
 /**
  * The worker. Each tick reads its facts once, then decides: it fires waits whose deadline has passed, renews claims,
@@ -468,7 +467,7 @@ export class Worker {
 		state.parked.remove(id);
 		state.faults.clear({ code: `item-${parked.why}`, item: id });
 
-		if (answer) state.events.add(ownerAnswered(id, answer.at));
+		if (answer) state.events.add(answerApplied(id, answer.at));
 
 		const landsAgain = state.landings.get(id) !== undefined && answer?.option !== RUN_AGAIN;
 
@@ -508,14 +507,16 @@ export class Worker {
 	#stageOf(id: string, ready: boolean, sleeping: ReadonlyMap<string, SavedSnapshot>): AnswerScope {
 		const parked = this.#o.state.parked.get(id);
 
-		if (this.#inFlight.has(id)) return { stage: "running" };
-
-		if (parked) return { stage: parked.why === "review" ? "approval" : "waiting", options: PARK_OPTIONS[parked.why], since: parked.since };
-
 		const asleep = sleeping.get(id);
+		const wait = asleep && waitOf(asleep);
+
+		if (this.#inFlight.has(id)) return { stage: "running", wait };
+
+		if (parked) return { stage: parked.why === "review" ? "approval" : "waiting", options: PARK_OPTIONS[parked.why], since: parked.since, wait: parkedWait(parked) };
+
 		const kind = asleep && this.#kindNamed(asleep.kind)?.kind;
 
-		if (asleep && kind) return { stage: ownerWaitStage(kind, asleep.state) };
+		if (asleep && kind) return { stage: ownerWaitStage(kind, asleep.state), wait };
 
 		return { stage: ready ? "waiting" : "ended" };
 	}
@@ -568,15 +569,14 @@ export class Worker {
 					const item = await settleAnswers({ state, workSource: adapters.workSource, judge: this.#judge, now: this.#now }, raw, this.#stageOf(id, raw.ready, asleep));
 					const held = parked.find((p) => p.item === id);
 					const lastAnswer = item.thread.findLast((e) => e.kind === "answer");
-					const lastAnswerAt = lastAnswer?.at;
 					const wait = asleep.get(id);
-					const answered = wait !== undefined && answerTo(item, wait.savedAt) !== undefined;
+					const answered = wait !== undefined && answerTo(state.events, item, waitOf(wait)) !== undefined;
 					const requested = await this.#settleRequests(item, { answered, parked: held !== undefined });
 
 					await this.#settleNotes(item);
 
 					if (held) {
-						if (isAnsweredSince(lastAnswerAt, held.since)) this.#unpark(id, lastAnswer);
+						if (lastAnswer !== undefined && isGivenAt(keptAnswer(state.events, id, lastAnswer), parkedWait(held))) this.#unpark(id, lastAnswer);
 
 						return;
 					}

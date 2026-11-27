@@ -32,8 +32,8 @@ const Commit = z.object({ oid: z.string(), message: z.string() });
 
 const Labels = z.object({ nodes: z.array(z.object({ name: z.string() })) });
 
-/** A comment with who wrote it; GitHub names no author once the account is deleted. */
-const IssueComment = z.object({ body: z.string(), createdAt: z.string(), authorAssociation: z.string(), author: z.object({ __typename: z.string(), login: z.string() }).nullable() });
+/** A comment with its id and who wrote it; GitHub names no author once the account is deleted. */
+const IssueComment = z.object({ id: z.string().min(1), body: z.string(), createdAt: z.string(), authorAssociation: z.string(), author: z.object({ __typename: z.string(), login: z.string() }).nullable() });
 
 type IssueComment = z.infer<typeof IssueComment>;
 
@@ -94,7 +94,7 @@ const ITEM = `query Item($owner: String!, $name: String!, $number: Int!, $claimR
 		issue(number: $number) {
 			id title body state
 			labels(first: 100) { nodes { name } }
-			comments(first: 100, after: $cursor) { nodes { body createdAt authorAssociation author { __typename login } } pageInfo { hasNextPage endCursor } }
+			comments(first: 100, after: $cursor) { nodes { id body createdAt authorAssociation author { __typename login } } pageInfo { hasNextPage endCursor } }
 			assignees(first: 10) { nodes { login } }
 			closedByPullRequestsReferences(first: 10) { nodes { number headRefName } }
 		}
@@ -351,7 +351,7 @@ export const githubAdapter = (options: GitHubOptions, { now, env }: AdapterConte
 					title: issue.title,
 					body: issue.body,
 					ready: isReadyIssue(issue) && !isLive(claimFrom(id, ref?.target), now()),
-					thread: issue.comments.nodes.map((found) => parseComment(found.body, Date.parse(found.createdAt))),
+					thread: issue.comments.nodes.map((found) => ({ ...parseComment(found.body, Date.parse(found.createdAt)), id: found.id })),
 					labels: issue.labels.nodes.map((label) => label.name),
 					claimedBy: [
 						...issue.assignees.nodes.map(({ login }) => `@${login}`),

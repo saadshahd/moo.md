@@ -18,6 +18,8 @@ import { openState, PUBLISH_DIR } from "../../src/state/open.ts";
 import { evidenceRef } from "../../src/worker/evidence.ts";
 import { runBranch } from "../../src/worker/thin-path.ts";
 import { publishWake } from "../../src/publish/wake.ts";
+import { requestWait } from "../../src/decide/request.ts";
+import { givenAt, keepAnswer, waitOf } from "../../src/worker/owner-answers.ts";
 import { doneByOf, foldItem } from "../../src/state/item-log.ts";
 import type { Intent } from "../../src/publish/intents.ts";
 
@@ -190,6 +192,7 @@ test("publish takes a pass past the owner's wait gather settled their answer to,
 	w.state.itemKinds.put(id, { item: id, kind: "feature", from: "source" });
 	w.state.items.save(id, feature, { status: "active", value: "asking", context: {} });
 	w.state.answers.put(`${id}#1`, { item: id, ordinal: 1, text: reply.text, disposition: "applied", why: "The run goes on with your answer.", at: now() + 3, source: "free" });
+	await keepAnswer(w.state.events, id, reply, () => ({ wait: givenAt(w.state.items.savedOf(id) && waitOf(w.state.items.savedOf(id)!), reply.at), choice: "", read: "free" }));
 	work.items.save(id, feature, { status: "active", value: "merging", context: {} });
 	await publisher.workSource.claim(id, publisher.holder, claimTtlMs(w.config));
 
@@ -210,7 +213,8 @@ test("publish takes a pass past the owner's wait at which gather applied the own
 	const now = () => w.clock.at;
 	const feature = w.config.kinds.feature!;
 	const publisher = publisherOf(w.thinPath({ now }), docsJudge);
-	const thread = [{ kind: "run-now", text: "Run the timer of asking now.", at: now() + 1, step: "asking", author: "hum" } as const];
+	const runNow = { kind: "run-now", text: "Run the timer of asking now.", at: now() + 1, step: "asking", author: "hum" } as const;
+	const thread = [runNow];
 
 	const wake = (work: ReturnType<typeof openState>) =>
 		publishWake({
@@ -236,6 +240,7 @@ test("publish takes a pass past the owner's wait at which gather applied the own
 	expect(w.state.items.savedOf(id)?.state).toBe("asking");
 
 	w.state.requests.put(`${id}#1`, { item: id, ordinal: 1, kind: "run-now", step: "asking", disposition: "applied", why: "the timer of asking fires now", at: now() + 2 });
+	await keepAnswer(w.state.events, id, runNow, () => ({ wait: requestWait(runNow, { at: "asking", savedAt: w.state.items.savedOf(id)?.savedAt }), choice: "run-now", read: "marker" }));
 
 	expect(await wake(workedToBuilding())).toEqual([{ outcome: "waiting", item: id }]);
 	expect(w.state.items.savedOf(id)?.state).toBe("building");

@@ -130,7 +130,7 @@ test("a snapshot from an older engine restores in place and saves under the newe
 	expect(JSON.parse(readFileSync(next.items.path("#68"), "utf8")).engineVersion).toBe("0.2.0");
 });
 
-const answered = (sourceId: string): NewEvent => ({ source: "thread", sourceId, itemId: "#68", type: "answered", payload: {} });
+const answered = (sourceId: string): NewEvent => ({ source: "thread", sourceId, itemId: "#68", type: "answer-applied", payload: {} });
 
 test("an older engine that meets a newer engine's snapshot and log gives one card however often it looks, keeps the files, and does not start the item over", async () => {
 	const newer = openState(dir, { engineVersion: "0.2.0", now: Date.now });
@@ -320,7 +320,8 @@ const readsOf = (state: State) =>
 const folderOf = (store: keyof typeof SAVED_0_1_0): string => (store === "runs" || store === "events" ? join(dir, store, slug(SAVED_0_1_0[store].itemId)) : join(dir, store));
 
 /** Where a record reads otherwise than hum 0.1.0 wrote it: its log record, at format 0, climbs to this engine's format. */
-const READS_AS: Partial<Record<keyof typeof SAVED_0_1_0, { readonly format: number }>> = { events: { format: LOG_FORMAT } };
+/** An `answered` of format 1 kept only that the owner's answer took effect: it reads as an `answer-applied`. */
+const READS_AS: Partial<Record<keyof typeof SAVED_0_1_0, { readonly format: number; readonly type?: string }>> = { events: { format: LOG_FORMAT, type: "answer-applied" } };
 
 // SAFETY: Object.keys of a literal object lists exactly the keys its type names.
 test.each(Object.keys(SAVED_0_1_0) as (keyof typeof SAVED_0_1_0)[])("a %s record hum 0.1.0 wrote reads, with a field a newer engine added", (store) => {

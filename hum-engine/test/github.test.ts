@@ -114,6 +114,22 @@ describe("the thread", () => {
 		expect(thread[1]?.option).toBe("approve");
 	});
 
+	test("each comment's entry carries GitHub's own id for it, the same on every read, so hum keeps an answer once however often it reads the thread", async () => {
+		const github = new FakeGitHub();
+		const adapter = onFake(github);
+		const id = ItemId.parse(String(github.seed("keyed")));
+
+		await adapter.questions.ask(id, { text: "Which?", options: ["approve", "change"] });
+		github.say(Number(id), "approve");
+
+		const ids = async () => (await adapter.workSource.read(id)).thread.map((entry) => entry.id);
+		const first = await ids();
+
+		expect(new Set(first).size).toBe(2);
+		expect(first.every((each) => each !== undefined)).toBe(true);
+		expect(await ids()).toEqual(first);
+	});
+
 	test("a comment by someone the repo does not trust is not on the thread, with hum's marker or without", async () => {
 		const github = new FakeGitHub();
 		const id = String(github.seed("public"));

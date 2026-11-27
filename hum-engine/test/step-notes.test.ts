@@ -74,7 +74,7 @@ test("hum keeps a note to a step the item can reach, and refuses, with why, one 
 
 		if (found === undefined) throw new Error("the entry is no note");
 
-		return decideNote(found, stand);
+		return decideNote(found.entry.step, stand);
 	};
 
 	expect(decided(note("fixing"))).toEqual({ disposition: "kept", why: "hum gives it to the next run of fixing" });

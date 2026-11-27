@@ -1,4 +1,6 @@
+import { z } from "zod";
 import { NOTE_KIND, type OwnerRequest, REQUEST_KINDS, type RequestKind, type ThreadEntry } from "../adapter-api.ts";
+import type { KeptAnswer, Wait } from "../state/events.ts";
 import type { Controls, Status } from "../status/format.ts";
 import { unreachableNote } from "./note.ts";
 
@@ -80,14 +82,30 @@ export const requestsOn = (thread: readonly ThreadEntry[]): ThreadRequest[] => {
 	return requests;
 };
 
+/** The wait a request on the thread was made at: the step it names, at the item's visit to it where it came during the visit the item is at now; none where it names no step. */
+export const requestWait = ({ step, at: madeAt }: ThreadEntry, { at, savedAt }: Pick<RequestStand, "at" | "savedAt">): Wait | undefined => {
+	if (step === undefined) return undefined;
+
+	return step === at && savedAt !== undefined && madeAt >= savedAt ? { step, since: savedAt } : { step };
+};
+
+/** One request as the item's log keeps it, with its number among the thread's requests. */
+export type KeptRequest = { readonly ordinal: number; readonly kind: RequestKind; readonly wait?: Wait };
+
+const RequestChoice = z.enum(REQUEST_KINDS);
+
+/** The request an owner's kept answer makes: its choice names the request's kind. */
+export const keptRequestOf = (ordinal: number, { choice, wait }: Pick<KeptAnswer, "choice" | "wait">): KeptRequest => ({ ordinal, kind: RequestChoice.parse(choice), wait });
+
 /** Whether the request was made at the item's visit to the step it is at now. */
-export const isCurrent = ({ entry }: ThreadRequest, { at, savedAt }: Pick<RequestStand, "at" | "savedAt">): boolean => at !== undefined && entry.step === at && savedAt !== undefined && entry.at >= savedAt;
+export const isCurrent = ({ wait }: KeptRequest, { at, savedAt }: Pick<RequestStand, "at" | "savedAt">): boolean => at !== undefined && wait?.step === at && wait.since !== undefined && wait.since === savedAt;
 
 const refused = (why: string): RequestDisposition => ({ disposition: "refused", why });
 
 /** What becomes of a request no saved record settles yet; `earlierApplies` once an earlier request made at this visit applies. */
-export const decideRequest = (request: ThreadRequest, stand: RequestStand, earlierApplies: boolean): RequestDisposition => {
-	const { kind, step } = request.entry;
+export const decideRequest = (request: KeptRequest, stand: RequestStand, earlierApplies: boolean): RequestDisposition => {
+	const { kind } = request;
+	const step = request.wait?.step;
 
 	if (step === undefined) return refused("it names no step");
 
@@ -107,8 +125,8 @@ export const decideRequest = (request: ThreadRequest, stand: RequestStand, earli
 };
 
 /** The request that acts on the item now: the first one settled applied that was made at this visit, where no answer released the wait first. */
-export const pendingRequest = (requests: readonly ThreadRequest[], settled: (request: ThreadRequest) => RequestDisposition | undefined, stand: RequestStand): RequestKind | undefined =>
-	stand.answered ? undefined : requests.find((request) => isCurrent(request, stand) && settled(request)?.disposition === "applied")?.entry.kind;
+export const pendingRequest = (requests: readonly KeptRequest[], settled: (request: KeptRequest) => RequestDisposition | undefined, stand: RequestStand): RequestKind | undefined =>
+	stand.answered ? undefined : requests.find((request) => isCurrent(request, stand) && settled(request)?.disposition === "applied")?.kind;
 
 /** The stem a request's reply opens with, which finds it again on the thread. */
 export const requestReplyStem = (ordinal: number, { disposition }: RequestDisposition): string => `Request ${ordinal} ${disposition}:`;

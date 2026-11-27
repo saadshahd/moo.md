@@ -17,7 +17,8 @@ import { type Kind, type Naming, PURPOSES, STUCK_TAG, TALK_PURPOSES } from "../c
 import { commandTimeoutMs } from "../exec.ts";
 import { doesLeaveDocs } from "../decide/kind.ts";
 import { type EventPick, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, REQUEST_CHANGES, requestedChanges, SPLIT, type SplitPart } from "../decide/prose.ts";
-import { answerOnce, foldItem, type ItemFold, keepPick, machineStarted, ownerAnswered, rebuilt } from "../state/item-log.ts";
+import type { EventLog, Wait } from "../state/events.ts";
+import { answerApplied, answerOnce, foldItem, type ItemFold, keepPick, machineStarted, rebuilt } from "../state/item-log.ts";
 import type { State } from "../state/open.ts";
 import type { Parked, SavedRepro, SavedTalk } from "../state/saved.ts";
 import { type SavedSnapshot, passedOnto, persistedSnapshot } from "../state/items.ts";
@@ -33,6 +34,7 @@ import { answerText, IdeateAnswer, PickAnswer, type BuildChoice, choicesAnswer, 
 import { NO_REVIEW_FILES, readReviewFiles } from "./review-files.ts";
 import { forgetProgress, keepKind, kindAnswered, pickKind } from "./kind.ts";
 import { type OwnerAnswer, planChangingAnswers, settleAnswers } from "./answers.ts";
+import { isGivenAt, keptAnswer, waitOf } from "./owner-answers.ts";
 import { settleRequests, standOf } from "./requests.ts";
 import { deliverNotes, type KeptNote, keptNotes, NOTE_REPLY_SCOPE, noteStandOf, noteWrites, settleNotes } from "./step-notes.ts";
 import { noteFrom, notesSection } from "../decide/note.ts";
@@ -138,11 +140,14 @@ export type ThinResult =
 
 type Answered = OwnerAnswer & { readonly option: string | undefined; readonly plan: string };
 
-/** The question, the answer to it and the plan, once the owner has answered the latest question from `since` on. */
-export const answerTo = (item: Item, since = 0): Answered | undefined => {
+/**
+ * The question, the answer to it and the plan, once the owner has answered the latest question: at `wait`, where the
+ * item is in one, as the owner's answer its log keeps says.
+ */
+export const answerTo = (events: EventLog, item: Item, wait?: Wait): Answered | undefined => {
 	const answer = answerToLatest(item.thread);
 
-	if (!answer || answer.at < since) return undefined;
+	if (!answer || (wait !== undefined && !isGivenAt(keptAnswer(events, item.id, answer), wait))) return undefined;
 
 	const plan = item.thread.findLast((e) => e.kind === "comment" && e.text.startsWith(PLAN_MARK));
 
@@ -282,7 +287,8 @@ export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gather
 	const ownerWait = knownKind && isWaitingOnOwner(knownKind, at) ? ownerWaitStage(knownKind, at) : undefined;
 	const stage: Stage = o.state.landings.get(id) ? "approval" : (ownerWait ?? (onSnapshot ? "running" : "waiting"));
 	const read = await o.workSource.read(id);
-	const item = await settleAnswers({ state: o.state, workSource: o.workSource, judge, now }, read, { stage });
+	const savedWait = o.state.items.savedOf(id);
+	const item = await settleAnswers({ state: o.state, workSource: o.workSource, judge, now }, read, { stage, wait: savedWait && waitOf(savedWait) });
 	const named = known && kindAnswered(known, item, o.config.hum.kinds);
 
 	if (named) o.state.itemKinds.put(id, named);
@@ -304,7 +310,7 @@ export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gather
 	const kind = kindNamed(o.config, kindName);
 	const asking = isWaitingOnOwner(kind, at);
 	const wait = asking ? o.state.items.savedOf(id) : undefined;
-	const answered = asking ? answerTo(item, wait?.savedAt) : onSnapshot ? undefined : answerTo(item);
+	const answered = asking ? answerTo(o.state.events, item, wait && waitOf(wait)) : onSnapshot ? undefined : answerTo(o.state.events, item);
 	const requested = await settleRequests({ state: o.state, workSource: o.workSource, questions: o.questions, now }, item, standOf(kind, o.state.items.savedOf(id), { answered: answered !== undefined, parked: false }));
 
 	await settleNotes({ state: o.state, writes: noteWrites(o.state, o.workSource), now }, item, noteStandOf(kind, o.config.hum.roles, noteFrom(kind, at, { running: false, landing: o.state.landings.get(id) !== undefined, parked: false })));
@@ -507,7 +513,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 	if (d.answered) {
 		tally.startAfresh();
-		state.events.add(ownerAnswered(id, d.answered.at));
+		state.events.add(answerApplied(id, d.answered.at));
 	}
 
 	let lastFailure = "";

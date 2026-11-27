@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { kindMoveFault, passReach, takeWorkRecords } from "../src/publish/handoff.ts";
-import { ownerAnswered } from "../src/state/item-log.ts";
+import { answerApplied } from "../src/state/item-log.ts";
 import { openState } from "../src/state/open.ts";
 import { savedLimitUntil, settleLimit } from "../src/adapters/limit.ts";
 import { configWith } from "./fixtures/config.ts";
@@ -42,9 +42,9 @@ test("publish keeps each log record as the work job's engine wrote it, at the ne
 	const work = openState(tempDir("work"), { engineVersion: "0.2.0", now: () => 5 });
 	const into = openState(tempDir("publish"), { engineVersion: "0.3.0", now: () => 9 });
 
-	into.events.add(ownerAnswered("a", 1));
+	into.events.add(answerApplied("a", 1));
 
-	for (const at of [3, 2]) work.events.add(ownerAnswered("a", at));
+	for (const at of [3, 2]) work.events.add(answerApplied("a", at));
 
 	for (let times = 0; times < 2; times++) takeWorkRecords(work, into, { item: "a", kind: feature, at: undefined, answered: false, timedOut: false, requested: false }, LIMITS);
 
