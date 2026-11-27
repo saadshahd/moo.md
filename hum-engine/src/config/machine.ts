@@ -51,6 +51,9 @@ export const OWNER_APPROVED = "owner-approved";
 /** What the owner's answer other than approval sends the wait for a change's approval. */
 export const OWNER_REJECTED = "owner-rejected";
 
+/** What the owner's skip sends a state its kind file lets them skip. The engine adds the transition, so no hum.json names it. */
+export const SKIP = "skip";
+
 /** What the state offers the owner, where it waits on them. */
 export const interactionAt = (kind: Kind, state: string | undefined): Interaction | undefined => (state === undefined ? undefined : kind.machine.states[state]?.meta?.interaction);
 
@@ -59,6 +62,15 @@ export const isOwnerWait = (node: StateNodeJSON | undefined): boolean => node?.m
 
 /** Whether the item waits on the owner in this state. */
 export const isWaitingOnOwner = (kind: Kind, state: string | undefined): boolean => state !== undefined && isOwnerWait(kind.machine.states[state]);
+
+/** Where the owner's skip takes the state: only a wait on the owner, which a pass restores, skips; undefined where the state does not. */
+export const skipTargetOf = (node: StateNodeJSON | undefined): string | undefined => (isOwnerWait(node) ? node?.meta?.skip?.target : undefined);
+
+/** Whether the owner may run the state's timer now: a wait on the owner with an `after` timeout. */
+const canRunNow = (node: StateNodeJSON | undefined): boolean => isOwnerWait(node) && timeoutsOf(node).length > 0;
+
+/** The requests the state lets the owner make: a skip, and running its timer now. */
+export const requestsAllowed = (node: StateNodeJSON | undefined) => ({ skip: skipTargetOf(node) !== undefined, runNow: canRunNow(node) });
 
 /** Whether the state waits for the owner's approval of a change: one of its options sends that approval. */
 export const isApprovalWait = (kind: Kind, state: string | undefined): boolean => interactionAt(kind, state)?.choices?.some(({ event }) => event.type === OWNER_APPROVED) ?? false;
@@ -84,6 +96,17 @@ export const withOverCapWaits = (kind: Kind): Kind => {
 	const waits = Object.fromEntries(runs.map((run) => [waitOf(run), machine.states[waitOf(run)] ?? { ...wait, on: { ...wait.on, [ANSWERED]: [{ target: run }] } }]));
 
 	return { ...kind, machine: { ...machine, states: { ...states, ...waits } } };
+};
+
+/** The kind with the skip transition on each state the owner may skip; a state's own `skip` transition stays, and the config check refuses it. */
+export const withSkips = (kind: Kind): Kind => {
+	const skipped = ([name, node]: [string, StateNodeJSON]): [string, StateNodeJSON] => {
+		const target = skipTargetOf(node);
+
+		return [name, target === undefined ? node : { ...node, on: { [SKIP]: [{ target }], ...node.on } }];
+	};
+
+	return { ...kind, machine: { ...kind.machine, states: Object.fromEntries(Object.entries(kind.machine.states).map(skipped)) } };
 };
 
 /**

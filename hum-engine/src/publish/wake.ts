@@ -10,6 +10,7 @@ import { fetchedPublishRepo, type Publisher, publishPass, refusedPass } from "./
 import { settleBaseCheck } from "../worker/base-check.ts";
 import { isDue } from "../worker/due.ts";
 import { withSettledAnswers } from "../worker/answers.ts";
+import { savedPendingRequest, standOf } from "../worker/requests.ts";
 
 /** What publish works from in a CI wake: its own root, which saves its state, what gather settled, and the work job's outbox and its state. */
 export type PublishWake = { readonly publisher: Publisher; readonly gathered: Gathered; readonly outbox: ReadOutbox; readonly work: State };
@@ -29,7 +30,8 @@ const publishWorked = async ({ publisher: p, gathered, outbox, work }: PublishWa
 	const saved = p.state.items.savedOf(pass.item);
 	const timedOut = saved !== undefined && isDue(p.state, { kind, saved }, p.now());
 	const answered = answerTo(withSettledAnswers(p.state, item), saved?.savedAt) !== undefined;
-	const refused = takeWorkRecords(work, p.state, { item: pass.item, kind, at: saved?.state, answered, timedOut }, { now: p.now(), usageLimitMaxMs: p.config.hum.ciUsageLimitMaxHours * HOUR_MS });
+	const requested = savedPendingRequest(p.state, item, standOf(kind, saved, { answered, parked: false })) !== undefined;
+	const refused = takeWorkRecords(work, p.state, { item: pass.item, kind, at: saved?.state, answered, timedOut, requested }, { now: p.now(), usageLimitMaxMs: p.config.hum.ciUsageLimitMaxHours * HOUR_MS });
 
 	if (refused !== undefined) return refusedPass(pass.item, refused);
 

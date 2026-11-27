@@ -41,7 +41,7 @@ const abortIfPermanent = (cause: unknown): never => {
  * - A reply of the wrong shape is refused at once with one card, and never retried.
  * - A transient failure is retried inside the timeout; one that outlasts it raises one card and throws.
  * - An empty ready list that contradicts the last read is a fault, not "no work".
- * - A call that would double on a retry (`comment`, `ask`, `decide`, `answer`) runs once; its caller retries it under an op key.
+ * - A call that would double on a retry (`comment`, `ask`, `decide`, `answer`, `request`) runs once; its caller retries it under an op key.
  * - An answer of `failed: "now"` raises one card naming the call and throws at once; that call completing later clears it. `failed: "retry"` is a transient failure like any other.
  */
 export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoffMs = SHIPPED_BACKOFF_MS, lastReady: remembered }: GuardOptions): Integrations => {
@@ -174,6 +174,7 @@ export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoff
 		answers: answers && {
 			...answers,
 			answer: (id, answer) => once("answer", () => answers.answer(id, answer), none),
+			request: (id, request) => once("request", () => answers.request(id, request), none),
 			watch: (since) => retried("watch", () => answers.watch(since), Watch),
 		},
 		release: release && {

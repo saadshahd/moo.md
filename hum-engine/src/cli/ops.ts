@@ -1,6 +1,6 @@
 import { Command, CommanderError, Option } from "commander";
 import { z } from "zod";
-import { type ClaimResult, Holder, type Item, ItemId, type ItemRef, PermanentError, Watch } from "../adapter-api.ts";
+import { type ClaimResult, Holder, type Item, ItemId, type ItemRef, PermanentError, type RequestKind, Watch } from "../adapter-api.ts";
 import { parseArgument } from "../adapters/argument.ts";
 import { pushArgs } from "../adapters/git.ts";
 import { resolveAdapters, type Slot } from "../adapters/registry.ts";
@@ -16,6 +16,8 @@ import { addServiceCommands } from "./service.ts";
 import { addSetupCommands } from "./setup.ts";
 import { sharedWatch } from "./shared-watch.ts";
 import { SECOND_MS } from "../time.ts";
+import { statusRefusal } from "../decide/request.ts";
+import { readStatus } from "../status/file.ts";
 
 type Printable = ItemRef[] | ItemRef | Item | ClaimResult | Watch | { readonly ok: true };
 
@@ -59,6 +61,8 @@ type Call = {
 	readonly stateDir: string;
 	/** The folder the worker reads item ids from at once. */
 	readonly inbox: string;
+	/** The status file the worker on this machine writes. */
+	readonly statusPath: string;
 	readonly settings: CliSettings;
 	/** The integration role of a slot; throws when none is set up. */
 	readonly slot: <T>(name: Slot, role: (adapter: NonNullable<Adapters[Slot]>) => T | undefined) => T;
@@ -81,6 +85,31 @@ type Handler = (call: Call) => Promise<Printable>;
 
 const idOf = (item: string): ItemId => parseArgument(ItemId, item);
 
+const Step = z.string().min(1);
+
+/**
+ * Puts the owner's request on the item's thread and wakes the worker, once the local status row allows it: a request
+ * the row refuses writes nothing. The worker checks every request again against the item's saved state.
+ */
+const requestOf =
+	(kind: RequestKind): Handler =>
+	async ({ slot, item, second, statusPath, inbox, settings }) => {
+		const id = idOf(item);
+		const request = { kind, step: parseArgument(Step, second) };
+		const read = readStatus(statusPath);
+
+		if (!read.ok && read.reason === "unreadable") throw new PermanentError(read.message);
+
+		const refusal = statusRefusal(request, id, read.ok ? read.status : undefined);
+
+		if (refusal !== undefined) throw new PermanentError(`refused: ${refusal}`);
+
+		await slot("answers", (a) => a.answers).request(id, request);
+		wakeWorker({ inbox, settings }, item);
+
+		return OK;
+	};
+
 const handlers = {
 	"list-ready": ({ slot }) => slot("work-source", (a) => a.workSource).listReady(),
 	claim: ({ slot, item, second: holder, flags, settings }) => {
@@ -98,6 +127,8 @@ const handlers = {
 
 		return OK;
 	},
+	skip: requestOf("skip"),
+	"run-now": requestOf("run-now"),
 	watch: ({ slot, stateDir, inbox, flags, settings }) => {
 		const answers = slot("answers", (a) => a.answers);
 
@@ -139,6 +170,7 @@ const callOf = async (positionals: readonly string[], flags: Flags, io: Io): Pro
 		options: [flags.option ?? []].flat(),
 		stateDir,
 		inbox: state.inbox,
+		statusPath: state.statusPath,
 		settings,
 		close,
 		slot: (name, role) => {

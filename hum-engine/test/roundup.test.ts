@@ -72,3 +72,13 @@ test.each([
 	expect(existsSync(claim)).toBe(true);
 	await adapter.close();
 });
+
+test("a request posts on the Todo as hum's own marked comment and reads back on the thread with its kind and step, where an answer through hum is refused", async () => {
+	const { adapter, id } = await claimedTodo();
+
+	await expect(adapter.answers.answer(id, { text: "go" })).rejects.toBeInstanceOf(Error);
+	await adapter.answers.request(id, { kind: "skip", step: "owner-review" });
+
+	expect((await adapter.workSource.read(id)).thread).toMatchObject([{ kind: "skip", step: "owner-review", author: "hum" }]);
+	await adapter.close();
+});

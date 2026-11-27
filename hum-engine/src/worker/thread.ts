@@ -8,6 +8,9 @@ export const isFromHum = (entry: ThreadEntry): boolean => entry.author !== "pers
 /** Whether the entry is a question hum asked. */
 export const isHumQuestion = (entry: ThreadEntry): boolean => entry.kind === "question" && isFromHum(entry);
 
+/** Whether hum already replied on the thread with a comment that opens with `stem`. */
+export const hasReplyOn = (thread: Thread, stem: string): boolean => thread.some((entry) => isFromHum(entry) && entry.kind === "comment" && entry.text.startsWith(stem));
+
 /** Where hum's latest question sits on the thread; -1 when it asked none. */
 export const latestQuestionAt = (thread: Thread): number => thread.findLastIndex(isHumQuestion);
 

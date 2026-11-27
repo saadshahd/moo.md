@@ -5,7 +5,7 @@ import type { FaultInput } from "./state/faults.ts";
 export type { FaultInput };
 
 /** Bumped on every change to the API an adapter implements; a breaking change bumps the engine's major version. */
-export const ADAPTER_API_VERSION = 4;
+export const ADAPTER_API_VERSION = 5;
 
 /** Failure that retrying cannot fix: a reply of the wrong shape, a refused push. The engine surfaces it at once, as it does a `failed: "now"` answer. */
 export class PermanentError extends Error {
@@ -50,7 +50,12 @@ export type Holder = z.infer<typeof Holder>;
 const text = z.string().min(1);
 const time = z.int().nonnegative();
 
-export const THREAD_KINDS = ["comment", "question", "answer", "decision"] as const;
+/** What the owner may ask of an item beside an answer: skip the step it is at, or run that step's timer now. */
+export const REQUEST_KINDS = ["skip", "run-now"] as const;
+
+export type RequestKind = (typeof REQUEST_KINDS)[number];
+
+export const THREAD_KINDS = ["comment", "question", "answer", "decision", ...REQUEST_KINDS] as const;
 
 /** Who wrote a thread entry: hum, which marks its comments, or a person typing without a marker. */
 export const THREAD_AUTHORS = ["hum", "person"] as const;
@@ -61,6 +66,8 @@ export const ThreadEntry = z.strictObject({
 	text,
 	at: time,
 	option: text.optional(),
+	/** The step a request names: the one the item was at when the owner made it. */
+	step: text.optional(),
 	/** A source that cannot tell leaves it out, and the entry reads as hum's. */
 	author: z.enum(THREAD_AUTHORS).optional(),
 });
@@ -128,6 +135,9 @@ export type Question = { readonly text: string; readonly options?: readonly stri
 
 export type Answer = { readonly text: string; readonly option?: string };
 
+/** An owner's request, made at `step`, the step the item was at as the owner saw it. */
+export type OwnerRequest = { readonly kind: RequestKind; readonly step: string };
+
 export type FollowUp = { readonly title: string; readonly body: string };
 
 /** The work source: the queue, the claims and the item threads. */
@@ -157,6 +167,8 @@ export interface Questions {
 /** Where the owner's answers arrive. */
 export interface Answers {
 	answer(id: ItemId, answer: Answer): Promise<void>;
+	/** Puts the owner's request on the item's thread, where hum reads it as it reads answers. */
+	request(id: ItemId, request: OwnerRequest): Promise<void>;
 	/** The one cheap read: has anything changed since `since`. An idle call costs no rate limit. */
 	watch(since?: string): Promise<Watch>;
 	/** The owner answers only a question hum asked, as on roundup, where a question is its row; so an item waiting on the owner, as a parked one, asks one. */

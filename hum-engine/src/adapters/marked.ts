@@ -11,6 +11,7 @@ const FOLLOW_UP_KEY_LENGTH = 12;
 export const Marker = z.looseObject({
 	kind: z.enum(THREAD_KINDS),
 	option: z.string().min(1).optional(),
+	step: z.string().min(1).optional(),
 	options: z.array(z.string()).optional(),
 	followUp: z.object({ key: z.string(), item: z.string().min(1) }).optional(),
 });
@@ -127,5 +128,5 @@ export const parseComment = (body: string, at: number): ThreadEntry => {
 	const marker = markerOf(body);
 	const text = splitMarker(body)?.text ?? "";
 
-	return marker && text !== "" ? { kind: marker.kind, text, at, option: marker.option, author: "hum" } : { kind: "comment", text: commentText(body.replaceAll("\r\n", "\n")), at, author: "person" };
+	return marker && text !== "" ? { kind: marker.kind, text, at, option: marker.option, step: marker.step, author: "hum" } : { kind: "comment", text: commentText(body.replaceAll("\r\n", "\n")), at, author: "person" };
 };

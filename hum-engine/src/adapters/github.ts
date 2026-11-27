@@ -10,6 +10,7 @@ import { HOUR_MS } from "../time.ts";
 import { parseArgument } from "./argument.ts";
 import { claimCommit, claimCommitMessage, claimer, claimOfCommit, isHeldBy, isLive } from "./claim.ts";
 import { failureOf, type GitHubClient, ownerGitHub, raise } from "./github-client.ts";
+import { requestEntry } from "./request-entry.ts";
 import { answerMarker, commentText, filedFollowUp, followUpBody, followUpNote, isFollowUpOf, type Marker, marked, parseComment, questionMarker, questionText } from "./marked.ts";
 import { gitHubPullRequests } from "./pull-requests.ts";
 
@@ -391,6 +392,11 @@ export const githubAdapter = (options: GitHubOptions, { now, env }: AdapterConte
 		},
 		answers: {
 			answer: (id, { text, option }) => commentMarked(id, answerMarker(option), text),
+			request: (id, request) => {
+				const { marker, text } = requestEntry(request);
+
+				return commentMarked(id, marker, text);
+			},
 			/** Any comment or issue change moves the newest issue's `updated_at`, so the list's ETag moves. */
 			watch: async (since?: string): Promise<Watch> => {
 				const token = await (await client())

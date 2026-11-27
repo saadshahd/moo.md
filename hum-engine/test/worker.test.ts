@@ -610,6 +610,50 @@ test("an item in an owner wait whose timeout goes on to work sleeps through it, 
 	expect(w.shim.calls()).toHaveLength(3);
 });
 
+test("the owner's run now fires the timer of the wait an item is at though the daily cap still holds its question, which it drops", async () => {
+	const repro = { write: { "docs/repro.sh": "grep -q fixed docs/note.md\n" }, structured: { status: "done", repro: { command: "sh docs/repro.sh" } } };
+	const w = await workerWorld({ script: [{}, repro, { write: { "docs/note.md": "fixed\n" } }] }, { worker: { judge: scriptedJudge({ kind: { kind: "fix" }, alignment: SOUND }) }, settings: { dailyQuestionCap: 1 } });
+	const held = () => w.state.questions.list().filter(({ item, askedAt }) => item === "a" && askedAt === undefined);
+
+	w.state.questions.put("other@0", { item: "other", text: "Asked earlier today?", priority: 0, queuedAt: NOW, askedAt: NOW });
+	w.item("a", "docs/note.md");
+	await w.worker.tick();
+	await w.worker.idle();
+	expect(w.state.items.savedOf("a")?.state).toBe("objecting");
+	expect(held()).toHaveLength(1);
+
+	await w.adapter.answers!.request(ItemId.parse("a"), { kind: "run-now", step: "objecting" });
+	await w.worker.tick();
+	await w.worker.idle();
+
+	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
+	expect(w.shim.calls()).toHaveLength(3);
+	expect(held()).toEqual([]);
+	expect((await w.adapter.workSource!.read(ItemId.parse("a"))).thread.map(({ text }) => text)).toContain("Request 1 applied: the timer of objecting fires now.");
+});
+
+test("the owner's skip takes a wait its kind file lets them skip where the skip leads, and a request at a step the item is not at is refused on the thread", async () => {
+	const config = configWith((raw) => void (raw.kinds.docs.machine.states.asking.meta.skip = { target: "checking" }));
+	const w = await workerWorld({ items: { a: { writeForItem: true, askUnlessAnswered: "Which?" } } }, { config });
+	const a = ItemId.parse("a");
+
+	w.item("a", "docs/a.md");
+	await w.worker.tick();
+	await w.worker.idle();
+	expect(w.state.items.savedOf("a")?.state).toBe("asking");
+
+	await w.adapter.answers!.request(a, { kind: "skip", step: "building" });
+	await w.adapter.answers!.request(a, { kind: "skip", step: "asking" });
+	await w.worker.tick();
+	await w.worker.idle();
+
+	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
+	expect(w.shim.calls().filter(({ itemId }) => itemId === "a")).toHaveLength(1);
+	expect((await w.adapter.workSource!.read(a)).thread.map(({ text }) => text)).toEqual(
+		expect.arrayContaining(["Request 1 refused: the item is at asking now, not building.", "Request 2 applied: the item leaves asking where its kind file's skip leads."]),
+	);
+});
+
 test("an item someone else claims never starts and carries a card naming them, which goes once they let it go", async () => {
 	const w = await workerWorld({ items: { a: { writeForItem: true } } });
 	const claimedBy: string[] = ["@ana"];

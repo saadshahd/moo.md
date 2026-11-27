@@ -1,4 +1,4 @@
-import { interactionAt, isWaitingOnOwner, nextStates, overCapWaits, reachedFrom } from "../config/machine.ts";
+import { interactionAt, isWaitingOnOwner, nextStates, overCapWaits, reachedFrom, requestsAllowed } from "../config/machine.ts";
 import type { Kind } from "../config/schema.ts";
 import type { OpenItem } from "./format.ts";
 
@@ -36,8 +36,7 @@ export const flowOf = (kind: Kind): Flow => {
 			controls: {
 				choices: (interaction?.choices ?? []).map(({ label, event }) => ({ label, event: event.type })),
 				answer: interaction?.textEvent !== undefined,
-				skip: node.meta?.skip !== undefined,
-				runNow: Object.keys(node.after ?? {}).length > 0,
+				...requestsAllowed(node),
 				noteTo: shown.filter((state) => reached.has(state) && !isFinal(state)),
 			},
 		};

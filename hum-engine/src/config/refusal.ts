@@ -10,6 +10,8 @@ export type Problem =
 	| { readonly problem: "run-and-owner-wait"; readonly kind: string; readonly state: string }
 	| { readonly problem: "interaction-event-unhandled"; readonly kind: string; readonly state: string; readonly event: string }
 	| { readonly problem: "interaction-event-not-owner"; readonly kind: string; readonly state: string; readonly event: string }
+	| { readonly problem: "skip-not-at-wait"; readonly kind: string; readonly state: string }
+	| { readonly problem: "skip-event-reserved"; readonly kind: string; readonly state: string; readonly event: string }
 	| { readonly problem: "unsure-unhandled"; readonly kind: string; readonly state: string; readonly role: string; readonly event: string }
 	| { readonly problem: "missing-skill"; readonly skill: string; readonly role: string }
 	| { readonly problem: "unknown-state"; readonly kind: string; readonly state: string; readonly why: string }
@@ -53,6 +55,8 @@ const DESCRIPTIONS = {
 	"run-and-owner-wait": (p) => `${p.kind}: state "${p.state}" starts a run and waits on the owner`,
 	"interaction-event-unhandled": (p) => `${p.kind}: state "${p.state}" offers the owner "${p.event}", which it does not take`,
 	"interaction-event-not-owner": (p) => `${p.kind}: state "${p.state}" offers the owner "${p.event}", which hum.json does not give source "owner"`,
+	"skip-not-at-wait": (p) => `${p.kind}: state "${p.state}" has meta.skip but does not wait on the owner; hum skips only a wait, which a pass restores`,
+	"skip-event-reserved": (p) => `${p.kind}: state "${p.state}" names the "${p.event}" event, which hum adds from meta.skip; give the state meta.skip instead`,
 	"unsure-unhandled": (p) => `${p.kind}: state "${p.state}" runs role "${p.role}" and takes no "${p.event}", the event its run sends when it is not sure`,
 	"missing-skill": (p) => `role "${p.role}" names skill "${p.skill}", which no installed plugin has`,
 	"unknown-state": (p) => `${p.kind}: ${p.why} names state "${p.state}", which does not exist`,

@@ -8,6 +8,7 @@ import { HELD_MS, HOLDING_SLOTS, writeHoldingAdapter } from "./fixtures/holding-
 import { OWNER } from "./fixtures/identity.ts";
 import { MAIN } from "./fixtures/owner-repo.ts";
 import { sh, WorkRepo } from "./fixtures/work-repo.ts";
+import { emptyStatus, writeStatus } from "../src/status/file.ts";
 
 
 const hum = (cwd: string, ...args: string[]) => {
@@ -97,6 +98,32 @@ test("hum list-ready, claim, watch, answer and read work end to end on a temp re
 	expect(json(worker, "watch", "--since", first.token).changed).toBe(true);
 	expect(inboxOf(worker)).toContain(id);
 	expect(json(worker, "read", id).thread).toMatchObject([{ kind: "answer", text: "looks good", option: "approve" }]);
+});
+
+test("hum skip and hum run-now write a request only where the local status row allows it, and where no status file is the worker alone decides", () => {
+	const repo = new WorkRepo();
+	const worker = repo.worker("w");
+	const id = repo.seed("requests");
+	const requests = () => json(worker, "read", id).thread.filter(({ kind }: { kind: string }) => kind === "skip" || kind === "run-now");
+
+	writeSettings(worker);
+
+	expect(json(worker, "skip", id, "objecting")).toEqual({ ok: true });
+	expect(requests()).toMatchObject([{ kind: "skip", step: "objecting" }]);
+	expect(inboxOf(worker)).toContain(id);
+
+	const controls = { choices: [], answer: true, skip: false, runNow: true, noteTo: [] };
+
+	writeStatus(join(worker, ".git", "hum", "status.json"), { ...emptyStatus("0.0.0", 0), open: [{ item: id, kind: "fix", flowVersion: "1", steps: [], at: "objecting", since: 0, running: false, controls }] });
+
+	const refused = hum(worker, "skip", id, "objecting");
+	const late = hum(worker, "run-now", id, "building");
+
+	expect([refused.code, late.code]).toEqual([1, 1]);
+	expect(refused.err).toContain("hum skip: refused: objecting is not a step the owner may skip");
+	expect(late.err).toContain("hum run-now: refused: the item is at objecting now, not building");
+	expect(json(worker, "run-now", id, "objecting")).toEqual({ ok: true });
+	expect(requests().map(({ kind }: { kind: string }) => kind)).toEqual(["skip", "run-now"]);
 });
 
 test("hum claim without --ttl lasts claimExpirySeconds from the repo's hum.json", () => {

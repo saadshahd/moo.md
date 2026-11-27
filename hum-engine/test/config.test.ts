@@ -22,6 +22,7 @@ import {
 	type Problem,
 	type RawConfig,
 } from "../src/index.ts";
+import { SKIP } from "../src/config/machine.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { readSettings } from "../src/config/settings.ts";
 import { WAIT_HOURS } from "../src/setup/tables.ts";
@@ -355,6 +356,27 @@ test("a wait that offers the owner an event it does not take or that the owner d
 	expect(problems).toContainEqual({ kind: "feature", problem: "interaction-event-unhandled", state: "owner-review", event: "merged" });
 	expect(problems).toContainEqual({ kind: "feature", problem: "interaction-event-not-owner", state: "owner-review", event: "merged" });
 	expect(problems).toContainEqual({ kind: "feature", problem: "unknown-state", state: "nowhere", why: 'the skip of "building"' });
+});
+
+test("a wait the kind file lets the owner skip takes hum's skip event to its target, which no hum.json event names", () => {
+	const raw = clone(setUp());
+	raw.kinds.feature.machine.states["owner-review"].meta.skip = { target: "fixing" };
+
+	const { states } = loaded(raw).kinds.feature!.machine;
+
+	expect(states["owner-review"]?.on?.[SKIP]).toEqual([{ target: "fixing" }]);
+	expect(Object.entries(states).filter(([, node]) => node.on?.[SKIP] !== undefined).map(([state]) => state)).toEqual(["owner-review"]);
+});
+
+test("a skip from a state that does not wait on the owner, and a kind's own skip transition, are refused", () => {
+	const bad = clone(setUp());
+	bad.kinds.feature.machine.states.building.meta = { skip: { target: "checking" } };
+	bad.kinds.feature.machine.states.asking.on[SKIP] = { target: "building" };
+
+	const problems = problemsOf(bad);
+
+	expect(problems).toContainEqual({ kind: "feature", problem: "skip-not-at-wait", state: "building" });
+	expect(problems).toContainEqual({ kind: "feature", problem: "skip-event-reserved", state: "asking", event: SKIP });
 });
 
 test("a wait's controls in meta.interaction reach the machine hum builds, where @statelyai/agent's getInteraction reads them", () => {
