@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { STATUS_FORMAT } from "../../src/status/version.ts";
 
 const LIBS = join(import.meta.dir, "..", "..", "..", "hum", "mod", "vendor", "libs.js");
 
@@ -13,7 +14,7 @@ test("the mod's vendored bundle takes the status format alone from the engine, w
 });
 
 test("the bundle's status reader says what a field holds wrong, in a process that loads nothing else", () => {
-	const read = Bun.spawnSync([process.execPath, "-e", `const { Status } = await import(${JSON.stringify(LIBS)}); console.log(JSON.stringify(Status.safeParse({ format: 2, writtenAt: "x" }).error?.issues[0]?.message))`]);
+	const read = Bun.spawnSync([process.execPath, "-e", `const { Status } = await import(${JSON.stringify(LIBS)}); console.log(JSON.stringify(Status.safeParse({ format: ${STATUS_FORMAT}, writtenAt: "x" }).error?.issues[0]?.message))`]);
 
 	expect(JSON.parse(read.stdout.toString())).toBe("Invalid input: expected number, received string");
 });

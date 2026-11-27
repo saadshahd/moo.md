@@ -1,4 +1,9 @@
 import { expect, test } from "bun:test";
+import shippedFix from "../defaults/kinds/fix.json" with { type: "json" };
+import { KindFile } from "../src/config/kind-file.ts";
+import { withOverCapWaits } from "../src/config/machine.ts";
+import { flowOf } from "../src/status/flow.ts";
+import type { Tree } from "./fixtures/config.ts";
 import { newestChoices, openQuestions } from "../src/status/sections.ts";
 import type { QueuedQuestion, SettledAnswer } from "../src/state/saved.ts";
 
@@ -20,4 +25,39 @@ test("the newest choices come first and no more than the shown count", () => {
 	const choices = [1, 3, 2].map((at) => ({ item: "a", text: `t${at}`, at }));
 
 	expect(newestChoices(choices, 2).map(({ at }) => at)).toEqual([3, 2]);
+});
+
+const fixWith = (edit: (states: Tree) => void) => {
+	const raw: Tree = structuredClone(shippedFix);
+
+	edit(raw.machine.states);
+
+	return withOverCapWaits(KindFile.parse(raw));
+};
+
+const FIX_STEPS = ["reproducing", "confirming", "objecting", "building", "checking", "proving", "fixing", "reviewing", "owner-review", "merging", "stuck", "done"];
+
+test("at a wait, the flow names every step it shows, which of them wait on the owner and which the item passed, and the options, answer, skip and notes the wait allows", () => {
+	const flow = flowOf(fixWith((states) => (states["owner-review"].meta.skip = { target: "merging" })));
+
+	expect(flow("owner-review", ["reproducing", "confirming", "building", "asking", "checking", "owner-review", "reviewing"])).toEqual({
+		steps: FIX_STEPS.map((name) => ({ name, waitsOnOwner: name === "objecting" || name === "owner-review" })),
+		at: "owner-review",
+		passed: ["reproducing", "confirming", "building", "checking", "reviewing"],
+		controls: {
+			choices: [{ label: "Approve", event: "owner-approved" }],
+			answer: true,
+			skip: true,
+			runNow: false,
+			noteTo: ["building", "checking", "proving", "fixing", "reviewing", "owner-review", "merging", "stuck"],
+		},
+	});
+});
+
+test("a wait a run stops at past its token cap is a step only while the item is in it, and a final step has no flow", () => {
+	const flow = flowOf(fixWith(() => {}));
+
+	expect(flow("asking-reviewing", undefined)?.steps.map(({ name }) => name)).toEqual([...FIX_STEPS, "asking-reviewing"]);
+	expect(flow("reviewing", undefined)?.steps.map(({ name }) => name)).toEqual(FIX_STEPS);
+	expect(flow("done", [])).toBeUndefined();
 });

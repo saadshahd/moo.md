@@ -32,8 +32,8 @@ const READS: readonly ViewRead[] = [
 
 const BAND_STATES: readonly Partial<BandInput>[] = [{}, { answering: LONGEST_ID }, { unread: UNREAD }];
 
-const foldIdsOf = ({ inFlight, merged, choices }: typeof worstStatus): Set<string> =>
-	new Set([...inFlight.map(({ item }) => `in-flight:${item}`), ...merged.map(({ item }) => `merged:${item}`), ...choices.map(({ item, at }) => `choice:${item}:${at}`)]);
+const foldIdsOf = ({ open, merged, choices }: typeof worstStatus): Set<string> =>
+	new Set([...open.map(({ item }) => `in-flight:${item}`), ...merged.map(({ item }) => `merged:${item}`), ...choices.map(({ item, at }) => `choice:${item}:${at}`)]);
 
 const drawn = (row: Row): string => row.map(({ text }) => text).join("");
 
@@ -169,7 +169,7 @@ test("the worst-case lists are as long as the shipped settings allow", () => {
 });
 
 test("a status file with no items draws only its header", () => {
-	const empty = { ...worstStatus, questions: [], cards: [], inFlight: [], merged: [], choices: [] };
+	const empty = { ...worstStatus, questions: [], cards: [], open: [], merged: [], choices: [] };
 
 	expect(paneRows({ read: { kind: "status", status: empty }, now: NOW, amberAfterSeconds: AMBER_AFTER, dismissed: [], width: 80, unfolded: new Set() })).toHaveLength(2);
 });
@@ -178,5 +178,5 @@ test("a status file with hundreds of items lists every item once", () => {
 	const listed = new Set(paneRows({ read: { kind: "status", status: hugeStatus }, now: NOW, amberAfterSeconds: AMBER_AFTER, dismissed: [], width: 80, unfolded: new Set() }).map(([, first]) => first?.text));
 
 	expect(hugeStatus.merged.filter(({ item }) => !listed.has(`#${item}`))).toEqual([]);
-	expect(hugeStatus.inFlight.filter(({ item }) => item !== LONGEST_ID && !listed.has(`#${item}`))).toEqual([]);
+	expect(hugeStatus.open.filter(({ item }) => item !== LONGEST_ID && !listed.has(`#${item}`))).toEqual([]);
 });

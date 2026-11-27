@@ -121,12 +121,14 @@ test("an item saved under an earlier machine version restores through the kinds 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
 	await w.worker.idle();
-	expect(w.results.at(-1)).toMatchObject({ outcome: "asked" });
-	expect(w.state.kinds.get("docs@1")).toBeDefined();
+	const { version } = w.config.kinds.docs!.machine;
 
-	// The owner changes the machine to version 2 and answers; a new worker starts on the new config.
+	expect(w.results.at(-1)).toMatchObject({ outcome: "asked" });
+	expect(w.state.kinds.get(`docs@${version}`)).toBeDefined();
+
+	// The owner changes the machine's version and answers; a new worker starts on the new config.
 	const next = configWith((raw) => {
-		raw.kinds.docs.machine.version = "2";
+		raw.kinds.docs.machine.version = `${version}-next`;
 	});
 
 	await w.adapter.answers!.answer(ItemId.parse("a"), { text: "Use Plain" });
@@ -139,7 +141,7 @@ test("an item saved under an earlier machine version restores through the kinds 
 
 	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
 	expect(w.state.faults.list().map((c) => c.code)).not.toContain("snapshot-machine-unknown");
-	expect(w.state.kinds.get("docs@2")).toBeDefined();
+	expect(w.state.kinds.get(`docs@${version}-next`)).toBeDefined();
 });
 
 test("an item's token total is saved over all its runs and restarts; the cap counts what it spent since the owner answered", async () => {

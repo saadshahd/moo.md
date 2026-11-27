@@ -239,12 +239,12 @@ const reported = (report: string) => ({ state: /;state=(\w+)/u.exec(report)?.[1]
 test("hum's status reads as one OSC 7501 record: its newest fault first, then the items in flight, else idle; its label is one line of at most 200 characters", () => {
 	const status = emptyStatus("1.0.0", 0);
 	const fault = (cause: string, since: number) => ({ kind: "fault" as const, key: cause, code: cause, cause, fix: "fix it", since });
-	const item = (id: string) => ({ item: id, title: `item ${id}`, state: "building", since: 0, unclear: false });
+	const item = (id: string, running = true) => ({ item: id, title: `item ${id}`, kind: "feature", flowVersion: "3", steps: [], at: "building", since: 0, running, controls: { choices: [], answer: false, skip: false, runNow: false, noteTo: [] } });
 
 	expect(reported(statusReport(programStatus({ ok: false, reason: "missing", message: "gone" })))).toEqual({ state: "idle", label: "" });
 	expect(reported(statusReport(programStatus({ ok: true, status })))).toEqual({ state: "idle", label: "no item in flight" });
-	expect(reported(statusReport(programStatus({ ok: true, status: { ...status, inFlight: [item("12"), item("13")] } })))).toEqual({ state: "working", label: "#12 item 12: building and 1 more" });
-	expect(reported(statusReport(programStatus({ ok: true, status: { ...status, inFlight: [item("12")], cards: [fault("old", 1), fault("new\nline", 2)] } })))).toEqual({ state: "error", label: "new line and 1 more" });
+	expect(reported(statusReport(programStatus({ ok: true, status: { ...status, open: [item("11", false), item("12"), item("13")] } })))).toEqual({ state: "working", label: "#12 item 12: building and 1 more" });
+	expect(reported(statusReport(programStatus({ ok: true, status: { ...status, open: [item("12")], cards: [fault("old", 1), fault("new\nline", 2)] } })))).toEqual({ state: "error", label: "new line and 1 more" });
 	expect(reported(statusReport(programStatus({ ok: true, status: { ...status, cards: [fault("x".repeat(300), 1)] } }))).label).toBe(`${"x".repeat(199)}…`);
 });
 

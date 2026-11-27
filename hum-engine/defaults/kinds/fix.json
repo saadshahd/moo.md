@@ -75,7 +75,7 @@
 	},
 	"machine": {
 		"id": "fix",
-		"version": "2",
+		"version": "3",
 		"initial": "reproducing",
 		"states": {
 			"reproducing": {
@@ -114,9 +114,6 @@
 				}
 			},
 			"objecting": {
-				"tags": [
-					"owner-wait"
-				],
 				"on": {
 					"answered": {
 						"target": "reproducing"
@@ -125,6 +122,12 @@
 				"after": {
 					"86400000": {
 						"target": "building"
+					}
+				},
+				"meta": {
+					"interaction": {
+						"label": "Object to the repro, or let the fix go on",
+						"textEvent": "answered"
 					}
 				}
 			},
@@ -202,15 +205,26 @@
 				}
 			},
 			"owner-review": {
-				"tags": [
-					"owner-wait"
-				],
 				"on": {
 					"owner-approved": {
 						"target": "merging"
 					},
 					"owner-rejected": {
 						"target": "fixing"
+					}
+				},
+				"meta": {
+					"interaction": {
+						"label": "Review the change",
+						"choices": [
+							{
+								"label": "Approve",
+								"event": {
+									"type": "owner-approved"
+								}
+							}
+						],
+						"textEvent": "owner-rejected"
 					}
 				}
 			},
@@ -222,22 +236,28 @@
 				}
 			},
 			"asking": {
-				"tags": [
-					"owner-wait"
-				],
 				"on": {
 					"answered": {
 						"target": "building"
 					}
+				},
+				"meta": {
+					"interaction": {
+						"label": "Answer the run's question",
+						"textEvent": "answered"
+					}
 				}
 			},
 			"asking-repro": {
-				"tags": [
-					"owner-wait"
-				],
 				"on": {
 					"answered": {
 						"target": "reproducing"
+					}
+				},
+				"meta": {
+					"interaction": {
+						"label": "Answer the repro run's question",
+						"textEvent": "answered"
 					}
 				}
 			},

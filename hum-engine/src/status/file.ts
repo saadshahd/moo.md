@@ -12,7 +12,7 @@ export const emptyStatus = (engineVersion: string, writtenAt: number): Status =>
 	engine: { version: engineVersion, adapterApi: ADAPTER_API_VERSION, configSchema: SCHEMA_VERSION },
 	questions: [],
 	cards: [],
-	inFlight: [],
+	open: [],
 	merged: [],
 	choices: [],
 	rules: [],

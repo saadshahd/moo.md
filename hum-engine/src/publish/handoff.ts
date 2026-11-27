@@ -1,9 +1,9 @@
 import { copyFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { savedLimitUntil, settleLimit } from "../adapters/limit.ts";
-import { nextStates, reachedFrom } from "../config/machine.ts";
+import { isWaitingOnOwner, nextStates, reachedFrom } from "../config/machine.ts";
 import { type Config } from "../config/load.ts";
-import { type Kind, OWNER_WAIT_TAG } from "../config/schema.ts";
+import { type Kind } from "../config/schema.ts";
 import type { State } from "../state/open.ts";
 import type { Spent } from "../state/saved.ts";
 import { queuedKey } from "../worker/questions.ts";
@@ -22,8 +22,6 @@ export type InboxItem = {
 	readonly timedOut: boolean;
 };
 
-const isOwnerWait = (kind: Kind, state: string): boolean => kind.machine.states[state]?.tags?.includes(OWNER_WAIT_TAG) ?? false;
-
 /**
  * The states one pass may carry an item to from where the inbox saved it: through every transition of its kind's
  * machine, past the owner's wait it starts in only with the owner's answer or once its timeout passed, and never past
@@ -32,7 +30,7 @@ const isOwnerWait = (kind: Kind, state: string): boolean => kind.machine.states[
 export const passReach = ({ kind, at, answered, timedOut }: Omit<InboxItem, "item">): ReadonlySet<string> => {
 	const start = at ?? kind.machine.initial;
 
-	return reachedFrom(start, nextStates(kind), (state) => !isOwnerWait(kind, state) || (state === start && (answered || timedOut)));
+	return reachedFrom(start, nextStates(kind), (state) => !isWaitingOnOwner(kind, state) || (state === start && (answered || timedOut)));
 };
 
 /** The rank of a kind's floor among the levels; a kind with no floor ranks lowest. */

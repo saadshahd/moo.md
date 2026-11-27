@@ -12,15 +12,15 @@ import { filesBetween, type Git, gitIn, isAncestor, PATCH, withConfigPinned } fr
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import { pickTier } from "../config/checks.ts";
 import type { Config } from "../config/load.ts";
-import { ANSWERED, earliestTimeout, invokedSources, kindMachine, TOKEN_CAP } from "../config/machine.ts";
-import { type Kind, type Naming, OWNER_WAIT_TAG, PURPOSES, STUCK_TAG, TALK_PURPOSES } from "../config/schema.ts";
+import { earliestTimeout, interactionAt, invokedSources, isApprovalWait, isWaitingOnOwner, kindMachine, OWNER_APPROVED, OWNER_REJECTED, TOKEN_CAP } from "../config/machine.ts";
+import { type Kind, type Naming, PURPOSES, STUCK_TAG, TALK_PURPOSES } from "../config/schema.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { doesLeaveDocs } from "../decide/kind.ts";
 import { type EventPick, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, requestedChanges, SPLIT, type SplitPart } from "../decide/prose.ts";
 import { answerOnce, foldItem, type ItemFold, keepPick, machineStarted, ownerAnswered, rebuilt } from "../state/item-log.ts";
 import type { State } from "../state/open.ts";
 import type { Parked, SavedRepro, SavedTalk } from "../state/saved.ts";
-import { type SavedSnapshot, persistedSnapshot } from "../state/items.ts";
+import { type SavedSnapshot, passedOnto, persistedSnapshot } from "../state/items.ts";
 import { dueClock, isDue } from "./due.ts";
 import { HOUR_MS, SECOND_MS } from "../time.ts";
 import { checkLimits, firstFailing, runChecks } from "./checks.ts";
@@ -157,9 +157,6 @@ const unansweredQuestion = (item: Item): ThreadEntry | undefined => {
 	return question && isWaitQuestion(visibleText(question.text)) ? question : undefined;
 };
 
-/** Whether the kind's machine takes the owner's approval of a change in this state. */
-const isApprovalWait = (kind: Kind, state: string | undefined): boolean => state !== undefined && kind.machine.states[state]?.on?.[OWNER_APPROVED] !== undefined;
-
 /** Where an item saved in an owner wait stands for an answer: waiting on approval where the state takes the owner's approval, else waiting. */
 export const ownerWaitStage = (kind: Kind, state: string | undefined): Stage => (isApprovalWait(kind, state) ? "approval" : "waiting");
 
@@ -177,8 +174,6 @@ export const rememberKinds = (state: State, config: Config): void => {
 
 /** Whether the kind's machine tags this state with `tag`. */
 const hasTag = (kind: Kind, state: string | undefined, tag: string): boolean => (state !== undefined && kind.machine.states[state]?.tags?.includes(tag)) ?? false;
-
-export const isWaitingOnOwner = (kind: Kind, state: string | undefined): boolean => hasTag(kind, state, OWNER_WAIT_TAG);
 
 export const hasEndedStuck = (kind: Kind, state: string | undefined): boolean => hasTag(kind, state, STUCK_TAG);
 
@@ -1062,6 +1057,10 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		handled = String(actor.getSnapshot().value);
 	} else actor = createActor(kindMachine(kind, invokedSources(kind, nothingRuns, sources), reads));
 
+	/** Where the machine stood at its last save, and the states it has left since it started: a restored wait goes on with its saved record. */
+	let at = d.resume ? String(actor.getSnapshot().value) : undefined;
+	let passed = d.resume ? state.items.savedOf(id)?.passed : [];
+
 	const react = async (value: string) => {
 		if (handled === value) return;
 
@@ -1085,7 +1084,12 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 	actor.subscribe({
 		next: (snapshot) => {
-			const saved = state.items.save(id, kind, persistedSnapshot(actor));
+			const value = String(snapshot.value);
+
+			passed = passedOnto(passed, at, value);
+			at = value;
+
+			const saved = state.items.save(id, kind, persistedSnapshot(actor), passed);
 
 			if (!saved.ok) result.reject(new Error(saved.fault.cause));
 
@@ -1113,7 +1117,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	actor.start();
 
 	if (d.answered && d.resume) {
-		const resume = resumeEvent(actor.getSnapshot(), d.answered);
+		const resume = resumeEvent(kind, String(actor.getSnapshot().value), d.answered);
 
 		if (resume === OWNER_REJECTED) lastFailure = d.answered.answer;
 
@@ -1177,15 +1181,15 @@ type Pending = { readonly question: Question; readonly plain: PlainQuestion; rea
 
 const chosenSection = (chosen: readonly string[]): string => (chosen.length === 0 ? "" : `\n\n## Decided without the owner\n${chosen.map((text) => `- ${text}`).join("\n")}\nGo on with these choices.`);
 
-const OWNER_APPROVED = "owner-approved";
+/** The event an owner's answer sends the saved wait: the approval of a change where the wait takes it and the answer approves, else the wait's written answer. */
+const resumeEvent = (kind: Kind, state: string, answered: Answered): string => {
+	if (isApprovalWait(kind, state) && answered.option === OWNER_APPROVAL) return OWNER_APPROVED;
 
-const OWNER_REJECTED = "owner-rejected";
+	const textEvent = interactionAt(kind, state)?.textEvent;
 
-/** The event an owner's answer sends a saved wait: `answered` where the state takes it, else the owner's approval or rejection of the change. */
-const resumeEvent = (snapshot: { can: (event: { type: string }) => boolean }, answered: Answered) => {
-	if (snapshot.can({ type: ANSWERED })) return ANSWERED;
+	if (textEvent === undefined) throw new Error(`${kind.machine.id}: the wait "${state}" takes no written answer`);
 
-	return answered.option === OWNER_APPROVAL ? OWNER_APPROVED : OWNER_REJECTED;
+	return textEvent;
 };
 
 type Purpose = (typeof PURPOSES)[number];

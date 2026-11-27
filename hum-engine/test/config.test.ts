@@ -3,12 +3,15 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createActor, SimulatedClock, waitFor } from "xstate";
 import { restoreActor } from "xstate/persist";
+import { getInteraction } from "@statelyai/agent";
 import { z } from "zod";
 import schemaFile from "../schema/hum.schema.json" with { type: "json" };
+import earlierFix from "./fixtures/fix-kind-2.json" with { type: "json" };
 import {
 	applyConfigChange,
 	type Config,
 	HumConfig,
+	KindFile,
 	kindMachine,
 	loadConfig,
 	migrateConfig,
@@ -88,9 +91,11 @@ test("a rename that strands a saved item is refused; with a map the item restore
 		const next = clone(setUp());
 		const text = JSON.stringify(next.kinds.feature).replaceAll("owner-review", "deep-review");
 		next.kinds.feature = JSON.parse(text);
-		next.kinds.feature.machine.version = "3";
+		const { version } = before.kinds.feature!.machine;
 
-		if (map) next.kinds.feature.stateMap = { "2": { "owner-review": "deep-review" } };
+		next.kinds.feature.machine.version = `${version}-renamed`;
+
+		if (map) next.kinds.feature.stateMap = { [version]: { "owner-review": "deep-review" } };
 
 		return next;
 	};
@@ -334,10 +339,45 @@ test("an event no machine handles, and a waited event nobody declares, are refus
 
 test("a state that starts a run and waits on the owner is refused", () => {
 	const bad = clone(setUp());
-	bad.kinds.feature.machine.states.building.tags = ["owner-wait"];
+	bad.kinds.feature.machine.states.building.meta = { interaction: { label: "Answer", textEvent: "token-cap" } };
 	bad.kinds.feature.machine.states.building.after = { [DAY_MS]: { target: "stuck" } };
 
 	expect(problemsOf(bad)).toContainEqual({ kind: "feature", problem: "run-and-owner-wait", state: "building" });
+});
+
+test("a wait that offers the owner an event it does not take or that the owner does not send, and a skip to no state, are refused", () => {
+	const bad = clone(setUp());
+	bad.kinds.feature.machine.states["owner-review"].meta.interaction.choices.push({ label: "Merge", event: { type: "merged" } });
+	bad.kinds.feature.machine.states.building.meta = { skip: { target: "nowhere" } };
+
+	const problems = problemsOf(bad);
+
+	expect(problems).toContainEqual({ kind: "feature", problem: "interaction-event-unhandled", state: "owner-review", event: "merged" });
+	expect(problems).toContainEqual({ kind: "feature", problem: "interaction-event-not-owner", state: "owner-review", event: "merged" });
+	expect(problems).toContainEqual({ kind: "feature", problem: "unknown-state", state: "nowhere", why: 'the skip of "building"' });
+});
+
+test("a wait's controls in meta.interaction reach the machine hum builds, where @statelyai/agent's getInteraction reads them", () => {
+	const kind = loaded(setUp()).kinds.feature!;
+	const actor = createActor(kindMachine({ ...kind, machine: { ...kind.machine, initial: "owner-review" } })).start();
+
+	expect(getInteraction(actor.getSnapshot())).toEqual({ label: "Review the change", events: [], choices: [{ label: "Approve", event: { type: "owner-approved" } }], textEvent: "owner-rejected" });
+});
+
+test("a kind file written before waits named their controls loads with each owner wait's controls in meta.interaction, its version kept", () => {
+	const kind = KindFile.parse(earlierFix);
+	const interactions = Object.entries(kind.machine.states).flatMap(([state, node]) => (node.meta?.interaction ? [[state, node.meta.interaction]] : []));
+	const answer = (state: string) => [state, { label: state, textEvent: "answered" }];
+
+	expect(interactions).toEqual([
+		answer("objecting"),
+		["owner-review", { label: "owner-review", choices: [{ label: "Approve", event: { type: "owner-approved" } }], textEvent: "owner-rejected" }],
+		answer("asking"),
+		answer("asking-repro"),
+		answer("asking-reviewing"),
+	]);
+	expect(Object.values(kind.machine.states).flatMap(({ tags = [] }) => tags)).toEqual(["stuck"]);
+	expect(kind.machine.version).toBe("2");
 });
 
 test("a state that runs a plan or review role and takes no event for an unsure run is refused", () => {

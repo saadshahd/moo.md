@@ -1,3 +1,4 @@
+import { interactionMetaSchema } from "@statelyai/agent";
 import { isValidCron } from "cron-validator";
 import isGitRefNameValid from "is-git-ref-name-valid";
 import { z } from "zod";
@@ -49,11 +50,8 @@ export const SIZES = ["small", "medium", "large"] as const;
 const TIERS = ["light", "standard", "top"] as const;
 export const EFFORTS = ["low", "medium", "high"] as const;
 
-/** A machine state tagged with either of these waits on something outside the run. */
+/** A machine state tagged with this waits on something outside the run; a state whose `meta` names an interaction waits on the owner. */
 export const WAIT_TAG = "wait";
-
-/** A state tagged with this waits on the owner; it is also a wait. */
-export const OWNER_WAIT_TAG = "owner-wait";
 
 /** A state tagged with this ends the item without finishing it. */
 export const STUCK_TAG = "stuck";
@@ -457,10 +455,35 @@ const Transitions = z
 	.union([Transition, z.array(Transition)])
 	.transform((value) => (Array.isArray(value) ? value : [value]));
 
+/** An option the owner picks at a wait: its label and the event it sends. */
+const InteractionChoice = z.strictObject({ label: name, event: z.strictObject({ type: name }) });
+
+/** What a wait offers the owner, in `@statelyai/agent`'s interaction form: its label, its options, and the event a written answer sends. */
+const Interaction = z.strictObject({ label: name, choices: z.array(InteractionChoice).optional(), textEvent: name.optional() });
+
+export type Interaction = z.infer<typeof Interaction>;
+
+/** A state's `meta`: the owner's controls there. No `actor`: hum.json's `source: "owner"` marks the events only the owner sends. */
+const StateMetaFields = z.strictObject({
+	/** The state waits on the owner, who answers with what it offers. */
+	interaction: Interaction.optional(),
+	/** The owner may skip the state, to `target`; a state without it is not skippable. */
+	skip: z.strictObject({ target: name }).optional(),
+});
+
+const isAgentMeta = (meta: z.infer<typeof StateMetaFields>): boolean => {
+	const checked = interactionMetaSchema["~standard"].validate(meta);
+
+	return !(checked instanceof Promise) && checked.issues === undefined;
+};
+
+const StateMeta = StateMetaFields.refine(isAgentMeta, "meta is not state metadata @statelyai/agent reads");
+
 const StateNode = z.strictObject({
 	type: z.enum(["atomic", "final"]).optional(),
 	description: z.string().optional(),
 	tags: z.array(name).optional(),
+	meta: StateMeta.optional(),
 	/** A run: `src` names a role. */
 	invoke: z
 		.strictObject({ src: name, onDone: Transitions.optional(), onError: Transitions.optional() })

@@ -8,12 +8,12 @@ import { createAsyncLogic } from "xstate";
 import { ADAPTER_API_VERSION, type Answers, type Holder, type Item, ItemGone, ItemId, type ItemRef, type Questions, type ThreadEntry, type WorkSource } from "../adapter-api.ts";
 import type { Runner } from "../adapters/claude-p.ts";
 import type { Config } from "../config/load.ts";
-import { invokedSources } from "../config/machine.ts";
+import { invokedSources, isWaitingOnOwner } from "../config/machine.ts";
 import { type Kind, SCHEMA_VERSION } from "../config/schema.ts";
 import { checkTokenAge } from "../service/token.ts";
 import { listFiles } from "../state/fs.ts";
 import { ENGINE_VERSION } from "../state/format.ts";
-import { persistedSnapshot, type SavedSnapshot } from "../state/items.ts";
+import { passedOnto, persistedSnapshot, type SavedSnapshot } from "../state/items.ts";
 import type { State } from "../state/open.ts";
 import { tallyOf } from "./tally.ts";
 import { dueClock, isDue, type SavedWait } from "./due.ts";
@@ -33,7 +33,8 @@ import { keepMergedCases } from "../measure/cases.ts";
 import { type StaleScore, staleScores } from "../measure/judges.ts";
 import type { Measured, Measurement } from "../measure/remeasure.ts";
 import { emptyStatus, readStatus, writeHeartbeat, writeStatus } from "../status/file.ts";
-import type { Choice, Status } from "../status/format.ts";
+import { type Flow, type FlowAt, flowOf } from "../status/flow.ts";
+import type { Choice, OpenItem, Status } from "../status/format.ts";
 import { newestChoices, openQuestions } from "../status/sections.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { SECOND_MS } from "../time.ts";
@@ -47,7 +48,7 @@ import { type AnswerScope, settleAnswers } from "./answers.ts";
 import { PARK_OPTIONS, RUN_AGAIN } from "../decide/answer.ts";
 import { queueQuestion, recentlyAsked, releaseQuestions } from "./questions.ts";
 import type { Parked } from "../state/saved.ts";
-import { answerTo, type Checkout, doesStartOver, ownerWaitStage, claimTtlMs, DEFAULT_BASE, gatherItem, hasEndedStuck, isGathered, isTalking, park, parkQuestion, rememberKinds, runThinPath, type TalkCopy, talkWaits, type ThinPathOptions, type ThinResult, isWaitingOnOwner } from "./thin-path.ts";
+import { answerTo, type Checkout, doesStartOver, ownerWaitStage, claimTtlMs, DEFAULT_BASE, gatherItem, hasEndedStuck, isGathered, isTalking, park, parkQuestion, rememberKinds, runThinPath, type TalkCopy, talkWaits, type ThinPathOptions, type ThinResult } from "./thin-path.ts";
 import { ownerAnswered } from "../state/item-log.ts";
 import { forgetItem, hasProgress } from "./kind.ts";
 
@@ -220,6 +221,10 @@ export class Worker {
 	readonly #pool = new PQueue();
 	#loopAt = Number.NEGATIVE_INFINITY;
 	readonly #inFlight = new Map<string, InFlight>();
+	/** Each item's title, as the worker last read it. */
+	readonly #titles = new Map<string, string>();
+	/** The flow of each kind an open item runs, by `<machine id>@<version>`, its graph read once. */
+	readonly #flows = new Map<string, Flow>();
 	/** Items the owner answered that have not started yet; kept across ticks, because the watch token moves on. */
 	readonly #answered = new Set<string>();
 	/** Items whose owner wait timed out into work: a pass restores each wait and fires its timeout. */
@@ -368,7 +373,7 @@ export class Worker {
 		const value = String(actor.getSnapshot().value);
 
 		if (hasEndedStuck(kind, value)) {
-			state.items.save(saved.itemId, kind, persistedSnapshot(actor));
+			state.items.save(saved.itemId, kind, persistedSnapshot(actor), passedOnto(saved.passed, saved.state, value));
 			park({ state, now: this.#now }, { outcome: "stuck", item: saved.itemId, detail: `its wait in ${saved.state} timed out` });
 		} else if (value !== saved.state) this.#timedOut.add(saved.itemId);
 
@@ -490,7 +495,11 @@ export class Worker {
 
 			this.#watchToken = watched.token;
 
-			return { changed: watched.changed, ready: await adapters.workSource.listReady() };
+			const ready = await adapters.workSource.listReady();
+
+			for (const { id, title } of ready) this.#titles.set(id, title);
+
+			return { changed: watched.changed, ready };
 		} catch {
 			return undefined;
 		}
@@ -959,8 +968,6 @@ export class Worker {
 
 		this.#showRefusedMemory(memory.refused);
 		const [latest, ci] = await Promise.all([this.#latest(), this.#ciTick()]);
-		const saved = new Map(state.items.saved().map((s) => [s.itemId, s.state]));
-
 		writeStatus(state.statusPath, {
 			...before,
 			writtenAt: t,
@@ -974,18 +981,41 @@ export class Worker {
 			questions: openQuestions(state.questions.list(), state.answers.list()),
 			choices: newestChoices(state.choices.list(), config.hum.choicesShown).map((choice) => ({ ...choice, result: this.#resultOf(choice.item) })),
 			cards: state.faults.list(),
-			inFlight: [...this.#inFlight].map(([item, run]) => ({
-				item,
-				title: run.known.title,
-				state: saved.get(item) ?? "starting",
-				since: run.since,
-				unclear: false,
-			})),
+			open: this.#openItems(),
 			merged: [...this.#merged.splice(0), ...before.merged].slice(0, this.#o.config.hum.mergedShown),
 			possibleRepeats: state.possibleRepeats.list().map(({ a, b }) => ({ a, b })),
 			unusedMemory: this.#unusedMemory(memory.entries),
 			measure: measureOf({ ...measureInputsOf(state), window: config.hum.measureWindow, globs: config.hum.paths.map(({ glob }) => glob) }) ?? null,
 			rules: state.learned.list().map(({ glob, level, item, at, commit }) => ({ glob, level, item, at, undo: { label: "Undo", command: `git revert ${commit}` } })),
+		});
+	}
+
+	/** Where the saved item's flow stands, as the kind it was saved under runs it; undefined where the state folder keeps no such kind. */
+	#flowAt(saved: SavedSnapshot, at: string): FlowAt | undefined {
+		const key = `${saved.kind}@${saved.machineVersion}`;
+
+		if (!this.#flows.has(key)) {
+			const kind = this.#o.state.kinds.get(key);
+
+			if (kind) this.#flows.set(key, flowOf(kind));
+		}
+
+		return this.#flows.get(key)?.(at, saved.passed);
+	}
+
+	/** Every item with a saved state that has not ended: where its flow stands, and whether a pass runs on it now. */
+	#openItems(): OpenItem[] {
+		const { state } = this.#o;
+
+		return state.items.saved().flatMap((saved) => {
+			const flow = saved.state === undefined ? undefined : this.#flowAt(saved, saved.state);
+
+			if (flow === undefined) return [];
+
+			const run = this.#inFlight.get(saved.itemId);
+			const title = run?.known.title ?? this.#titles.get(saved.itemId);
+
+			return [{ item: saved.itemId, title, kind: state.itemKinds.get(saved.itemId)?.kind ?? saved.kind, flowVersion: saved.machineVersion, ...flow, since: run?.since ?? saved.savedAt, running: run !== undefined }];
 		});
 	}
 
@@ -1017,6 +1047,8 @@ export class Worker {
 	/** What the scheduler needs of an item, read fresh each tick so an owner's edit to its `touches:` counts. */
 	async #learn(id: string): Promise<Known> {
 		const item = await this.#o.adapters.workSource.read(ItemId.parse(id));
+
+		this.#titles.set(id, item.title);
 
 		return { footprint: footprintOf(item) ?? undeclaredFootprint(this.#o.config.hum), title: item.title, claimedBy: item.claimedBy ?? [] };
 	}

@@ -41,10 +41,46 @@ export const Card = z.object({
 
 export type Card = z.infer<typeof Card>;
 
-const Row = z.object({ item: name, title: name, level: z.optional(name), state: name, since: time });
+/** A step of an item's flow, and whether the item waits there on the owner. */
+const Step = z.object({ name, waitsOnOwner: z.boolean() });
 
-/** An unclear item carries the mark apart from its risk level. */
-export const InFlight = z.extend(Row, { unclear: z.boolean() });
+/** What the owner may do at the step an item is in. */
+export const Controls = z.object({
+	/** The options the flow file offers there, each with the event it sends. */
+	choices: z.array(z.object({ label: name, event: name })),
+	/** It takes a written answer. */
+	answer: z.boolean(),
+	/** The flow file lets the owner skip it. */
+	skip: z.boolean(),
+	/** It waits on a timer the owner may run now. */
+	runNow: z.boolean(),
+	/** The steps a note may go to: each the item can still reach. */
+	noteTo: z.array(name),
+});
+
+export type Controls = z.infer<typeof Controls>;
+
+/**
+ * An item with a saved state that has not ended: its kind file and that flow's version, the flow's steps as the item
+ * runs it, the step it is in since `since`, whether a pass runs on it now, and what the owner may do there. A wait a run
+ * stops at past its token cap is a step only while the item is in it.
+ */
+export const OpenItem = z.object({
+	item: name,
+	/** Absent until the worker has read the item since it started. */
+	title: z.optional(name),
+	kind: name,
+	flowVersion: name,
+	steps: z.array(Step),
+	at: name,
+	/** The shown steps it has passed since its flow last started, in the order it first left each; absent where hum began keeping them after the item started. */
+	passed: z.optional(z.array(name)),
+	since: time,
+	running: z.boolean(),
+	controls: Controls,
+});
+
+export type OpenItem = z.infer<typeof OpenItem>;
 
 /** A question to the owner: its text and the option words an answer may pick, none for a free answer. */
 export const Question = z.object({ item: name, text: name, options: z.array(name), since: time });
@@ -109,7 +145,7 @@ export const Status = z.object({
 	}),
 	questions: z.array(Question),
 	cards: z.array(Card),
-	inFlight: z.array(InFlight),
+	open: z.array(OpenItem),
 	merged: z.array(Merged),
 	choices: z.array(Choice),
 	rules: z.array(LearnedRule),

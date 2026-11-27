@@ -97,7 +97,7 @@ const programBack = (was: string, what: string) =>
 	}, what);
 
 /** Whether the status shows the rig's item in flight in its build. */
-const isBuilding = ({ inFlight }: Status) => inFlight.some((flight) => flight.item === item && flight.state === "building");
+const isBuilding = ({ open }: Status) => open.some((row) => row.item === item && row.running && row.at === "building");
 
 /** The rows of every attempt at the item's build. */
 const buildRows = async () => z.array(Node).parse(await rig.user.call("rail.tree")).filter((node) => node.kind === "agent" && node.name.startsWith(railName(`hum ${item} build #`)));

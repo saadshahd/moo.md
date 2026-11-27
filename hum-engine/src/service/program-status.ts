@@ -23,9 +23,10 @@ export const programStatus = (read: StatusRead): ProgramStatus => {
 
 	if (fault) return { state: "error", msg: `${fault.cause}${andMore(faults.length)}` };
 
-	const [item] = read.status.inFlight;
+	const running = read.status.open.filter((open) => open.running);
+	const [item] = running;
 
-	if (item) return { state: "working", msg: `#${item.item} ${item.title}: ${item.state}${andMore(read.status.inFlight.length)}` };
+	if (item) return { state: "working", msg: `#${item.item}${item.title === undefined ? "" : ` ${item.title}`}: ${item.at}${andMore(running.length)}` };
 
 	return { state: "idle", msg: "no item in flight" };
 };

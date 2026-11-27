@@ -747,7 +747,7 @@ function stringWidth(input, options = {}) {
   return width;
 }
 // ../hum-engine/src/status/version.ts
-var STATUS_FORMAT = 2;
+var STATUS_FORMAT = 3;
 // ../hum-engine/node_modules/zod/v4/core/util.js
 function getEnumValues(entries) {
   const numericValues = Object.values(entries).filter((v) => typeof v === "number");
@@ -2530,8 +2530,26 @@ var Card = object({
   action: optional(CardAction),
   since: time2
 }).check(refine(({ item, action }) => action === undefined || item !== undefined, "a card's action answers its item, so a card with an action names one"));
-var Row = object({ item: name, title: name, level: optional(name), state: name, since: time2 });
-var InFlight = extend2(Row, { unclear: boolean2() });
+var Step = object({ name, waitsOnOwner: boolean2() });
+var Controls = object({
+  choices: array(object({ label: name, event: name })),
+  answer: boolean2(),
+  skip: boolean2(),
+  runNow: boolean2(),
+  noteTo: array(name)
+});
+var OpenItem = object({
+  item: name,
+  title: optional(name),
+  kind: name,
+  flowVersion: name,
+  steps: array(Step),
+  at: name,
+  passed: optional(array(name)),
+  since: time2,
+  running: boolean2(),
+  controls: Controls
+});
 var Question = object({ item: name, text: name, options: array(name), since: time2 });
 var Merged = object({ item: name, title: name, level: optional(name), mergedAt: time2 });
 var CHOICE_RESULTS = ["merged", "stuck", "review"];
@@ -2563,7 +2581,7 @@ var Status = object({
   }),
   questions: array(Question),
   cards: array(Card),
-  inFlight: array(InFlight),
+  open: array(OpenItem),
   merged: array(Merged),
   choices: array(Choice),
   rules: array(LearnedRule),

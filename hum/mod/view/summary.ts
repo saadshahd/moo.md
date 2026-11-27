@@ -13,7 +13,7 @@ const STATE_WORDS: readonly { readonly count: (status: Status, dismissed: readon
 	{ count: (status, dismissed) => shownFaultGroups(status, dismissed).length, words: (count) => plural(count, "fault") },
 	{ count: (status) => cardsOf(status, "limited"), words: () => "limited" },
 	{ count: (status) => cardsOf(status, "waiting"), words: (count) => `${count} waiting` },
-	{ count: (status) => status.inFlight.length, words: (count) => `${count} running` },
+	{ count: (status) => status.open.filter(({ running }) => running).length, words: (count) => `${count} running` },
 ];
 
 const IDLE = "idle";
