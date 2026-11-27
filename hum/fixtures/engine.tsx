@@ -38,13 +38,14 @@ export const engineWith = (on: On, disk: Disk, hum: Hum = () => undefined, env: 
 
 	on("env.get", (_, e) => ({ value: env[e.name] }));
 	on("process.run", async (_, e) => {
-		if (e.argv[0] === "git") return { value: disk.isRepo ? ran(0, GIT_PLACES) : ran(128, "") };
+		if (e.argv[0] === "git") return { value: disk.isRepo ? ran(0, e.argv.includes("--git-common-dir") ? GIT_PLACES : `${REPO}\n`) : ran(128, "") };
 
 		await hum(e.argv);
 
 		return { value: ran(0, "") };
 	});
 	on("session.start", (_, e) => ({ cwd: e.cwd }));
+	on("session.cwd", () => ({ value: REPO }));
 	on("fs.exists", (_, e) => ({ value: disk.humFiles.includes(e.path) }));
 	on("fs.stat", (_, e) => {
 		const held = heldAt(disk, e.path);

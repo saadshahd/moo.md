@@ -496,7 +496,7 @@ const statusFile = () => {
 	const status = emptyStatus(ENGINE_VERSION, 1000);
 
 	status.workers = { mac: 990 };
-	status.open = [{ item: "#68", title: "Fix it", kind: "fix", flowVersion: "3", steps: [{ name: "building", waitsOnOwner: false }], at: "building", passed: [], since: 900, running: true, controls: { choices: [], answer: false, skip: false, runNow: false, noteTo: ["building"] } }];
+	status.open = [{ item: "#68", title: "Fix it", kind: "fix", flowVersion: "3", steps: [{ name: "building", part: "step", waitsOnOwner: false }], at: "building", passed: [], since: 900, running: true, controls: { choices: [], answer: false, skip: false, runNow: false, noteTo: ["building"] } }];
 	writeStatus(path, status);
 
 	return { path, status };

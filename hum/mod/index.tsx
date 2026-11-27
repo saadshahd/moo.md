@@ -1,12 +1,12 @@
 import type { EngineInterface, Register } from "claude-code";
 import { atom, read, update } from "claude-code";
 import { guardAnswer } from "./answer/guard.ts";
-import { answeringLabel, changedBox, editedBox, fillAnswer, isAnswering, post, restartAnswer, routeEnter } from "./answer/mode.ts";
+import { answeringLabel, changedBox, editedBox, fillAnswer, fillNote, isAnswering, post, restartAnswer, routeEnter } from "./answer/mode.ts";
 import type { Dismissal } from "../types";
 import { dismiss, lookDismissed, NOTHING_DISMISSED_SEEN } from "./dismissed.ts";
 import { drawRows } from "./draw.tsx";
 import { humSays } from "./says.ts";
-import { type PressContext, openLink, openPane } from "./press.ts";
+import { type PressContext, askHum, openLink, openPane } from "./press.ts";
 import { viewSettings } from "./settings.ts";
 import { bandRow } from "./view/band.ts";
 import type { ViewInput } from "./view/input.ts";
@@ -31,6 +31,9 @@ const feed = atom({ plugin: "hum", key: "feed" } as const, null, { shape: "feed-
 /* oxlint-enable anti-slop/no-shape-in-symbol-names */
 
 const toggled = (ids: readonly string[], id: string): string[] => (ids.includes(id) ? ids.filter((one) => one !== id) : [...ids, id]);
+
+/** The root of the repo this session works in, where its pinned hum runs. */
+const rootOf = ($: EngineInterface) => (): Promise<string> => $.session.cwd().then((cwd) => repoRoot($, cwd));
 
 /** A failure outside answer mode shows once and the event passes on. */
 const showOnce = ($: EngineInterface) => (error: Error): void => $.ui.toast(humSays(error.message));
@@ -62,6 +65,14 @@ const pressed = ($: EngineInterface, context: PressContext) => async (press: Pre
 			break;
 		case "dismiss":
 			await dismissCards($, press.cards, context).catch(showOnce($));
+			break;
+		case "note":
+			await fillNote($, press.item, press.step);
+			break;
+		case "request":
+			await rootOf($)()
+				.then((root) => askHum($, root, press))
+				.catch(showOnce($));
 			break;
 		default:
 			return press satisfies never;
@@ -148,7 +159,7 @@ export const register: Register = (on, options) => {
 			decide: async () => {
 				const { decision, toPost } = await routeEnter($, e.origin.kind, e.text);
 
-				if (toPost !== undefined) post($, () => $.session.cwd().then((cwd) => repoRoot($, cwd)), toPost).catch(showOnce($));
+				if (toPost !== undefined) post($, rootOf($), toPost).catch(showOnce($));
 
 				return decision;
 			},

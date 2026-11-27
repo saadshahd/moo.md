@@ -18,7 +18,7 @@ const OPEN: Answering = {
 	opener: "#68: ",
 	filled: "#68: change the plan so that ",
 	isOpen: true,
-	option: "change",
+	to: { kind: "answer", option: "change" },
 };
 
 const WHOLE: Answering = {
@@ -27,7 +27,7 @@ const WHOLE: Answering = {
 	opener: "#68: ",
 	filled: "#68: approve",
 	isOpen: false,
-	option: "approve",
+	to: { kind: "answer", option: "approve" },
 };
 
 const WRITTEN = `${OPEN.filled}README stays`;
@@ -288,9 +288,9 @@ test("a question with no options has one button, for a free answer", () => {
 });
 
 test.each([
-	["an open sentence", "68", "change", { filled: "#68: change the plan so that ", isOpen: true, option: "change" }],
-	["a whole answer", "68", "approve", { filled: "#68: approve", isOpen: false, option: "approve" }],
-	["a free answer", "seed-2", FREE_ANSWER, { filled: "seed-2: ", isOpen: true, option: undefined }],
+	["an open sentence", "68", "change", { filled: "#68: change the plan so that ", isOpen: true, to: { kind: "answer", option: "change" } }],
+	["a whole answer", "68", "approve", { filled: "#68: approve", isOpen: false, to: { kind: "answer", option: "approve" } }],
+	["a free answer", "seed-2", FREE_ANSWER, { filled: "seed-2: ", isOpen: true, to: { kind: "answer", option: undefined } }],
 ])("a question's button fills %s", (_, item, word, answer) => {
 	expect(answerOf({ item, word })).toMatchObject(answer);
 });

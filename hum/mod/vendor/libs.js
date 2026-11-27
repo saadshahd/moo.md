@@ -747,7 +747,7 @@ function stringWidth(input, options = {}) {
   return width;
 }
 // ../hum-engine/src/status/version.ts
-var STATUS_FORMAT = 3;
+var STATUS_FORMAT = 4;
 // ../hum-engine/node_modules/zod/v4/core/util.js
 function getEnumValues(entries) {
   const numericValues = Object.values(entries).filter((v) => typeof v === "number");
@@ -2530,9 +2530,10 @@ var Card = object({
   action: optional(CardAction),
   since: time2
 }).check(refine(({ item, action }) => action === undefined || item !== undefined, "a card's action answers its item, so a card with an action names one"));
-var Step = object({ name, waitsOnOwner: boolean2() });
+var STEP_PARTS = ["step", "route", "condition", "end"];
+var Step = object({ name, part: _enum(STEP_PARTS), waitsOnOwner: boolean2() });
 var Controls = object({
-  choices: array(object({ label: name, event: name })),
+  choices: array(object({ label: name, event: name, answer: optional(name) })),
   answer: boolean2(),
   skip: boolean2(),
   runNow: boolean2(),

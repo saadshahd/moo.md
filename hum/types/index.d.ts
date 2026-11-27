@@ -4,18 +4,21 @@ export type ServedSource = { kind: "text"; text: string } | { kind: "failed"; me
 /** What the poller last found: nothing where hum does not serve, else what the status file held. */
 export type ViewSource = { kind: "unserved" } | ServedSource;
 
-/** The answer a fill started: the item, the words in front of the owner's own, and the option it carries. */
+/** Where Enter posts the owner's words: an answer to the item's question, with the option the fill picked, or a note to one of its steps. */
+export type PostTo = { readonly kind: "answer"; readonly option?: string } | { readonly kind: "note"; readonly step: string };
+
+/** What a fill started: the item, the words in front of the owner's own, and where Enter posts them. */
 export type Answering = {
 	readonly item: string;
 	/** How the item reads to the owner, `#68` or a slug. */
 	readonly label: string;
-	/** `#68: `: while the box starts with it, Enter posts on the thread. */
+	/** `#68: ` or `#68 note for building: `: while the box starts with it, Enter posts on the thread. */
 	readonly opener: string;
 	/** What the fill put in the box. */
 	readonly filled: string;
 	/** An open sentence waits for the owner's words; a whole answer is complete as filled. */
 	readonly isOpen: boolean;
-	readonly option?: string;
+	readonly to: PostTo;
 };
 
 /** An answer whose post is in flight, with the box as Enter took it. */

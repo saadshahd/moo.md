@@ -155,9 +155,16 @@ export const transitionsOf = (node: StateNodeJSON) =>
 const targetsOf = (transitions: ReturnType<typeof transitionsOf>): string[] => transitions.flatMap(({ target }) => (target === undefined ? [] : [target]));
 
 /** The waits a run stops at past its token cap: the states only the over-cap event leads to. */
+/** The waits a run's question or its token cap leads to. */
+export const cappedWaits = (kind: Kind): ReadonlySet<string> => new Set(Object.values(kind.machine.states).flatMap((node) => targetsOf(node.on?.[TOKEN_CAP] ?? [])));
+
+/** Whether the state only picks the next one: it moves on at once by its `always` transitions, running nothing and waiting on nothing. */
+export const isRoute = (node: StateNodeJSON | undefined): boolean =>
+	node?.always !== undefined && node.invoke === undefined && node.after === undefined && Object.keys(node.on ?? {}).length === 0 && !isOwnerWait(node);
+
 export const overCapWaits = (kind: Kind): ReadonlySet<string> => {
 	const nodes = Object.values(kind.machine.states);
-	const capped = new Set(nodes.flatMap((node) => targetsOf(node.on?.[TOKEN_CAP] ?? [])));
+	const capped = cappedWaits(kind);
 	const otherwise = new Set(nodes.flatMap(({ on = {}, ...node }) => targetsOf(transitionsOf({ ...node, on: Object.fromEntries(Object.entries(on).filter(([event]) => event !== TOKEN_CAP)) }))));
 
 	return new Set([...capped].filter((state) => !otherwise.has(state)));

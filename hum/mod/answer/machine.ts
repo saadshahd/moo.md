@@ -31,7 +31,7 @@ const isEmptyBox = (box: string): boolean => box.trim() === "";
 
 const isBare = (answering: Answering, text: string): boolean => answering.isOpen && text.trim() === answering.filled.trim();
 
-const answeringOf = ({ item, label, opener, filled, isOpen, option }: Posting): Answering => ({ item, label, opener, filled, isOpen, option });
+const answeringOf = ({ item, label, opener, filled, isOpen, to }: Posting): Answering => ({ item, label, opener, filled, isOpen, to });
 
 /** Answer mode ends: no answer held, and the outcome the event decided. */
 const toOff = (patch: Partial<AnswerOutcome>) => ({ target: "off", context: { ...outcome(patch), answering: undefined } }) as const;
