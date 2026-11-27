@@ -16,7 +16,7 @@ import { earliestTimeout, interactionAt, invokedSources, isApprovalWait, isWaiti
 import { type Kind, type Naming, PURPOSES, STUCK_TAG, TALK_PURPOSES } from "../config/schema.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { doesLeaveDocs } from "../decide/kind.ts";
-import { type EventPick, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, requestedChanges, SPLIT, type SplitPart } from "../decide/prose.ts";
+import { type EventPick, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, REQUEST_CHANGES, requestedChanges, SPLIT, type SplitPart } from "../decide/prose.ts";
 import { answerOnce, foldItem, type ItemFold, keepPick, machineStarted, ownerAnswered, rebuilt } from "../state/item-log.ts";
 import type { State } from "../state/open.ts";
 import type { Parked, SavedRepro, SavedTalk } from "../state/saved.ts";
@@ -38,6 +38,8 @@ import { answerToLatest, latestQuestionAt, openQuestion } from "./thread.ts";
 import { memorySection, readMemory, rulesUsed } from "../loop/memory.ts";
 import { proveCheckItem } from "../loop/prove-item.ts";
 import { tallyOf } from "./tally.ts";
+import { keepReview } from "./owner-handoff.ts";
+import { runName } from "../state/runs.ts";
 import { decideProse } from "./prose-run.ts";
 import { type PrefixGate } from "./scheduler.ts";
 import { evidenceRef, keepEvidence } from "./evidence.ts";
@@ -607,7 +609,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		const prefix = config.hum.roles[role]?.file ?? role;
 		const prompt = `${text}${memorySection(held)}`;
 		const tier = await tierFor(role);
-		const named = { name: `hum ${id} ${run} #${key.attempt}`, sessionId: d.newSessionId() };
+		const named = { name: runName(key), sessionId: d.newSessionId() };
 
 		const { begun, outcome } = await runs.add(() => answerOnce(state, { key, launch: named, machineVersion: version, question: judged && { prompt, ...tier, ...judged } }, async (begun) => {
 			const lease = await d.gate?.enter(prefix, signal);
@@ -875,7 +877,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		["plan-blocked", ownerQuestion],
 		["needs-owner", ownerQuestion],
 		[
-			"request-changes",
+			REQUEST_CHANGES,
 			(pick) => {
 				lastFailure = requestedChanges(pick);
 			},
@@ -914,7 +916,14 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 				prompt: PROSE_PROMPTS[purpose](config, talked(), diff, role, read.files),
 				diff,
 				model: (await tierFor(role)).model,
-				run: (text, schema) => runAgent(role, text, schema, signal, { head }),
+				run: async (text, schema) => {
+					const key = state.runs.keyFor(id, role);
+					const answered = await runAgent(role, text, schema, signal, { head });
+
+					if (isReview) keepReview(state, { item: id, head, diff, run: key, outcome: answered, at: d.now() });
+
+					return answered;
+				},
 				canTake: (type) => actor.getSnapshot().can({ type }),
 			});
 
@@ -1352,7 +1361,7 @@ const pauseOf = (id: string, outcome: Paused): ThinResult => {
  * side that wrote the change.
  */
 export const reviewRunOf =
-	(o: Pick<ThinPathOptions, "runner" | "state" | "config">, item: Item, kindName: string) =>
+	(o: Pick<ThinPathOptions, "runner" | "state" | "config" | "now">, item: Item, kindName: string) =>
 	async ({ head, diff, level, patch, files }: Parameters<LandContext["reviewRun"]>[0]): Promise<ReviewOutcome> => {
 		const kind = kindNamed(o.config, kindName);
 		const row = pickTier(kind, { role: REVIEW_ROLE, purpose: "review", level, size: "small" });
@@ -1373,6 +1382,7 @@ export const reviewRunOf =
 
 			if (outcome.kind === "finished") {
 				tally.spend(outcome.tokens);
+				keepReview(o.state, { item: item.id, head, diff, outcome, at: o.now() });
 
 				return outcome;
 			}

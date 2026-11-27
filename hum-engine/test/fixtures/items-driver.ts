@@ -128,6 +128,66 @@ const park = async (): Promise<object> => {
 	return { outcomes: w.results.map(({ outcome }) => outcome), asked: w.state.questions.list().map(({ options }) => options), runs: [...runs, w.shim.calls().length] };
 };
 
+/** The handoff scenario's own Workstream of items. */
+const HANDOFF_WORKSTREAM = "hum handoff";
+
+const PadRead = z.looseObject({ text: z.string(), home: z.string().nullish(), visibility: z.string() });
+
+/**
+ * A whole worker over the roundup adapter at a level a review run clears: the review asks for a change to a file the
+ * branch never touches, so the change parks for the owner's review, and its question row names the shown handoff Pad.
+ * The owner stops that first row once it asked them, and the row hum asks again names the Pad too; their approve there
+ * lands the change, and the Pad then says what merged, in the scenario's Workstream.
+ */
+const handoff = async (): Promise<object> => {
+	const seeder = roundupRpc(socket);
+	const home = z.looseObject({ id: z.string() }).parse(await seeder.call("rail.createWorkstream", { name: HANDOFF_WORKSTREAM })).id;
+	const { id } = z.looseObject({ id: z.int() }).parse(await seeder.call("todo.create", { title: "handoff item" }));
+
+	await seeder.call("todo.move", { id, home });
+
+	const item = String(id);
+	const readme = { event: "request-changes", sure: true, reason: "README.md does not name the new note.", cites: [{ file: `docs/${item}.md`, line: 1 }], plan: { summary: "Name the new note in README.md.", steps: ["Add a line."], paths: ["README.md"] } };
+	const w = await workerWorld({ items: { [item]: { writeForItem: true } }, decisions: [readme] }, { settings: { paths: [{ glob: "docs/**", level: "medium" }] }, source: (context) => roundupOn("state-handoff", context, HANDOFF_WORKSTREAM) });
+	const padOf = async (name: string) => seeder.call("pad.read", { name }).then((pad) => PadRead.parse(pad), () => undefined);
+
+	const ticked = async (ms: number) => {
+		w.clock.at += ms;
+		await w.worker.tick();
+		await w.worker.idle();
+	};
+
+	const tickUntil = async <T>(found: () => Promise<T | undefined>): Promise<T | undefined> => {
+		for (const deadline = Date.now() + ANSWER_WAIT_MS; Date.now() < deadline; await ticked(SECOND_MS)) {
+			const value = await found();
+
+			if (value !== undefined) return value;
+		}
+
+		return undefined;
+	};
+
+	const pad = `#${item} handoff`;
+
+	writeFileSync(join(rig, `go-ask-${item}`), "approve");
+	writeFileSync(join(rig, `unanswered-hum-${item}-ask-1`), "");
+
+	const atReview = await tickUntil(() => padOf(pad));
+	const brief = await tickUntil(() => padOf(`hum ${item} ask 1 brief`));
+	const itemHome = (await railTree(seeder.call)).find((node) => node.kind === "workstream" && node.name.startsWith(`#${item} `))?.id;
+
+	await stopOnceAsked("state-handoff", `hum ${item} ask 1`);
+
+	const reBrief = await tickUntil(() => padOf(`hum ${item} ask 2 brief`));
+
+	await tickUntil(async () => (w.results.at(-1)?.outcome === "merged" ? true : undefined));
+
+	return {
+		outcomes: w.results.map(({ outcome }) => outcome),
+		handoff: { item, home, itemHome, atReview, brief: brief?.text, reBrief: reBrief?.text, atLand: await padOf(pad), comments: z.array(z.looseObject({ body: z.string() })).parse(await seeder.call("todo.comments", { id })).map(({ body }) => body) },
+	};
+};
+
 /**
  * A Workstream of feature items, and thin-path passes over the roundup adapter with Rail rows, as hum serve runs
  * them, in a run slot of the scenario's own, their talk rows in talk copies the slot pool gives; their talk rows act
@@ -270,7 +330,7 @@ const contract = async (): Promise<object> => {
 	return { results };
 };
 
-const SCENARIOS = new Map(Object.entries({ question: questionIn("state-question", "b"), "question-words": questionIn("state-question-words", OWN_WORDS), "question-stopped": questionIn("state-question-stopped", "b", { stopsFirst: true }), "question-worktrees": questionIn("state-question-worktrees", "b"), park, contract, talk: talkIn("hum talk", "s1"), "talk-worktrees": talkIn("hum talk worktrees", "s3"), split }));
+const SCENARIOS = new Map(Object.entries({ question: questionIn("state-question", "b"), "question-words": questionIn("state-question-words", OWN_WORDS), "question-stopped": questionIn("state-question-stopped", "b", { stopsFirst: true }), "question-worktrees": questionIn("state-question-worktrees", "b"), park, handoff, contract, talk: talkIn("hum talk", "s1"), "talk-worktrees": talkIn("hum talk worktrees", "s3"), split }));
 
 const result = JSON.stringify(await (SCENARIOS.get(scenario) ?? (async () => ({ error: `no scenario ${scenario}` })))().catch((error: Error) => ({ error: error.stack ?? error.message })));
 

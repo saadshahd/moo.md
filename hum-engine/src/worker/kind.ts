@@ -5,6 +5,7 @@ import { declaredKind, kindQuestion, UNSURE } from "../decide/kind.ts";
 import { PLAIN_QUESTIONS } from "../decide/question.ts";
 import type { State } from "../state/open.ts";
 import type { ItemKind } from "../state/saved.ts";
+import { dropReviews } from "./owner-handoff.ts";
 import { queuedKey, queueQuestion } from "./questions.ts";
 import { pickedAnswer } from "./thread.ts";
 
@@ -63,12 +64,13 @@ export const kindAnswered = (known: ItemKind, item: Item, kinds: readonly string
 /** Whether hum started the item and its next pass goes on from what it saved: a snapshot or a landing. */
 export const hasProgress = (state: State, id: string): boolean => state.items.savedOf(id) !== undefined || state.landings.get(id) !== undefined;
 
-/** Drops what an item's run on its earlier kind left: its snapshot, its landing, its plan, its verdict and its repro. Its next run restarts its branch at the base. */
+/** Drops what an item's run on its earlier kind left: its snapshot, its landing, its plan, its verdict, its reviews and its repro. Its next run restarts its branch at the base. */
 export const forgetProgress = (state: State, id: string): void => {
 	state.items.remove(id);
 	state.landings.remove(id);
 	state.plans.remove(id);
 	state.verdicts.remove(id);
+	dropReviews(state, id);
 	state.repros.remove(id);
 };
 

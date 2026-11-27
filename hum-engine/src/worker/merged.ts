@@ -4,6 +4,7 @@ import { type Git, isAncestor, isCommit } from "../adapters/git.ts";
 import type { State } from "../state/open.ts";
 import type { Landing } from "../state/saved.ts";
 import { dropEvidence } from "./evidence.ts";
+import { dropReviews, mergedHandoff } from "./owner-handoff.ts";
 
 /** Where a merged change's evidence ref is taken off: git in a repo with `remote`. */
 export type EvidenceRemote = { readonly git: Git; readonly remote: string };
@@ -16,7 +17,7 @@ export const mergedThrough = (landing: Landing | undefined, mergeCommit: string)
 
 /**
  * An item's change reached the base: its evidence ref is taken off the remote, the merge is kept for the measure, the
- * saved landing, plan, verdict, pull request text, repro and split part go, and the merge is logged once per commit in the item's log,
+ * saved landing, plan, verdict, reviews, pull request text, repro and split part go, and the merge is logged once per commit in the item's log,
  * which keeps how the item reached done and the picks behind it.
  */
 export const recordMerged = async (state: State, { git, remote }: EvidenceRemote, { item, at, sha, commits }: OnBase & { readonly item: string; readonly at: number }): Promise<void> => {
@@ -32,15 +33,16 @@ export const recordMerged = async (state: State, { git, remote }: EvidenceRemote
 	state.pullRequests.remove(item);
 	state.repros.remove(item);
 	state.parts.remove(item);
+	dropReviews(state, item);
 	state.events.add({ source: "work-source", sourceId: `merged:${sha}`, itemId: item, type: "merged", payload: {} });
 };
 
 /** Where an item ends once its change reached the base: the work source that lists it, and the remote its evidence ref is taken off. */
 type Ending = { readonly workSource: Pick<WorkSource, "finish"> } & EvidenceRemote;
 
-/** A landed item ends at the work source, so it is never listed again, its merge is recorded, so the measure counts it, and its saved state goes. */
+/** A landed item ends at the work source, which reads what merged, so it is never listed again, its merge is recorded, so the measure counts it, and its saved state goes. */
 const endLanded = async (state: State, { workSource, ...evidenceRemote }: Ending, { item, at, ...onBase }: OnBase & { readonly item: string; readonly at: number }): Promise<void> => {
-	await workSource.finish(ItemId.parse(item));
+	await workSource.finish(ItemId.parse(item), mergedHandoff(state, item, onBase.sha));
 	await recordMerged(state, evidenceRemote, { item, at, ...onBase });
 	state.items.remove(item);
 };

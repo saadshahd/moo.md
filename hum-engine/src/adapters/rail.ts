@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { ItemRef } from "../adapter-api.ts";
 import { slug } from "../state/fs.ts";
-import type { RoundupCall } from "./roundup-rpc.ts";
+import { type RoundupCall, RoundupRefusal } from "./roundup-rpc.ts";
 
 /** A node of roundup's Rail as hum reads it: a Workstream, or an Agent under one. */
 export const RailNode = z.looseObject({
@@ -13,6 +13,33 @@ export const RailNode = z.looseObject({
 });
 
 export type RailNode = z.infer<typeof RailNode>;
+
+/** A Pad as hum reads it: its name and where it sits. */
+const Pad = z.looseObject({ name: z.string(), home: z.string().nullish() });
+
+export type Pad = z.infer<typeof Pad>;
+
+/** Writes the Pad `name` whole, making it with `visibility` where none stands, and answers it as roundup holds it now and whether this call made it. */
+export const putPad = async (call: RoundupCall, { name, text, visibility }: { readonly name: string; readonly text: string; readonly visibility: "shown" | "internal" }): Promise<{ readonly pad: Pad; readonly made: boolean }> => {
+	const made = await call("pad.create", { name, text, visibility }).then(
+		(pad) => Pad.parse(pad),
+		(error: Error) => {
+			if (!(error instanceof RoundupRefusal)) throw error;
+
+			return undefined;
+		},
+	);
+
+	return made ? { pad: made, made: true } : { pad: Pad.parse(await call("pad.write", { name, text })), made: false };
+};
+
+/** A link the roundup App opens, as its own links read: the page's kind, its id with every reserved character escaped, and the Project. */
+const roundupLink = (kind: "agent" | "pad", id: string, projectKey: string): string =>
+	`roundup://${kind}/${encodeURIComponent(id).replace(/[!'()*]/gu, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)}?project=${projectKey}`;
+
+export const agentLink = (id: string, projectKey: string): string => roundupLink("agent", id, projectKey);
+
+export const padLink = (name: string, projectKey: string): string => roundupLink("pad", name, projectKey);
 
 /** The status of a row that waits on the owner. */
 export const NEEDS_YOU = "needs-you";

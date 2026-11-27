@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { lock } from "proper-lockfile";
 import { z } from "zod";
-import { ADAPTER_API_VERSION, type AdapterContext, type Answers, type Claim, Holder, type Integrations, type Item, ItemGone, ItemId, type ItemRef, PermanentError, type Question, type Questions, type ThreadEntry, type Watch, type WorkSource } from "../adapter-api.ts";
+import { ADAPTER_API_VERSION, type AdapterContext, type Answers, type Claim, Holder, type Integrations, type Item, ItemGone, ItemId, type ItemRef, type OwnerHandoff, PermanentError, type Question, type Questions, type ThreadEntry, type Watch, type WorkSource } from "../adapter-api.ts";
 import { hashJson } from "../config/hash.ts";
 import type { Json } from "../config/json.ts";
 import type { HumConfig } from "../config/schema.ts";
@@ -10,9 +10,10 @@ import { atomicWrite, dropInto, listFiles, orMissing, slug } from "../state/fs.t
 import { INBOX_DIR } from "../state/open.ts";
 import { parseArgument } from "./argument.ts";
 import { claimer, isHeldBy, isLive } from "./claim.ts";
+import { handoffPadName, handoffText } from "./handoff-pad.ts";
 import { ownerAnswers } from "./hooked-run.ts";
 import { commentText, cutLine, followUpBody, isFollowUpOf, type Marker, markedLine, optionsIn, parseComment, questionOf, questionText } from "./marked.ts";
-import { ENDED, itemWorkstream, NEEDS_YOU, type RailNode, railName, railTree, rootWorkstream } from "./rail.ts";
+import { agentLink, ENDED, itemWorkstream, NEEDS_YOU, padLink, putPad, type RailNode, railName, railTree, rootWorkstream } from "./rail.ts";
 import { type RowConfig, startRow } from "./rail-rows.ts";
 import { HUM_EXT, type RoundupEvent, RoundupRefusal, roundupRpc } from "./roundup-rpc.ts";
 import { askedSince, markAsked, type RunFolder, runFolderAt } from "./run-answer.ts";
@@ -62,7 +63,7 @@ const Kept = z.strictObject({ holder: Holder, expiresAt: z.number() });
 const Taken = z.strictObject({ text: z.string(), option: z.string().optional(), at: z.number() });
 
 /** A question hum asked as a row, named `name`. */
-const Asked = z.strictObject({ item: z.string(), name: z.string(), text: z.string(), at: z.number() });
+const Asked = z.strictObject({ item: z.string(), name: z.string(), text: z.string(), at: z.number(), handoff: z.strictObject({ name: z.string(), link: z.string() }).optional() });
 
 const RowRecord = z.looseObject({ id: z.string() });
 
@@ -93,10 +94,14 @@ type Whole = Integrations & {
 
 const readJson = <T>(schema: z.ZodType<T>, path: string): T | undefined => orMissing(() => schema.parse(JSON.parse(readFileSync(path, "utf8"))), undefined);
 
-const askPrompt = ({ text, options, detail }: Question): string =>
+/** A Pad the owner reads, by its name and its link. */
+type Linked = { readonly name: string; readonly link: string };
+
+const askPrompt = ({ text, options, detail }: Question, handoff: Linked | undefined): string =>
 	[
 		"Ask the owner the question below with your AskUserQuestion tool, in its words: one call that holds only this question. Never answer it yourself, and do nothing else. hum takes the owner's answer from the tool, and your turn ends there.",
 		`## The question\n\n${text}`,
+		handoff ? `End the question's text with this line, so the owner reads what they decide before they answer: Read the Pad "${handoff.name}" first: ${handoff.link}` : "",
 		[options?.length ? `Offer each of these as an option, labeled exactly so: ${options.join(", ")}.` : "", "The tool takes two to four options: add options that fit the question until it has two. The owner may answer in their own words instead."].filter(Boolean).join(" "),
 		detail ? `## Why hum asks\n\n${detail}\n\nUse it only to explain the question when the owner asks why.` : "",
 	]
@@ -112,8 +117,10 @@ const isOneLine = (text: string): boolean => !text.includes("\n") && text.length
  * roundup as a work source over its Daemon's socket, as `ext:hum`. An item is an open, unblocked Todo in the root
  * Workstream `workstream` names, or in its own Workstream "#<id> <title>" once its claim lapsed; a Todo a run makes in
  * an item's Workstream is never one. The first claim moves the Todo into its own Workstream, and roundup holds no
- * claim an Ext could write, so the holder and expiry stay in hum's state. Finishing completes the Todo, moves it back
- * where the owner put it, and removes its Workstream with every row and Pad in it. The thread is hum's own comments on
+ * claim an Ext could write, so the holder and expiry stay in hum's state. A question about a change that waits on the
+ * owner first writes the item's shown handoff Pad, "#<id> handoff", which the question names. Finishing completes the
+ * Todo, rewrites the handoff Pad as what merged and moves it to hum's Workstream, moves the Todo back where the owner
+ * put it, and removes the item's Workstream with every row and other Pad in it. The thread is hum's own comments on
  * the Todo, the questions hum asked as rows, and each answer the owner gave in a row's AskUserQuestion after roundup
  * showed the row waiting on them, as the row's answer hook reported it; the owner answers only there, never in a Todo
  * comment or through `hum answer`. The watch follows roundup's Event log, and each change to an item or a question row
@@ -338,7 +345,7 @@ export const roundupAdapter = (options: RoundupOptions, { now, env, report }: Ad
 
 		const newest = questionsOf(id).toSorted((one, other) => other.asked.at - one.asked.at)[0];
 
-		if (newest !== undefined && endedUnanswered(newest, nodes)) await ask(ItemId.parse(id), questionOf(newest.asked.text));
+		if (newest !== undefined && endedUnanswered(newest, nodes)) await ask(ItemId.parse(id), questionOf(newest.asked.text), newest.asked.handoff);
 	};
 
 	const threadOf = async (id: string, nodes: readonly RailNode[]): Promise<ThreadEntry[]> => {
@@ -360,6 +367,41 @@ export const roundupAdapter = (options: RoundupOptions, { now, env, report }: Ad
 		await onTodo("todo.comment", id, { body: text });
 	};
 
+	const projectKey = async (): Promise<string> => Ping.parse(await call("daemon.ping")).projectKey;
+
+	/** Writes the item's handoff Pad, shown, as the change waits on the owner; a Pad this call made goes in the item's Workstream, and one that stood stays where it is, as the owner may have moved it. */
+	const writeHandoff = async (id: string, { title, handoff, question, home }: { readonly title: string; readonly handoff: OwnerHandoff; readonly question: string; readonly home: string }): Promise<Linked> => {
+		const [key, nodes] = await Promise.all([projectKey(), railTree(call)]);
+
+		const rowLink = (name: string): string | undefined => {
+			const row = nodes.find((node) => node.parent === home && node.name === railName(name));
+
+			return row && agentLink(row.id, key);
+		};
+
+		const { pad, made } = await putPad(call, { name: handoffPadName(id), text: handoffText({ id, title, handoff, question, rowLink }), visibility: "shown" });
+
+		if (made) await call("pad.move", { name: pad.name, home });
+
+		return { name: pad.name, link: padLink(pad.name, key) };
+	};
+
+	/**
+	 * Rewrites the item's handoff Pad as what merged and moves it to hum's Workstream, where removing the item's own
+	 * keeps it, unless the owner moved it elsewhere; then one comment on the Todo names it with its link.
+	 */
+	const keepHandoff = async (todo: Todo, handoff: OwnerHandoff, nodes: readonly RailNode[]): Promise<void> => {
+		const id = String(todo.id);
+		const { pad, made } = await putPad(call, { name: handoffPadName(id), text: handoffText({ id, title: todo.title, handoff, rowLink: () => undefined }), visibility: "shown" });
+
+		if (made || nodes.some((node) => node.id === pad.home && isItemWorkstream(id, node))) await call("pad.move", { name: pad.name, home: humOf(nodes)?.id ?? null });
+
+		const line = `#${id} merged. What merged and what stays open: Pad "${pad.name}" ${padLink(pad.name, await projectKey())}`;
+		const comments = z.array(Comment).parse(await onTodo("todo.comments", id));
+
+		if (!comments.some(({ author, body }) => author.id === HUM_EXT && body === line)) await post(id, line);
+	};
+
 	/** A text too long for one comment goes whole into a Pad in the item's Workstream; the comment holds its first words and the Pad's name. */
 	const postInPad = async (id: string, marker: Marker | undefined, text: string): Promise<void> => {
 		const name = `hum ${id} ${hashJson(text).slice(0, PAD_DIGEST_LENGTH)}`;
@@ -374,23 +416,26 @@ export const roundupAdapter = (options: RoundupOptions, { now, env, report }: Ad
 
 	const postPlain = async (id: string, text: string): Promise<void> => (isOneLine(text) ? post(id, text) : postInPad(id, undefined, text));
 
-	const ask = async (id: ItemId, question: Question): Promise<void> => {
+	/** Asks `question` in a new row, naming the handoff Pad an earlier asking of it wrote, else the one its own handoff writes now. */
+	const ask = async (id: ItemId, question: Question, handoff?: Linked): Promise<void> => {
 		const name = `hum ${id} ask ${questionsOf(id).length + 1}`;
 		const root = join(dirs.questions, slug(name));
 		const folder: RunFolder = runFolderAt(root);
 		const todo = await todoOf(id);
+		const workstream = await itemWorkstream(call, { id, title: todo.title });
+		const pad = handoff ?? (question.handoff && (await writeHandoff(id, { title: todo.title, handoff: question.handoff, question: question.text, home: workstream })));
 
 		/* The row's hooks write into this folder and do not make it. */
 		mkdirSync(folder.hooks, { recursive: true });
 
-		const request = { prompt: askPrompt(question), cwd: options.repo, model: options.config.models.light, effort: QUESTION_EFFORT } as const;
+		const request = { prompt: askPrompt(question, pad), cwd: options.repo, model: options.config.models.light, effort: QUESTION_EFFORT } as const;
 
 		await stopOpen(id);
 
-		const row = await startRow(call, { repo: options.repo, stateDir: options.stateDir, config: options.config }, { name, folder, request, answer: { by: "question" }, workstream: await itemWorkstream(call, { id, title: todo.title }) });
+		const row = await startRow(call, { repo: options.repo, stateDir: options.stateDir, config: options.config }, { name, folder, request, answer: { by: "question" }, workstream });
 
 		/* Asked when roundup started the row, on the clock its comments carry, so the thread keeps their order. */
-		atomicWrite(join(root, "question.json"), JSON.stringify({ item: id, name, text: questionText(question), at: row.status?.since ?? now() }));
+		atomicWrite(join(root, "question.json"), JSON.stringify({ item: id, name, text: questionText(question), at: row.status?.since ?? now(), handoff: pad }));
 	};
 
 	return {
@@ -417,12 +462,14 @@ export const roundupAdapter = (options: RoundupOptions, { now, env, report }: Ad
 
 				return { id: ItemId.parse(String(filed.id)), title };
 			},
-			finish: async (id) => {
+			finish: async (id, handoff) => {
 				const todo = await todoOf(id);
 
 				if (!todo.done) await call("todo.complete", { id: todo.id });
 
 				const nodes = await railTree(call);
+
+				if (handoff) await keepHandoff(todo, handoff, nodes);
 
 				/* Only a Todo in its own Workstream goes back to the owner's, as removing that Workstream would delete it. */
 				if (nodes.some((node) => node.id === todo.home && isItemWorkstream(id, node))) await call("todo.move", { id: todo.id, home: humOf(nodes)?.id ?? null });
@@ -447,14 +494,14 @@ export const roundupAdapter = (options: RoundupOptions, { now, env, report }: Ad
 			onlyToQuestions: true,
 			/** On roundup a question is its row: the owner answers there, so an answer through hum is refused with the open row's link. */
 			answer: async (id) => {
-				const { projectKey } = Ping.parse(await call("daemon.ping"));
+				const key = await projectKey();
 
 				const open = questionsOf(id)
 					.filter((asking) => takenOf(asking) === undefined && asking.row !== undefined)
 					.toSorted((one, other) => one.asked.at - other.asked.at)
 					.at(-1);
 
-				throw new PermanentError(open ? `On roundup the owner answers in the question's row: roundup://agent/${open.row}?project=${projectKey}` : `On roundup the owner answers only in a question's row, and #${id} has no open question`);
+				throw new PermanentError(open?.row !== undefined ? `On roundup the owner answers in the question's row: ${agentLink(open.row, key)}` : `On roundup the owner answers only in a question's row, and #${id} has no open question`);
 			},
 			/** The socket is local: none of this spends rate limit. */
 			watch: async (since?: string): Promise<Watch> => {

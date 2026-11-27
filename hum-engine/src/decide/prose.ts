@@ -76,10 +76,13 @@ export const planHash = (plan: PlanFile): string => hashJson(plan);
 /** The event by which a plan run splits its item into parts. */
 export const SPLIT = "needs-split";
 
+/** The event by which a review run asks for changes to the files it cites. */
+export const REQUEST_CHANGES = "request-changes";
+
 /** The two states whose outcome is prose: the events each may pick, and the safer pick an unsure run takes. */
 export const PROSE_STATES = {
 	plan: { boundary: "plan-outcome", events: ["plan-ready", SPLIT, "plan-blocked"], unsure: "plan-blocked" },
-	review: { boundary: "review-verdict", events: ["approve", "request-changes", "needs-owner"], unsure: "needs-owner" },
+	review: { boundary: "review-verdict", events: ["approve", REQUEST_CHANGES, "needs-owner"], unsure: "needs-owner" },
 } as const satisfies Record<string, { boundary: Boundary; events: readonly [string, ...string[]]; unsure: string }>;
 
 export type ProsePurpose = keyof typeof PROSE_STATES;
@@ -143,7 +146,7 @@ const splitFault = ({ parts }: EventPick): string | undefined => {
 /** Code's check on the artifact behind a pick: why it fails, or undefined when it holds. */
 const FENCES = new Map<string, (pick: EventPick, diff: string) => string | undefined>([
 	[SPLIT, splitFault],
-	["request-changes", (pick, diff) => (doesCiteDiff(pick.cites, diff) ? undefined : "request-changes must cite a file and a line the diff changes")],
+	[REQUEST_CHANGES, (pick, diff) => (doesCiteDiff(pick.cites, diff) ? undefined : "request-changes must cite a file and a line the diff changes")],
 	["plan-ready", (pick) => (pick.plan ? undefined : "plan-ready must hold a plan: a summary, at least one step and the paths it touches")],
 ]);
 

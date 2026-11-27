@@ -42,6 +42,7 @@ test("a row's brief pipes its answer to the engine the repo installs, so a row t
 	const replies = new Map<string, Json>([
 		["project.get", { models: { roles: [] } }],
 		["agent.spawn", { id: "9", name: RUN, kind: "agent" }],
+		["pad.create", { name: `${RUN} brief`, home: null }],
 	]);
 
 	const call: RoundupCall = async (method, params = {}) => {

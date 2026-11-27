@@ -24,6 +24,8 @@ import { Holder, ItemId } from "../../src/adapter-api.ts";
 import { doneByOf, foldItem } from "../../src/state/item-log.ts";
 import { openState } from "../../src/state/open.ts";
 import { PLAIN_QUESTIONS } from "../../src/decide/question.ts";
+import { PARK_OPTIONS } from "../../src/decide/answer.ts";
+import { waitingHandoff } from "../../src/worker/owner-handoff.ts";
 import { DAY_MS, HOUR_MS } from "../../src/time.ts";
 
 /** A worker world whose shim's start check finished, checking for the note by default. */
@@ -1171,6 +1173,7 @@ test("a medium change waits for a fresh review run at landing: a request for cha
 	const held = w.repo.seed("Write the note");
 
 	expect(await runThinPath(w.thinPath())).toEqual({ outcome: "review", item: held, detail: "the review run answered request-changes: Wrong file." });
+	expect(waitingHandoff(w.state, w.config, held, PARK_OPTIONS.review)).toMatchObject({ files: [{ path: "docs/note.md", added: 1, removed: 0 }], reviews: [{ label: "review at landing", event: "request-changes", request: { status: "open", files: ["docs/note.md"], untouched: [] } }] });
 
 	const merged = w.repo.seed("Write it again");
 
@@ -1307,6 +1310,12 @@ test.each(APPROVALS)("a review that leaves the change to the owner asks, and the
 	const id = w.repo.seed("Write the note");
 
 	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toEqual({ outcome: "asked", item: id, detail: "Is the tone right?" });
+	expect(waitingHandoff(w.state, w.config, id)).toMatchObject({
+		files: [{ path: "docs/note.md" }],
+		reviews: [{ label: expect.stringMatching(/^review #\d+$/u), row: expect.stringMatching(new RegExp(`^hum ${id} review #\\d+$`, "u")), event: "needs-owner" }],
+		rows: expect.arrayContaining([expect.objectContaining({ label: expect.stringMatching(/^build #\d+$/u) })]),
+		decide: { options: ["approve"], ownWords: true },
+	});
 
 	await w.adapter.answers!.answer(id, approval);
 

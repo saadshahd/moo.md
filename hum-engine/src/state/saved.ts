@@ -27,6 +27,11 @@ export const ReadyList = z.object({ ids: z.array(name) });
 /** The alignment call's grades, or why it abstained. */
 export const Alignment = z.union([z.object({ graded: AlignmentAnswer }), z.object({ abstained: name })]);
 
+/** One file a change holds, with its lines added and removed; a binary file counts none. */
+export const ChangedFile = z.object({ path: name, added: z.int().nonnegative().optional(), removed: z.int().nonnegative().optional() });
+
+export type ChangedFile = z.infer<typeof ChangedFile>;
+
 /** A finished change on its way to the base: what its diff showed, so a retry lands it again without a run. */
 export const Landing = z.object({
 	item: name,
@@ -43,6 +48,10 @@ export const Landing = z.object({
 	alignment: Alignment.optional(),
 	/** The run branch's commits past the base, oldest first, hum's done mark among them: what a push puts on the base. Absent on a landing saved before hum kept them. */
 	commits: z.array(name).optional(),
+	/** Each file the change holds against the base: what the owner's handoff lists. Absent on a landing saved before hum kept them. */
+	files: z.array(ChangedFile).optional(),
+	/** By the head each of the item's reviews judged, the files that changed from it to `head`; a head git could not read is left out. */
+	changedSince: z.record(name, z.array(name)).optional(),
 });
 
 export type Landing = z.infer<typeof Landing>;
@@ -99,6 +108,25 @@ export type PullRequestText = z.infer<typeof PullRequestText>;
 export const Verdict = z.object({ item: name, head: name, patch: z.string().optional(), event: name, reason: z.string(), cites: z.array(Cite), models });
 
 export type Verdict = z.infer<typeof Verdict>;
+
+/**
+ * A review run's answer on the change that ends at `head`, kept whether or not hum took it, so the owner's handoff
+ * lists every review: `refused` says why hum set the answer aside and asked again. A review that ran as a Rail row
+ * names it by `run`; one at landing names none.
+ */
+export const Review = z.object({
+	item: name,
+	head: name,
+	at: time,
+	run: z.object({ name, label: name }).optional(),
+	event: name,
+	reason: z.string(),
+	cites: z.array(Cite),
+	plan: PlanFile.optional(),
+	refused: name.optional(),
+});
+
+export type Review = z.infer<typeof Review>;
 
 /** A question the run asked, waiting for room under the daily cap until `askedAt` is set; `askedAt` stays to count the day. */
 export const QueuedQuestion = z.object({

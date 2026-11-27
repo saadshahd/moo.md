@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { Holder, ItemId } from "../src/adapter-api.ts";
-import { itemWorkstreamName } from "../src/adapters/rail.ts";
+import { itemWorkstreamName, padLink } from "../src/adapters/rail.ts";
 import { roundupAdapter } from "../src/adapters/roundup.ts";
 import { HUM_EXT } from "../src/adapters/roundup-rpc.ts";
 import { Json } from "../src/config/json.ts";
@@ -39,6 +39,18 @@ const Result = z.looseObject({
 	talk: z.looseObject({}).optional(),
 	passes: z.looseObject({ outcomes: z.array(z.string()) }).optional(),
 	prepareMs: z.array(z.number()).optional(),
+	handoff: z
+		.looseObject({
+			item: z.string(),
+			home: z.string(),
+			itemHome: z.string().optional(),
+			atReview: z.looseObject({ text: z.string(), home: z.string().nullish(), visibility: z.string() }).optional(),
+			brief: z.string().optional(),
+			reBrief: z.string().optional(),
+			atLand: z.looseObject({ text: z.string(), home: z.string().nullish() }).optional(),
+			comments: z.array(z.string()),
+		})
+		.optional(),
 });
 
 const HOLDER = Holder.parse("rig");
@@ -177,6 +189,24 @@ test.skipIf(!live)("a parked item asks a row with the owner's park actions, and 
 	expect(outcomes.at(0)).toBe("stuck");
 	expect(outcomes.at(-1)).toBe("merged");
 	expect(runs[1]).toBeGreaterThan(runs[0] ?? Infinity);
+}, RIG_MS);
+
+test.skipIf(!live)("a change that waits on the owner's review gets a shown handoff Pad its question names, asked again too, and once it lands the Pad says what merged, outlives the item's Workstream and is named on its Todo", async () => {
+	const { outcomes = [], handoff } = await run("handoff");
+	const link = padLink(`#${handoff?.item} handoff`, z.looseObject({ projectKey: z.string() }).parse(await rig.user.call("daemon.ping")).projectKey);
+
+	console.log(`handoff Pad at review:\n${handoff?.atReview?.text}\n\nat land:\n${handoff?.atLand?.text}\n\ncomments: ${JSON.stringify(handoff?.comments)}`);
+	expect(outcomes.at(0)).toBe("review");
+	expect(outcomes.at(-1)).toBe("merged");
+	expect(handoff?.atReview).toMatchObject({ visibility: "shown", home: handoff?.itemHome ?? "the item's Workstream" });
+	expect(handoff?.atReview?.text).toContain("**Decide:** approve, or retry.");
+	expect(handoff?.atReview?.text).toContain("`README.md` is not on");
+	expect(handoff?.brief).toContain(`Read the Pad "#${handoff?.item} handoff" first: ${link}`);
+	expect(handoff?.reBrief).toContain(`Read the Pad "#${handoff?.item} handoff" first: ${link}`);
+	expect(handoff?.atLand?.home).toBe(handoff?.home ?? "the scenario's Workstream");
+	expect(handoff?.atLand?.text).toContain(": merged at ");
+	expect(handoff?.atLand?.text).toContain("## Open follow-ups");
+	expect(handoff?.comments.filter((body) => body.includes(link))).toHaveLength(1);
 }, RIG_MS);
 
 test.skipIf(!live)("the roundup adapter keeps the adapter contract as the Project's program", async () => {
