@@ -1,22 +1,23 @@
 import { randomUUID } from "node:crypto";
-import { writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { type AdapterContext, Holder, ItemId } from "../../src/adapter-api.ts";
 import { runContract } from "../../src/adapters/contract.ts";
 import { railRunner, roundupProgram } from "../../src/adapters/rail-rows.ts";
-import { railTree, rootWorkstream } from "../../src/adapters/rail.ts";
+import { railName, railTree, rootWorkstream } from "../../src/adapters/rail.ts";
 import { roundupAdapter } from "../../src/adapters/roundup.ts";
 import { roundupRpc } from "../../src/adapters/roundup-rpc.ts";
 import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 import { RUN_AGAIN } from "../../src/decide/answer.ts";
+import { slug } from "../../src/state/fs.ts";
 import { openState } from "../../src/state/open.ts";
 import { SECOND_MS } from "../../src/time.ts";
 import { SlotPool } from "../../src/slots/pool.ts";
 import { runThinPath, type TalkCopy } from "../../src/worker/thin-path.ts";
 import { configWith } from "./config.ts";
 import { scriptedJudge, SOUND } from "./judge.ts";
-import { PREPARE_STEP, refusing, SLOTS_DIR, woken } from "./rows-rig.ts";
+import { OWN_WORDS, PREPARE_STEP, refusing, SLOTS_DIR, woken } from "./rows-rig.ts";
 import { TTL, workerWorld } from "./worker-world.ts";
 
 /**
@@ -38,27 +39,56 @@ const roundupOn = (state: string, context: AdapterContext, workstream = SHIPPED_
 
 const adapterOn = (state: string) => roundupOn(state, { report: () => {}, now, env: process.env });
 
-/** Asks the question item's question as a row, with hum's state in `state`, and reads its thread until an answer is on it. */
-const questionIn = (state: string) => async (): Promise<object> => {
-	const adapter = adapterOn(state);
-	const item = (await adapter.workSource.listReady()).find(({ title }) => title === "question item");
+/**
+ * Asks a new question item's question as a row, with hum's state in `state`, the owner answering `owner` in it, reads
+ * its thread until an answer is on it, and finishes the item. Where the owner stops the first row once it asked them,
+ * that row gets no answer.
+ */
+const questionIn =
+	(state: string, owner: string, { stopsFirst = false }: { readonly stopsFirst?: boolean } = {}) =>
+	async (): Promise<object> => {
+		const adapter = adapterOn(state);
+		const item = (await adapter.workSource.listReady()).findLast(({ title }) => title === "question item");
 
-	if (!item) return { error: "no ready Todo named question item" };
+		if (!item) return { error: "no ready Todo named question item" };
 
-	await adapter.workSource.claim(item.id, Holder.parse("rig"), ANSWER_WAIT_MS);
-	writeFileSync(join(rig, `go-ask-${item.id}`), "b");
-	await adapter.questions.ask(item.id, { text: "Which title?", options: ["a", "b"] });
+		const first = `hum ${item.id} ask 1`;
 
-	const refusal = await adapter.answers.answer(item.id, { text: "through hum" }).then(
-		() => undefined,
-		(error: Error) => error.message,
-	);
+		await adapter.workSource.claim(item.id, Holder.parse("rig"), ANSWER_WAIT_MS);
+		writeFileSync(join(rig, `go-ask-${item.id}`), owner);
 
-	for (const deadline = Date.now() + ANSWER_WAIT_MS; ; await Bun.sleep(200)) {
-		const { thread } = await adapter.workSource.read(item.id);
+		if (stopsFirst) writeFileSync(join(rig, `unanswered-${first.replaceAll(" ", "-")}`), "");
 
-		if (thread.some(({ kind }) => kind === "answer") || Date.now() > deadline) return { thread, refusal };
-	}
+		await adapter.questions.ask(item.id, { text: "Which title?", options: ["a", "b"] });
+
+		const refusal = await adapter.answers.answer(item.id, { text: "through hum" }).then(
+			() => undefined,
+			(error: Error) => error.message,
+		);
+
+		if (stopsFirst) await stopOnceAsked(state, first);
+
+		for (const deadline = Date.now() + ANSWER_WAIT_MS; ; await Bun.sleep(200)) {
+			const { thread } = await adapter.workSource.read(item.id);
+
+			if (thread.some(({ kind }) => kind === "answer") || Date.now() > deadline) {
+				/* Finished, the item is ready to no later scenario's worker. */
+				await adapter.workSource.finish(item.id);
+
+				return { thread, refusal };
+			}
+		}
+	};
+
+/** Stops the question row named `name` as the owner would, once hum marked it waiting on them. */
+const stopOnceAsked = async (state: string, name: string): Promise<void> => {
+	const asked = join(rig, state, "roundup", "questions", slug(name), "asked.json");
+
+	for (const deadline = Date.now() + ANSWER_WAIT_MS; !existsSync(asked) && Date.now() < deadline; ) await Bun.sleep(100);
+
+	const row = (await railTree(roundupRpc(socket).call)).find((node) => node.name === railName(name));
+
+	if (row) await roundupRpc(socket).call("agent.stop", { id: row.id });
 };
 
 /** The park scenario's own Workstream of items, so the worker sees no Todo another case left. */
@@ -240,7 +270,7 @@ const contract = async (): Promise<object> => {
 	return { results };
 };
 
-const SCENARIOS = new Map(Object.entries({ question: questionIn("state-question"), "question-worktrees": questionIn("state-question-worktrees"), park, contract, talk: talkIn("hum talk", "s1"), "talk-worktrees": talkIn("hum talk worktrees", "s3"), split }));
+const SCENARIOS = new Map(Object.entries({ question: questionIn("state-question", "b"), "question-words": questionIn("state-question-words", OWN_WORDS), "question-stopped": questionIn("state-question-stopped", "b", { stopsFirst: true }), "question-worktrees": questionIn("state-question-worktrees", "b"), park, contract, talk: talkIn("hum talk", "s1"), "talk-worktrees": talkIn("hum talk worktrees", "s3"), split }));
 
 const result = JSON.stringify(await (SCENARIOS.get(scenario) ?? (async () => ({ error: `no scenario ${scenario}` })))().catch((error: Error) => ({ error: error.stack ?? error.message })));
 

@@ -17,6 +17,9 @@ export type RailNode = z.infer<typeof RailNode>;
 /** The status of a row that waits on the owner. */
 export const NEEDS_YOU = "needs-you";
 
+/** A row's status once it has ended, whoever ended it. */
+export const ENDED = "done";
+
 /** The longest name roundup gives a Rail row. */
 const RAIL_NAME_LENGTH = 42;
 

@@ -10,9 +10,9 @@ import { PROGRAM_FIX, readProgram } from "../service/program.ts";
 import { SECOND_MS } from "../time.ts";
 import { type RunOutcome, type RunRequest, type Runner } from "./claude-p.ts";
 import { gitIn } from "./git.ts";
-import { failedWith, finishedOf, hookReports, runSettings, STOP_EVENT, succeededWith, tokensOf } from "./hooked-run.ts";
+import { answerHooks, failedWith, finishedOf, hookReports, runSettings, STOP_EVENT, succeededWith, tokensOf } from "./hooked-run.ts";
 import { type LimitEnded, limitOf, savedLimitUntil, settleLimit } from "./limit.ts";
-import { itemWorkstream, NEEDS_YOU, RailNode, railName, railTree } from "./rail.ts";
+import { ENDED, itemWorkstream, NEEDS_YOU, RailNode, railName, railTree } from "./rail.ts";
 import { HUM_EXT, type RoundupCall, type RoundupClient, RoundupRefusal } from "./roundup-rpc.ts";
 import { askedSince, dropAnswers, hasSavedAnswer, keepSchema, keepTalkRun, markAsked, type RunFolder, runFolder, runFolders, runKey, takeAnswer, talkRunOf } from "./run-answer.ts";
 import { readTranscript, type RunTranscript } from "./transcript.ts";
@@ -21,9 +21,6 @@ const RowRecord = z.strictObject({ id: z.string(), name: z.string() });
 
 /** hum's note to a row, with how many turns the row had ended when hum sent it. */
 const NotedMark = z.strictObject({ stops: z.number() });
-
-/** A row's status once it has ended, whoever ended it. */
-const ENDED = "done";
 
 const IDLE = "idle";
 
@@ -72,30 +69,48 @@ const runAnswerCommand = (repo: string): string => [process.execPath, installedC
 /** The Pad that carries a run's prompt to its row, since a row's order holds only a short ask. */
 const briefName = (name: string): string => railName(`${name} brief`);
 
-const briefOf = ({ prompt, schema }: Pick<RunRequest, "prompt" | "schema">, repo: string): string =>
-	[
-		prompt,
-		"## Your answer",
-		`When you are done, pipe your answer, one JSON value that matches the schema below, to \`${runAnswerCommand(repo)}\`. It prints \`answer saved\` once hum has it, or what to fix: fix the answer and pipe it again until it prints \`answer saved\`, then end your turn.`,
-		`\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\``,
-	].join("\n\n");
+/**
+ * How a row hands hum its answer: piped to `hum run-answer` as one JSON value its schema takes, or as the owner's
+ * answer to the question it asks with AskUserQuestion, which its answer hook reports.
+ */
+export type RowAnswer = { readonly by: "pipe"; readonly schema: object } | { readonly by: "question" };
 
-const orderOf = (name: string): Json => ({
+const briefOf = (prompt: string, answer: RowAnswer, repo: string): string =>
+	answer.by === "question"
+		? prompt
+		: [
+				prompt,
+				"## Your answer",
+				`When you are done, pipe your answer, one JSON value that matches the schema below, to \`${runAnswerCommand(repo)}\`. It prints \`answer saved\` once hum has it, or what to fix: fix the answer and pipe it again until it prints \`answer saved\`, then end your turn.`,
+				`\`\`\`json\n${JSON.stringify(answer.schema, null, 2)}\n\`\`\``,
+			].join("\n\n");
+
+/** What a row's order asks for each way it hands hum its answer, beside its title and the limit every row keeps. */
+const ORDERS = {
+	pipe: { ask: (brief: string) => `Do the work the Pad "${brief}" holds, then hand hum your answer as it says.`, done: "hum's answer command printed `answer saved` for your answer.", limit: "Hand your answer to hum only through its answer command." },
+	question: { ask: (brief: string) => `Ask the owner the question the Pad "${brief}" holds, with your AskUserQuestion tool.`, done: "The owner answered your question.", limit: "Ask only with your AskUserQuestion tool." },
+} as const satisfies Record<RowAnswer["by"], { readonly ask: (brief: string) => string; readonly done: string; readonly limit: string }>;
+
+const orderOf = (name: string, { by }: RowAnswer): Json => ({
 	kind: "work",
 	title: railName(name),
-	ask: `Do the work the Pad "${briefName(name)}" holds, then hand hum your answer as it says.`,
-	done: "hum's answer command printed `answer saved` for your answer.",
-	limits: ["Hand your answer to hum only through its answer command.", "Make no Todo."],
+	ask: ORDERS[by].ask(briefName(name)),
+	done: ORDERS[by].done,
+	limits: [ORDERS[by].limit, "Make no Todo."],
 });
 
 /** What a row may not do beyond every run's rules: make a Todo, which hum would read as new work. */
 const ROW_DENY = ["mcp__roundup__todo_create", "Bash(rup todo create *)"];
 
-/** A row's settings: every run's, hum's exact model, auto mode, which the row starts in, the denials above, and what `hum run-answer` reads. */
-const rowSettings = (config: RowConfig, folder: RunFolder, env: Readonly<Record<string, string>>, model: string): Json => {
+/**
+ * A row's settings: every run's, hum's exact model, auto mode, which the row starts in, the denials above, what `hum
+ * run-answer` reads, and for a row that asks the owner a question, the hook that reports their answer.
+ */
+const rowSettings = (config: RowConfig, folder: RunFolder, env: Readonly<Record<string, string>>, model: string, answer: RowAnswer): Json => {
 	const settings = runSettings(config, folder.hooks, env);
+	const hooks = answer.by === "question" ? { ...settings.hooks, ...answerHooks(folder.hooks) } : settings.hooks;
 
-	return { ...settings, model, permissions: { defaultMode: "auto", deny: [...settings.permissions.deny, ...ROW_DENY] } };
+	return { ...settings, hooks, model, permissions: { defaultMode: "auto", deny: [...settings.permissions.deny, ...ROW_DENY] } };
 };
 
 /** What starting a row reads of the owner's config: every run's rules, and how long a git command may take. */
@@ -105,7 +120,8 @@ export type RowConfig = Pick<HumConfig, "deniedRunCommands" | "runAutoMode" | "c
 export type RowStart = {
 	readonly name: string;
 	readonly folder: RunFolder;
-	readonly request: Pick<RunRequest, "prompt" | "schema" | "cwd" | "model" | "effort" | "env" | "talk">;
+	readonly request: Pick<RunRequest, "prompt" | "cwd" | "model" | "effort" | "env" | "talk">;
+	readonly answer: RowAnswer;
 	readonly workstream: string;
 };
 
@@ -158,14 +174,14 @@ const launchModel = async (call: RoundupCall, model: string): Promise<string | n
  * order. A row the owner talks to is shown from its start; every other row starts folded.
  */
 export const startRow = async (call: RoundupCall, { repo, stateDir, config }: { readonly repo: string; readonly stateDir: string; readonly config: RowConfig }, start: RowStart): Promise<RailNode> => {
-	const { name, folder, request, workstream } = start;
+	const { name, folder, request, answer, workstream } = start;
 
-	await writeBrief(call, name, briefOf(request, repo), workstream);
+	await writeBrief(call, name, briefOf(request.prompt, answer, repo), workstream);
 
 	const env = { ...request.env, HUM_RUN: name, HUM_RUN_KEY: runKey(stateDir, name), HUM_RUN_DIR: folder.root };
 	const place = await placeOf(config, repo, start);
 
-	const node = RailNode.parse(await call(place.method, { ...place.params, parent: workstream, order: orderOf(name), model: await launchModel(call, request.model), effort: request.effort, settings: rowSettings(config, folder, env, request.model), visibility: request.talk === true ? "shown" : "internal" }));
+	const node = RailNode.parse(await call(place.method, { ...place.params, parent: workstream, order: orderOf(name, answer), model: await launchModel(call, request.model), effort: request.effort, settings: rowSettings(config, folder, env, request.model, answer), visibility: request.talk === true ? "shown" : "internal" }));
 
 	atomicWrite(folder.row, JSON.stringify({ id: node.id, name }));
 	await call("rail.rename", { id: node.id, name: railName(name) });
@@ -487,7 +503,7 @@ export const railRunner = ({ call, repo, state, config, fallback, now, signal }:
 
 		try {
 			const workstream = await itemWorkstream(call, item);
-			const row = (await rowOf(folder, name, workstream, talks)) ?? (await startRow(call, { repo, stateDir: state.dir, config }, { name, folder, request, workstream })).id;
+			const row = (await rowOf(folder, name, workstream, talks)) ?? (await startRow(call, { repo, stateDir: state.dir, config }, { name, folder, request, answer: { by: "pipe", schema: request.schema }, workstream })).id;
 
 			state.faults.clear({ code: ROW_REFUSED_CODE });
 

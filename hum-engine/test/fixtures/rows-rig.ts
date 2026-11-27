@@ -45,6 +45,9 @@ const SLOTS = 8;
 
 export const SLOTS_DIR = ".hum-slots";
 
+/** What the owner types in a question row's dialog in place of an option. */
+export const OWN_WORDS = "neither: call it Exports";
+
 /** The slot recipe's prepare in the rig's talk copies: it leaves the mark a talk row looks for as it starts. */
 export const PREPARE_STEP = "touch .hum-prepared";
 
