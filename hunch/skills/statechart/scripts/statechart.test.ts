@@ -98,6 +98,10 @@ describe("readConfig", () => {
 		const bounded = readConfig("SPECIFICATION Spec\nCONSTRAINT Low\nACTION_CONSTRAINT Small\nINVARIANT Safe\n");
 		expect([bounded.base, bounded.stateBound]).toEqual(["SPECIFICATION Spec\nCONSTRAINT Low\nACTION_CONSTRAINT Small", "SPECIFICATION Spec\nCONSTRAINT Low"]);
 	});
+	test("leaves out the ALIAS, which changes only how a run prints a trace's states, from the model and from its CONSTRAINT bounds", () => {
+		const config = readConfig("SPECIFICATION Spec\nALIAS Shifted\nCONSTRAINT Low\nACTION_CONSTRAINT Small\nINVARIANT Safe\n");
+		expect([config.base, config.stateBound]).toEqual(["SPECIFICATION Spec\nCONSTRAINT Low\nACTION_CONSTRAINT Small", "SPECIFICATION Spec\nCONSTRAINT Low"]);
+	});
 });
 
 test("parseValue reads sets as arrays, and records, sequences and functions as objects keyed by their domain", () => {
