@@ -1,6 +1,7 @@
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
+import { parseLooseJson } from "../../src/adapters/marked.ts";
 import { type AnsweredHook, answeredHook } from "./ask-hook.ts";
 import { SHIM_MODEL } from "./shim.ts";
 
@@ -34,7 +35,10 @@ if (args.includes("-p")) {
 	process.exit(0);
 }
 
-const Hooks = z.record(z.string(), z.array(z.looseObject({ hooks: z.array(z.looseObject({ command: z.string() })) })));
+const Hooks = z.record(z.string(), z.array(z.looseObject({ matcher: z.string().optional(), hooks: z.array(z.looseObject({ command: z.string() })) })));
+
+/** What a hook prints to end the turn it fired in. */
+const EndsTurn = z.looseObject({ continue: z.literal(false) });
 const Settings = z.looseObject({ env: z.record(z.string(), z.string()).default({}), hooks: Hooks.default({}) });
 
 const settings = Settings.parse(JSON.parse(readFileSync(args[args.indexOf("--settings") + 1] ?? "", "utf8")));
@@ -56,10 +60,13 @@ writeFileSync(join(rig, `key-${scenario}.txt`), env.HUM_RUN_KEY ?? "");
 /** Claude Code's question dialog, as its `PermissionRequest` hook reports it. */
 const QUESTION = { tool_name: "AskUserQuestion", tool_input: { questions: [{ question: "Which title?", header: "Title", options: [{ label: "a" }, { label: "b" }], multiSelect: false }] } };
 
-const hook = (event: string, payload: Partial<typeof QUESTION> | AnsweredHook = {}): void => {
+/** Fires the hooks settings give `event` whose matcher, where one is set, names the payload's tool; false once one ends the turn. */
+const hook = (event: string, payload: Partial<typeof QUESTION> | AnsweredHook = {}): boolean => {
 	const input = JSON.stringify({ session_id: session, transcript_path: transcript, hook_event_name: event, cwd: process.cwd(), ...payload });
+	const matched = (settings.hooks[event] ?? []).filter(({ matcher }) => matcher === undefined || matcher === payload.tool_name);
+	const printed = matched.flatMap((group) => group.hooks.map(({ command }) => Bun.spawnSync(["sh", "-c", command], { env, stdin: Buffer.from(input) }).stdout.toString()));
 
-	for (const group of settings.hooks[event] ?? []) for (const { command } of group.hooks) Bun.spawnSync(["sh", "-c", command], { env, stdin: Buffer.from(input) });
+	return !printed.some((out) => parseLooseJson(EndsTurn, out) !== undefined);
 };
 
 const answer = (text: string, over: Record<string, string> = {}): void => {
@@ -181,6 +188,9 @@ const SCENARIOS = new Map<string, () => Promise<void>>(Object.entries({
 		const answers = !existsSync(join(rig, `unanswered-${env.HUM_RUN?.replaceAll(" ", "-") ?? ""}`));
 
 		await turn(async () => {
+			/* The row reads its brief first: only an answer hook that matches every tool ends the turn here. */
+			if (!hook("PostToolUse", { tool_name: "Read" })) return;
+
 			hook("PostToolUse", answeredHook("early"));
 			await Bun.sleep(1500);
 			hook("PermissionRequest", QUESTION);
