@@ -41,13 +41,21 @@ export const Card = z.object({
 
 export type Card = z.infer<typeof Card>;
 
-/** A step of an item's flow, and whether the item waits there on the owner. */
-const Step = z.object({ name, waitsOnOwner: z.boolean() });
+/**
+ * What a state of a flow is to the owner reading it: a step the work goes through, a route that only picks the next
+ * step, a condition a step falls into (a run's question past its cap, or stuck), or the end.
+ */
+export const STEP_PARTS = ["step", "route", "condition", "end"] as const;
+
+export type StepPart = (typeof STEP_PARTS)[number];
+
+/** A state of an item's flow, the part it plays, and whether the item waits there on the owner. */
+const Step = z.object({ name, part: z.enum(STEP_PARTS), waitsOnOwner: z.boolean() });
 
 /** What the owner may do at the step an item is in. */
 export const Controls = z.object({
-	/** The options the flow file offers there, each with the event it sends. */
-	choices: z.array(z.object({ label: name, event: name })),
+	/** The options the flow file offers there, each with the event it sends and the answer word that sends it, where one does. */
+	choices: z.array(z.object({ label: name, event: name, answer: z.optional(name) })),
 	/** It takes a written answer. */
 	answer: z.boolean(),
 	/** The flow file lets the owner skip it. */

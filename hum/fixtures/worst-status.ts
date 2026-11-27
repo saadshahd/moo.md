@@ -74,7 +74,7 @@ const flightsOf = (count: number): Status["open"] =>
 		title: index % 8 === 7 ? undefined : ([CJK_TITLE, EMOJI_TITLE, "x".repeat(120), UNBROKEN_PATH, "a", RTL_TITLE, `Rename the release script and update every workflow that calls it ${"and then some ".repeat(6)}`][index % 7] ?? ""),
 		kind: "feature",
 		flowVersion: "x".repeat(40),
-		steps: [{ name: LONG_STEP, waitsOnOwner: true }],
+		steps: [{ name: LONG_STEP, part: "step", waitsOnOwner: true }],
 		at: ["building", LONG_STEP, "checking", "x"][index % 4] ?? "",
 		since: ago(index * 37),
 		running: true,

@@ -26,6 +26,10 @@ import { configWith, trustedScores } from "./fixtures/config.ts";
 import { type FakeRoundup, fakeRoundup } from "./fixtures/fake-roundup.ts";
 import { roundupAdapter } from "../src/adapters/roundup.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
+import type { StepPart } from "../src/status/format.ts";
+
+/** The part a state of the docs kind plays, where `wait` is the wait the item stops at. */
+const docsPart = (name: string, wait?: string): StepPart => (name === "done" ? "end" : name === "stuck" || name === wait ? "condition" : "step");
 
 /** The work order the owner takes in a talk row. */
 const WORK_ORDER = { title: "Write the note", ask: "Write docs/a.md.", done: "docs/a.md exists.", limits: ["Change no other file."] };
@@ -387,7 +391,7 @@ test("the status file lists each item with a saved state: a waiting one at its w
 	await worker.tick();
 
 	const status = readStatus(w.state.statusPath);
-	const steps = (wait?: string) => ["building", "checking", "fixing", "merging", ...(wait ? [wait] : []), "stuck", "done"].map((name) => ({ name, waitsOnOwner: name === wait }));
+	const steps = (wait?: string) => ["building", "checking", "fixing", "merging", ...(wait ? [wait] : []), "stuck", "done"].map((name) => ({ name, part: docsPart(name, wait), waitsOnOwner: name === wait }));
 	const flowRow = { kind: "docs", flowVersion: w.config.kinds.docs!.machine.version, since: NOW };
 
 	expect(status.ok && status.status.open.toSorted((x, y) => x.item.localeCompare(y.item))).toEqual([

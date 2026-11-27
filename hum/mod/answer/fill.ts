@@ -21,6 +21,14 @@ export const answerOf = ({ item, word }: { readonly item: string; readonly word:
 		opener,
 		filled: isFree ? opener : `${opener}${sentenceOf(word)}`,
 		isOpen: !WHOLE_ANSWERS.has(word),
-		option: isFree ? undefined : word,
+		to: { kind: "answer", option: isFree ? undefined : word },
 	};
+};
+
+/** What picking a step for a note puts in the prompt: a sentence to the step that the owner finishes. */
+export const noteOf = ({ item, step }: { readonly item: string; readonly step: string }): Answering => {
+	const label = displayId(item);
+	const opener = `${label} note for ${step}: `;
+
+	return { item, label, opener, filled: opener, isOpen: true, to: { kind: "note", step } };
 };

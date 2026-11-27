@@ -1,8 +1,10 @@
 import { expect, test } from "bun:test";
 import shippedFix from "../defaults/kinds/fix.json" with { type: "json" };
 import { KindFile } from "../src/config/kind-file.ts";
+import shippedFeature from "../defaults/kinds/feature.json" with { type: "json" };
 import { withOverCapWaits } from "../src/config/machine.ts";
 import { flowOf } from "../src/status/flow.ts";
+import type { StepPart } from "../src/status/format.ts";
 import { configWith } from "./fixtures/config.ts";
 import type { Tree } from "./fixtures/config.ts";
 import { newestChoices, openQuestions } from "../src/status/sections.ts";
@@ -29,13 +31,15 @@ test("the newest choices come first and no more than the shown count", () => {
 	expect(newestChoices(choices, 2).map(({ at }) => at)).toEqual([3, 2]);
 });
 
-const fixWith = (edit: (states: Tree) => void) => {
-	const raw: Tree = structuredClone(shippedFix);
+const kindWith = (shipped: Tree) => (edit: (states: Tree) => void) => {
+	const raw: Tree = structuredClone(shipped);
 
 	edit(raw.machine.states);
 
 	return withOverCapWaits(KindFile.parse(raw));
 };
+
+const fixWith = kindWith(shippedFix);
 
 const ROLES = configWith().hum.roles;
 
@@ -44,15 +48,17 @@ const BETWEEN = { running: false, landing: false, parked: false };
 
 const FIX_STEPS = ["reproducing", "confirming", "objecting", "building", "checking", "proving", "fixing", "reviewing", "owner-review", "merging", "stuck", "done"];
 
+const FIX_PARTS: ReadonlyMap<string, StepPart> = new Map([["stuck", "condition"], ["done", "end"]]);
+
 test("at a wait, the flow names every step it shows, which of them wait on the owner and which the item passed, and the options, answer, skip and notes the wait allows", () => {
 	const flow = flowOf(fixWith((states) => (states["owner-review"].meta.skip = { target: "merging" })), ROLES);
 
 	expect(flow("owner-review", ["reproducing", "confirming", "building", "asking", "checking", "owner-review", "reviewing"], BETWEEN)).toEqual({
-		steps: FIX_STEPS.map((name) => ({ name, waitsOnOwner: name === "objecting" || name === "owner-review" })),
+		steps: FIX_STEPS.map((name) => ({ name, part: FIX_PARTS.get(name) ?? "step", waitsOnOwner: name === "objecting" || name === "owner-review" })),
 		at: "owner-review",
 		passed: ["reproducing", "confirming", "building", "checking", "reviewing"],
 		controls: {
-			choices: [{ label: "Approve", event: "owner-approved" }],
+			choices: [{ label: "Approve", event: "owner-approved", answer: "approve" }],
 			answer: true,
 			skip: true,
 			runNow: false,
@@ -85,4 +91,11 @@ test("a wait a run stops at past its token cap is a step only while the item is 
 	expect(flow("asking-reviewing", undefined, BETWEEN)?.steps.map(({ name }) => name)).toEqual([...FIX_STEPS, "asking-reviewing"]);
 	expect(flow("reviewing", undefined, BETWEEN)?.steps.map(({ name }) => name)).toEqual(FIX_STEPS);
 	expect(flow("done", [], BETWEEN)).toBeUndefined();
+});
+
+test("each state of a flow names its part: a route that only picks the next step, a condition a run's question or stuck leads to, the end, else a step", () => {
+	const flow = flowOf(kindWith(shippedFeature)(() => {}), ROLES);
+	const partsAt = (at: string) => Object.fromEntries(flow(at, [], BETWEEN)?.steps.map(({ name, part }) => [name, part]) ?? []);
+
+	expect(partsAt("asking-reviewing")).toMatchObject({ opening: "route", ideating: "step", "owner-review": "step", merging: "step", asking: "condition", "asking-reviewing": "condition", stuck: "condition", done: "end" });
 });

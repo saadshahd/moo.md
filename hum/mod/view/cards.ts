@@ -28,10 +28,10 @@ type CardInput = Pick<ViewInput, "now" | "width">;
 
 const paragraph = (text: string, width: number, tone: Tone): Row[] => wrap(text, width).map((line) => [span(line, tone)]);
 
-type Labeled = { readonly label: string; readonly press: Press };
+export type Labeled = { readonly label: string; readonly press: Press };
 
 /** Where the owner answers a question: in the row that asks it, which the one button opens, else here, where each button fills the prompt with an answer to finish. */
-const questionButtons = ({ item, options, row }: Question): Labeled[] => (row === undefined ? buttonWords({ options }).map((word) => ({ label: word, press: { kind: "fill", item, word } })) : [{ label: OPEN, press: opening(row) }]);
+export const questionButtons = ({ item, options, row }: Question): Labeled[] => (row === undefined ? buttonWords({ options }).map((word) => ({ label: word, press: { kind: "fill", item, word } })) : [{ label: OPEN, press: opening(row) }]);
 
 /** A question card: the question is never cut, only wrapped; then where the owner answers it. */
 export const questionCardRows = (question: Question, { now, width }: CardInput): Row[] => [

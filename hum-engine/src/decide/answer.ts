@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { ThreadEntry } from "../adapter-api.ts";
+import { OWNER_APPROVED } from "../config/machine.ts";
 import type { HumConfig } from "../config/schema.ts";
 import { OWNER_APPROVAL } from "./merge.ts";
 import { DATA_RULE, fenced } from "./prose.ts";
@@ -7,6 +8,12 @@ import { bareWord, isOverCapStop, OVER_CAP_OPTIONS } from "./question.ts";
 
 /** The answer option that runs a parked item again from the start. */
 export const RUN_AGAIN = "retry";
+
+/** The answer word that sends each event a wait's choice may name; an event missing here takes no word. */
+const CHOICE_WORDS: ReadonlyMap<string, string> = new Map([[OWNER_APPROVED, OWNER_APPROVAL]]);
+
+/** The answer word that sends a choice's event, where one does. */
+export const choiceWord = (event: string): string | undefined => CHOICE_WORDS.get(event);
 
 /** What the owner may answer an item parked for each reason. */
 export const PARK_OPTIONS = { stuck: [RUN_AGAIN], review: [OWNER_APPROVAL, RUN_AGAIN] } as const;

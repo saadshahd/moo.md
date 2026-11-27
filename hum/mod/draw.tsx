@@ -1,16 +1,19 @@
 import type { EngineInterface, RenderElement } from "claude-code";
-import type { Press, Row, Span, Tone } from "./view/row.ts";
+import { cells } from "./view/cells.ts";
+import type { NotePick, Press, Row, Span, Tone } from "./view/row.ts";
 
 type Tags = ReturnType<EngineInterface["ui"]["resolve"]>;
+
+const ACCENT = "suggestion";
 
 const TONE = {
 	plain: {},
 	dim: { dimColor: true },
 	strong: { bold: true },
 	amber: { color: "warning" },
-} as const satisfies Record<Exclude<Tone, "filled">, { readonly color?: "warning"; readonly dimColor?: true; readonly bold?: true }>;
-
-const ACCENT = "suggestion";
+	accent: { color: ACCENT },
+	success: { color: "success" },
+} as const satisfies Record<Exclude<Tone, "filled">, { readonly color?: "warning" | typeof ACCENT | "success"; readonly dimColor?: true; readonly bold?: true }>;
 
 /** What a press does, as text: a button's address, which the focus ring follows from one drawing to the next. */
 const addressOf = (press: Press): string => {
@@ -25,6 +28,10 @@ const addressOf = (press: Press): string => {
 			return `link:${press.url}`;
 		case "dismiss":
 			return `dismiss:${press.cards.map(({ key }) => key).join(",")}`;
+		case "note":
+			return `note:${press.item}:${press.step}`;
+		case "request":
+			return `${press.request}:${press.item}:${press.step}`;
 	}
 };
 
@@ -33,7 +40,7 @@ const addressOf = (press: Press): string => {
  * A button's key is its press, never its place, so a card drawn above it leaves the focus on the same answer; the
  * spans of one entry that share a press are told apart by their order.
  */
-export const drawRows = ({ Box, Text, Button }: Tags, rows: readonly Row[], onPress: (press: Press) => void): RenderElement => {
+export const drawRows = ({ Box, Text, Button, Select }: Tags, rows: readonly Row[], onPress: (press: Press) => void): RenderElement => {
 	const drawn = new Map<string, number>();
 
 	const keyOf = (press: Press): string => {
@@ -49,7 +56,7 @@ export const drawRows = ({ Box, Text, Button }: Tags, rows: readonly Row[], onPr
 		<Box flexDirection="column">
 			{rows.map((row, y) => (
 				<Box key={`row-${y}`} flexDirection="row">
-					{row.map((part) => drawSpan({ Text, Button }, part, keyOf, onPress))}
+					{row.map((part) => (part.pick === undefined ? drawSpan({ Text, Button }, part, keyOf, onPress) : drawPick({ Box, Select }, part.text, part.pick, onPress)))}
 				</Box>
 			))}
 		</Box>
@@ -72,6 +79,13 @@ const drawFilled = ({ Text }: Pick<Tags, "Text">, text: string): RenderElement[]
 		</Text>,
 	];
 };
+
+/** The note's picker, in the room its span holds: a pick presses a note to the step picked. Its key is its item's, so the pick stays put as the rail redraws. */
+const drawPick = ({ Box, Select }: Pick<Tags, "Box" | "Select">, text: string, pick: NotePick, onPress: (press: Press) => void): RenderElement => (
+	<Box key={`note-to:${pick.item}`} width={cells(text)} flexShrink={0}>
+		<Select key={`note-to:${pick.item}`} label={pick.label} options={pick.steps.map((step) => ({ value: step }))} value={pick.steps[0]} onSelect={(step) => onPress({ kind: "note", item: pick.item, step })} />
+	</Box>
+);
 
 const drawSpan = ({ Text, Button }: Pick<Tags, "Text" | "Button">, { text, tone, press }: Span, keyOf: (press: Press) => string, onPress: (press: Press) => void): RenderElement =>
 	press === undefined ? (

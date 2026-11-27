@@ -6,6 +6,12 @@ export const GLYPHS = {
 	capLeft: "▐",
 	capRight: "▌",
 	link: "↗",
+	passed: "✓",
+	now: "●",
+	ahead: "○",
+	unfold: "▾",
+	fold: "▴",
+	frame: { topLeft: "╭", topRight: "╮", bottomLeft: "╰", bottomRight: "╯", side: "│" },
 } as const;
 
 export const SEPARATOR = ` ${GLYPHS.separator} `;

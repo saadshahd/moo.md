@@ -12,7 +12,7 @@ import { filesBetween, type Git, gitIn, isAncestor, PATCH, withConfigPinned } fr
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import { pickTier } from "../config/checks.ts";
 import type { Config } from "../config/load.ts";
-import { earliestTimeout, interactionAt, invokedSources, isApprovalWait, isWaitingOnOwner, kindMachine, OWNER_APPROVED, OWNER_REJECTED, SKIP, TOKEN_CAP } from "../config/machine.ts";
+import { earliestTimeout, interactionAt, invokedSources, isApprovalWait, isWaitingOnOwner, kindMachine, OWNER_REJECTED, SKIP, TOKEN_CAP } from "../config/machine.ts";
 import { type Kind, type Naming, PURPOSES, STUCK_TAG, TALK_PURPOSES } from "../config/schema.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { doesLeaveDocs } from "../decide/kind.ts";
@@ -27,7 +27,7 @@ import { checkLimits, firstFailing, runChecks } from "./checks.ts";
 import { BASE_CONTENDED, carriedVerdict, changeOn, declaredChange, type LandContext, patchOf, placementOf, rebaseOnto, type ReviewOutcome, tierOf } from "./land.ts";
 import { OWNER_APPROVAL, REVIEW_APPROVAL } from "../decide/merge.ts";
 import { askDecision, askedQuestion, isOverCapStop, isWaitQuestion, OVER_CAP_OPTIONS, PLAIN_QUESTIONS, type PlainQuestion, RunReason } from "../decide/question.ts";
-import { humOptions, PARK_OPTIONS, RUN_AGAIN, type Stage } from "../decide/answer.ts";
+import { choiceWord, humOptions, PARK_OPTIONS, RUN_AGAIN, type Stage } from "../decide/answer.ts";
 import { type ItemText, type ReadFile, reviewInput } from "../decide/review.ts";
 import { answerText, IdeateAnswer, PickAnswer, type BuildChoice, choicesAnswer, talkedBody } from "../decide/talk.ts";
 import { NO_REVIEW_FILES, readReviewFiles } from "./review-files.ts";
@@ -1260,11 +1260,14 @@ type Pending = { readonly question: Question; readonly plain: PlainQuestion; rea
 
 const chosenSection = (chosen: readonly string[]): string => (chosen.length === 0 ? "" : `\n\n## Decided without the owner\n${chosen.map((text) => `- ${text}`).join("\n")}\nGo on with these choices.`);
 
-/** The event an owner's answer sends the saved wait: the approval of a change where the wait takes it and the answer approves, else the wait's written answer. */
+/** The event an owner's answer sends the saved wait: the wait's choice its answer word picks, else the wait's written answer. */
 const resumeEvent = (kind: Kind, state: string, answered: Answered): string => {
-	if (isApprovalWait(kind, state) && answered.option === OWNER_APPROVAL) return OWNER_APPROVED;
+	const interaction = interactionAt(kind, state);
+	const chosen = answered.option === undefined ? undefined : interaction?.choices?.find(({ event }) => choiceWord(event.type) === answered.option);
 
-	const textEvent = interactionAt(kind, state)?.textEvent;
+	if (chosen !== undefined) return chosen.event.type;
+
+	const textEvent = interaction?.textEvent;
 
 	if (textEvent === undefined) throw new Error(`${kind.machine.id}: the wait "${state}" takes no written answer`);
 

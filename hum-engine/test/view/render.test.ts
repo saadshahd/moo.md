@@ -277,7 +277,7 @@ test("every row of the pane stays inside its width, and the unfolded set draws i
 		for (const width of WIDTHS) {
 			const rows = paneRows({
 				...inputOf(read, width),
-				unfolded: new Set(["in-flight:seed-3", "merged:69", "choice:70:1"]),
+				unfolded: new Set(["flow:seed-3", "passed:72", "merged:69", "choice:70:1"]),
 			});
 
 			for (const row of rows)
@@ -288,12 +288,12 @@ test("every row of the pane stays inside its width, and the unfolded set draws i
 	}
 });
 
-test("on roundup, the pane with its runs unfolded and each item's feed row pane stay inside their width, and an unfolded item in flight lists its runs", () => {
+test("on roundup, the pane with its runs unfolded and each item's feed row pane stay inside their width, and an unfolded open item lists its runs", () => {
 	const linked: ViewRead = { kind: "status", status: linkedStatus };
 
 	for (const width of WIDTHS) {
 		const panes = [
-			paneRows({ ...inputOf(linked, width), unfolded: new Set(["in-flight:72", "in-flight:seed-3"]) }),
+			paneRows({ ...inputOf(linked, width), unfolded: new Set(["flow:72", "flow:seed-3", "passed:74"]) }),
 			...["74", "72", "99"].map((feed) => paneRows({ ...inputOf(linked, width), feed, unfolded: new Set() })),
 		];
 
@@ -301,13 +301,13 @@ test("on roundup, the pane with its runs unfolded and each item's feed row pane 
 			expect(rowCells(row), `at ${width}`).toBeLessThanOrEqual(width);
 	}
 
-	const unfolded = paneRows({ ...inputOf(linked, 80), unfolded: new Set(["in-flight:72"]) }).map(textOf);
+	const unfolded = paneRows({ ...inputOf(linked, 80), unfolded: new Set(["flow:72"]) }).map(textOf);
 
 	expect(unfolded.some((line) => /▸ build {2}working {2,}open ↗/.test(line))).toBe(true);
 	expect(paneRows({ ...inputOf(linked, 80), feed: "99", unfolded: new Set() }).map(textOf)).toContainEqual(expect.stringContaining("hum holds no open item #99"));
 });
 
-test("the pane lists question cards, then waiting, limited and fault cards, then in flight, merged and choices made without you", () => {
+test("the pane lists question cards, then waiting, limited and fault cards, then each open item's flow, merged and choices made without you", () => {
 	const text = paneRows({
 		...inputOf(statusRead, 80),
 		unfolded: new Set(),
@@ -322,7 +322,7 @@ test("the pane lists question cards, then waiting, limited and fault cards, then
 		"waiting",
 		"limited",
 		"fault",
-		"in flight (2)",
+		"Rename the release script",
 		"merged (1)",
 		"choices made without you (1)",
 	].map(at);

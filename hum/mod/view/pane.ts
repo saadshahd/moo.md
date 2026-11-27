@@ -1,10 +1,11 @@
-import type { Card, Status } from "../../../hum-engine/src/status/format.ts";
+import type { Card, Question, Status } from "../../../hum-engine/src/status/format.ts";
 import { displayId } from "../item.ts";
 import { blankRow, faultCardRows, noticeCardRows, questionCardRows, titleRule, unreadCardRows } from "./cards.ts";
 import { shownFaultGroups } from "./faults.ts";
 import { reportedUnread, sinceText } from "./freshness.ts";
 import { headerRow, measureRow } from "./header.ts";
 import type { ViewInput } from "./input.ts";
+import { flowRows } from "./flow.ts";
 import { handoffRow, itemTitle, runRows } from "./links.ts";
 import { type ListEntry, listRows } from "./lists.ts";
 import { innerWidth, padded, type Row, span } from "./row.ts";
@@ -32,17 +33,18 @@ const listSection = (title: string, entries: readonly ListEntry[], input: PaneIn
 		input.width,
 	);
 
-/** An item in flight: its step and age; unfolded, its runs, each with the control that opens it. */
-const inFlightEntries = ({ open }: Status, { now, width }: Pick<ViewInput, "now" | "width">): ListEntry[] =>
-	open
-		.filter(({ running }) => running)
-		.map(({ item, title = "", at, since, rows = [] }) => ({
-			foldId: `in-flight:${item}`,
-			item,
-			title,
-			meta: [span(at, "plain"), span(sinceText(since, now), "dim")],
-			below: runRows(item, rows, width),
-		}));
+/** The question an open item's card asks: its newest open one, asked at the wait it is at. */
+const cardQuestionOf = ({ questions }: Status, item: string): Question | undefined => questions.findLast((question) => question.item === item);
+
+/** Each open item's flow, a block of its own, with the question its card asks. */
+const flowBlocks = (status: Status, input: PaneInput): Row[][] => status.open.map((item) => flowRows(item, { ...input, question: cardQuestionOf(status, item.item) }));
+
+/** The status without the questions open items' cards ask; an item's older questions stay cards. */
+const withoutCardQuestions = (status: Status): Status => {
+	const asked = new Set(status.open.map(({ item }) => cardQuestionOf(status, item)));
+
+	return { ...status, questions: status.questions.filter((question) => !asked.has(question)) };
+};
 
 const mergedEntries = ({ merged }: Status, now: number): ListEntry[] =>
 	merged.map(({ item, title, level, mergedAt }) => ({
@@ -101,13 +103,12 @@ const blocksOf = (input: PaneInput) => {
 
 	if (input.feed !== undefined) return feedBlocksOf(status, input.feed, input);
 
-	const [first = [], ...cards] = cardBlocks(status, input);
+	const [first = [], ...rest] = [...cardBlocks(withoutCardQuestions(status), input), ...flowBlocks(status, input)];
 
 	return {
 		lead: [headerRows(status, input), first],
 		rest: [
-			...cards,
-			listSection("in flight", inFlightEntries(status, input), input),
+			...rest,
 			listSection("merged", mergedEntries(status, now), input),
 			listSection("choices made without you", choiceEntries(status, now), input),
 		],
@@ -116,7 +117,7 @@ const blocksOf = (input: PaneInput) => {
 
 const innerBlocksOf = (input: PaneInput) => blocksOf({ ...input, width: innerWidth(input.width) });
 
-/** The whole pane: header, then question cards, notice cards, in flight, merged, and choices made without the owner; each row has its padding. */
+/** The whole pane: header, then the cards, every open item's flow, merged, and choices made without the owner; each row has its padding. */
 export const paneRows = (input: PaneInput): Row[] => {
 	const { lead, rest } = innerBlocksOf(input);
 

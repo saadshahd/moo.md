@@ -2,14 +2,14 @@ import type { EngineInterface } from "claude-code";
 import { atom, read, update } from "claude-code";
 import { runHum } from "../hum.ts";
 import { failureOf } from "../says.ts";
-import { answerOf } from "./fill.ts";
+import { answerOf, noteOf } from "./fill.ts";
 import type { Decision } from "./guard.ts";
 import { type AnswerEvent, type AnswerSnapshot, answerMachine, type Answering, type Posting, postedText } from "./machine.ts";
 
 type Engine = EngineInterface;
 
 /* oxlint-disable anti-slop/no-shape-in-symbol-names -- `shape` is the engine's option name for a stored value's version tag */
-const mode = atom({ plugin: "hum", key: "answerMode" } as const, answerMachine.initialState, { shape: "answer-mode-2" });
+const mode = atom({ plugin: "hum", key: "answerMode" } as const, answerMachine.initialState, { shape: "answer-mode-3" });
 /* oxlint-enable anti-slop/no-shape-in-symbol-names */
 
 const PASS: Decision = { kind: "pass" };
@@ -45,9 +45,18 @@ export async function restartAnswer($: Engine): Promise<void> {
 	await send($, { type: "restarted" });
 }
 
+async function fill($: Engine, answer: Answering): Promise<void> {
+	await send($, { type: "filled", answer, box: (await $.prompt.read()).text });
+}
+
 /** A question's button: fills the prompt, only when it is empty. */
 export async function fillAnswer($: Engine, item: string, word: string): Promise<void> {
-	await send($, { type: "filled", answer: answerOf({ item, word }), box: (await $.prompt.read()).text });
+	await fill($, answerOf({ item, word }));
+}
+
+/** A step picked for a note: fills the prompt with a sentence to it, only when the prompt is empty. */
+export async function fillNote($: Engine, item: string, step: string): Promise<void> {
+	await fill($, noteOf({ item, step }));
 }
 
 export async function editedBox($: Engine, box: string): Promise<void> {
@@ -58,7 +67,15 @@ export async function changedBox($: Engine, { origin, box }: { readonly origin: 
 	await send($, { type: "changed", origin, box });
 }
 
-const optionArgs = ({ option }: Answering): string[] => (option === undefined ? [] : ["--option", option]);
+/** The `hum` command that posts the owner's words: an answer, with its option where the fill picked one, or a note to its step. */
+const postArgs = ({ item, to }: Answering, text: string): string[] => {
+	switch (to.kind) {
+		case "answer":
+			return ["answer", ...(to.option === undefined ? [] : ["--option", to.option]), "--", item, text];
+		case "note":
+			return ["note", "--", item, to.step, text];
+	}
+};
 
 /** How a post ended: the repo could not be found, hum exited 0 or not, or it never reported, so the answer may be on the thread. */
 async function postEvent($: Engine, rootOf: () => Promise<string>, answering: Posting, box: () => Promise<string>): Promise<AnswerEvent> {
@@ -66,7 +83,7 @@ async function postEvent($: Engine, rootOf: () => Promise<string>, answering: Po
 
 	if (root instanceof Error) return { type: "postFailed", cause: root.message, box: await box() };
 
-	const ran = await runHum($, root, ["answer", ...optionArgs(answering), "--", answering.item, postedText(answering)], { timeoutMs: POST_LIMIT_MS }).catch((error: Error) => error);
+	const ran = await runHum($, root, postArgs(answering, postedText(answering)), { timeoutMs: POST_LIMIT_MS }).catch((error: Error) => error);
 
 	if (ran instanceof Error) return { type: "postUnconfirmed", cause: ran.message, box: await box() };
 
