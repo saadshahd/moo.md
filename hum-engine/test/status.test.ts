@@ -37,12 +37,13 @@ const fixWith = (edit: (states: Tree) => void) => {
 
 const FIX_STEPS = ["reproducing", "confirming", "objecting", "building", "checking", "proving", "fixing", "reviewing", "owner-review", "merging", "stuck", "done"];
 
-test("at a wait, the flow names every step it shows, which of them wait on the owner, and the options, answer, skip and notes the wait allows", () => {
+test("at a wait, the flow names every step it shows, which of them wait on the owner and which the item passed, and the options, answer, skip and notes the wait allows", () => {
 	const flow = flowOf(fixWith((states) => (states["owner-review"].meta.skip = { target: "merging" })));
 
-	expect(flow("owner-review")).toEqual({
+	expect(flow("owner-review", ["reproducing", "confirming", "building", "asking", "checking", "owner-review", "reviewing"])).toEqual({
 		steps: FIX_STEPS.map((name) => ({ name, waitsOnOwner: name === "objecting" || name === "owner-review" })),
 		at: "owner-review",
+		passed: ["reproducing", "confirming", "building", "checking", "reviewing"],
 		controls: {
 			choices: [{ label: "Approve", event: "owner-approved" }],
 			answer: true,
@@ -56,7 +57,7 @@ test("at a wait, the flow names every step it shows, which of them wait on the o
 test("a wait a run stops at past its token cap is a step only while the item is in it, and a final step has no flow", () => {
 	const flow = flowOf(fixWith(() => {}));
 
-	expect(flow("asking-reviewing")?.steps.map(({ name }) => name)).toEqual([...FIX_STEPS, "asking-reviewing"]);
-	expect(flow("reviewing")?.steps.map(({ name }) => name)).toEqual(FIX_STEPS);
-	expect(flow("done")).toBeUndefined();
+	expect(flow("asking-reviewing", undefined)?.steps.map(({ name }) => name)).toEqual([...FIX_STEPS, "asking-reviewing"]);
+	expect(flow("reviewing", undefined)?.steps.map(({ name }) => name)).toEqual(FIX_STEPS);
+	expect(flow("done", [])).toBeUndefined();
 });

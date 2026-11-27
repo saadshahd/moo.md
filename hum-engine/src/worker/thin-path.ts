@@ -20,7 +20,7 @@ import { type EventPick, type JsonSchema, jsonSchemaOf, type ProsePurpose, planH
 import { answerOnce, foldItem, type ItemFold, keepPick, machineStarted, ownerAnswered, rebuilt } from "../state/item-log.ts";
 import type { State } from "../state/open.ts";
 import type { Parked, SavedRepro, SavedTalk } from "../state/saved.ts";
-import { type SavedSnapshot, persistedSnapshot } from "../state/items.ts";
+import { type SavedSnapshot, passedOnto, persistedSnapshot } from "../state/items.ts";
 import { dueClock, isDue } from "./due.ts";
 import { HOUR_MS, SECOND_MS } from "../time.ts";
 import { checkLimits, firstFailing, runChecks } from "./checks.ts";
@@ -1057,6 +1057,10 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		handled = String(actor.getSnapshot().value);
 	} else actor = createActor(kindMachine(kind, invokedSources(kind, nothingRuns, sources), reads));
 
+	/** Where the machine stood at its last save, and the states it has left since it started: a restored wait goes on with its saved record. */
+	let at = d.resume ? String(actor.getSnapshot().value) : undefined;
+	let passed = d.resume ? state.items.savedOf(id)?.passed : [];
+
 	const react = async (value: string) => {
 		if (handled === value) return;
 
@@ -1080,7 +1084,12 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 	actor.subscribe({
 		next: (snapshot) => {
-			const saved = state.items.save(id, kind, persistedSnapshot(actor));
+			const value = String(snapshot.value);
+
+			passed = passedOnto(passed, at, value);
+			at = value;
+
+			const saved = state.items.save(id, kind, persistedSnapshot(actor), passed);
 
 			if (!saved.ok) result.reject(new Error(saved.fault.cause));
 

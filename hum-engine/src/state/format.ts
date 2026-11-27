@@ -23,6 +23,8 @@ export const Envelope = z.object({
 	machineVersion: z.string().min(1),
 	savedAt: z.int().nonnegative(),
 	snapshot: Json,
+	/** The states the machine has left since it last started, each once, in the order it first left it; absent where an earlier engine saved the item. */
+	passed: z.array(z.string().min(1)).optional(),
 });
 
 export type Envelope = z.infer<typeof Envelope>;
@@ -51,4 +53,5 @@ export const SavedHeader = z.looseObject({
 	machineVersion: z.string().min(1),
 	savedAt: z.int().nonnegative(),
 	snapshot: z.looseObject({ value: z.string().optional().catch(undefined) }),
+	passed: z.array(z.string().min(1)).optional().catch(undefined),
 });

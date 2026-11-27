@@ -19,6 +19,7 @@ import {
 import { kindMachine } from "../src/index.ts";
 import { LOG_FORMAT, type NewEvent } from "../src/state/events.ts";
 import { slug } from "../src/state/fs.ts";
+import { passedOnto } from "../src/state/items.ts";
 import { SAVED_0_1_0 } from "./fixtures/saved-0-1-0.ts";
 import earlierFix from "./fixtures/fix-kind-2.json" with { type: "json" };
 import shippedFix from "../defaults/kinds/fix.json" with { type: "json" };
@@ -481,12 +482,21 @@ test("an item saved under an earlier flow, kept in a kind file written before wa
 	expect(fix.machine.version).not.toBe("2");
 });
 
+test("a state joins the passed states the first time the machine leaves it, and a record kept before hum kept them stays unknown", () => {
+	expect(passedOnto([], undefined, "building")).toEqual([]);
+	expect(passedOnto([], "building", "checking")).toEqual(["building"]);
+	expect(passedOnto(["building", "checking"], "fixing", "checking")).toEqual(["building", "checking", "fixing"]);
+	expect(passedOnto(["building", "checking", "fixing"], "checking", "fixing")).toEqual(["building", "checking", "fixing"]);
+	expect(passedOnto(["building"], "checking", "checking")).toEqual(["building"]);
+	expect(passedOnto(undefined, "building", "checking")).toBeUndefined();
+});
+
 const statusFile = () => {
 	const path = join(dir, "nested", "status.json");
 	const status = emptyStatus(ENGINE_VERSION, 1000);
 
 	status.workers = { mac: 990 };
-	status.open = [{ item: "#68", title: "Fix it", kind: "fix", flowVersion: "3", steps: [{ name: "building", waitsOnOwner: false }], at: "building", since: 900, running: true, controls: { choices: [], answer: false, skip: false, runNow: false, noteTo: ["building"] } }];
+	status.open = [{ item: "#68", title: "Fix it", kind: "fix", flowVersion: "3", steps: [{ name: "building", waitsOnOwner: false }], at: "building", passed: [], since: 900, running: true, controls: { choices: [], answer: false, skip: false, runNow: false, noteTo: ["building"] } }];
 	writeStatus(path, status);
 
 	return { path, status };

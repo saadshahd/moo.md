@@ -2545,6 +2545,7 @@ var OpenItem = object({
   flowVersion: name,
   steps: array(Step),
   at: name,
+  passed: optional(array(name)),
   since: time2,
   running: boolean2(),
   controls: Controls

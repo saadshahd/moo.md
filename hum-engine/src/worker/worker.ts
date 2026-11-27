@@ -13,7 +13,7 @@ import { type Kind, SCHEMA_VERSION } from "../config/schema.ts";
 import { checkTokenAge } from "../service/token.ts";
 import { listFiles } from "../state/fs.ts";
 import { ENGINE_VERSION } from "../state/format.ts";
-import { persistedSnapshot, type SavedSnapshot } from "../state/items.ts";
+import { passedOnto, persistedSnapshot, type SavedSnapshot } from "../state/items.ts";
 import type { State } from "../state/open.ts";
 import { tallyOf } from "./tally.ts";
 import { dueClock, isDue, type SavedWait } from "./due.ts";
@@ -33,7 +33,7 @@ import { keepMergedCases } from "../measure/cases.ts";
 import { type StaleScore, staleScores } from "../measure/judges.ts";
 import type { Measured, Measurement } from "../measure/remeasure.ts";
 import { emptyStatus, readStatus, writeHeartbeat, writeStatus } from "../status/file.ts";
-import { type FlowAt, flowOf } from "../status/flow.ts";
+import { type Flow, type FlowAt, flowOf } from "../status/flow.ts";
 import type { Choice, OpenItem, Status } from "../status/format.ts";
 import { newestChoices, openQuestions } from "../status/sections.ts";
 import { commandTimeoutMs } from "../exec.ts";
@@ -224,7 +224,7 @@ export class Worker {
 	/** Each item's title, as the worker last read it. */
 	readonly #titles = new Map<string, string>();
 	/** The flow of each kind an open item runs, by `<machine id>@<version>`, its graph read once. */
-	readonly #flows = new Map<string, (at: string) => FlowAt | undefined>();
+	readonly #flows = new Map<string, Flow>();
 	/** Items the owner answered that have not started yet; kept across ticks, because the watch token moves on. */
 	readonly #answered = new Set<string>();
 	/** Items whose owner wait timed out into work: a pass restores each wait and fires its timeout. */
@@ -373,7 +373,7 @@ export class Worker {
 		const value = String(actor.getSnapshot().value);
 
 		if (hasEndedStuck(kind, value)) {
-			state.items.save(saved.itemId, kind, persistedSnapshot(actor));
+			state.items.save(saved.itemId, kind, persistedSnapshot(actor), passedOnto(saved.passed, saved.state, value));
 			park({ state, now: this.#now }, { outcome: "stuck", item: saved.itemId, detail: `its wait in ${saved.state} timed out` });
 		} else if (value !== saved.state) this.#timedOut.add(saved.itemId);
 
@@ -1000,7 +1000,7 @@ export class Worker {
 			if (kind) this.#flows.set(key, flowOf(kind));
 		}
 
-		return this.#flows.get(key)?.(at);
+		return this.#flows.get(key)?.(at, saved.passed);
 	}
 
 	/** Every item with a saved state that has not ended: where its flow stands, and whether a pass runs on it now. */

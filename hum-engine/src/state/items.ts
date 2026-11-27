@@ -48,7 +48,13 @@ export type SavedSnapshot = {
 	readonly savedAt: number;
 	/** The machine's state, when it is a plain state name. */
 	readonly state: string | undefined;
+	/** The states the machine has left since it last started; undefined where the record began before hum kept them. */
+	readonly passed: readonly string[] | undefined;
 };
+
+/** The states left once the machine moves from `from` to `to`: `from` joins them the first time it is left; an unknown record stays unknown. */
+export const passedOnto = (passed: readonly string[] | undefined, from: string | undefined, to: string): readonly string[] | undefined =>
+	passed === undefined || from === undefined || from === to || passed.includes(from) ? passed : [...passed, from];
 
 /** The snapshot of a running item actor, as the JSON `saveItem` writes. */
 export const persistedSnapshot = (actor: AnyActor): Json => asJson(actor.getPersistedSnapshot());
@@ -88,9 +94,9 @@ export class Items {
 		return join(this.#folder, `${slug(itemId)}.json`);
 	}
 
-	/** A failed write leaves the old snapshot and raises one card. */
-	save(itemId: string, kind: Kind, snapshot: Json): Outcome<void> {
-		const envelope = { format: this.#format, engineVersion: this.#engineVersion, itemId, kind: kind.machine.id, machineVersion: kind.machine.version, savedAt: this.#now(), snapshot };
+	/** A failed write leaves the old snapshot and raises one card. `passed` is the states the machine has left, where they are known. */
+	save(itemId: string, kind: Kind, snapshot: Json, passed?: readonly string[]): Outcome<void> {
+		const envelope = { format: this.#format, engineVersion: this.#engineVersion, itemId, kind: kind.machine.id, machineVersion: kind.machine.version, savedAt: this.#now(), snapshot, passed };
 
 		try {
 			atomicWrite(this.path(itemId), `${JSON.stringify(envelope)}\n`);
@@ -119,9 +125,9 @@ export class Items {
 
 				if (!header.success) return [];
 
-				const { itemId, kind, machineVersion, savedAt, snapshot } = header.data;
+				const { itemId, kind, machineVersion, savedAt, snapshot, passed } = header.data;
 
-				return [{ itemId, kind, machineVersion, savedAt, state: snapshot.value }];
+				return [{ itemId, kind, machineVersion, savedAt, state: snapshot.value, passed }];
 			} catch {
 				return [];
 			}

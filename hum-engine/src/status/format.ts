@@ -73,6 +73,8 @@ export const OpenItem = z.object({
 	flowVersion: name,
 	steps: z.array(Step),
 	at: name,
+	/** The shown steps it has passed since its flow last started, in the order it first left each; absent where hum began keeping them after the item started. */
+	passed: z.optional(z.array(name)),
 	since: time,
 	running: z.boolean(),
 	controls: Controls,
