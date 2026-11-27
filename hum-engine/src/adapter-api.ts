@@ -5,7 +5,7 @@ import type { FaultInput } from "./state/faults.ts";
 export type { FaultInput };
 
 /** Bumped on every change to the API an adapter implements; a breaking change bumps the engine's major version. */
-export const ADAPTER_API_VERSION = 6;
+export const ADAPTER_API_VERSION = 7;
 
 /** Failure that retrying cannot fix: a reply of the wrong shape, a refused push. The engine surfaces it at once, as it does a `failed: "now"` answer. */
 export class PermanentError extends Error {
@@ -55,7 +55,10 @@ export const REQUEST_KINDS = ["skip", "run-now"] as const;
 
 export type RequestKind = (typeof REQUEST_KINDS)[number];
 
-export const THREAD_KINDS = ["comment", "question", "answer", "decision", "close", ...REQUEST_KINDS] as const;
+/** What the owner sends a step the item can still reach, for that step's next run to read. */
+export const NOTE_KIND = "note";
+
+export const THREAD_KINDS = ["comment", "question", "answer", "decision", "close", ...REQUEST_KINDS, NOTE_KIND] as const;
 
 /** Who wrote a thread entry: hum, which marks its comments, or a person typing without a marker. */
 export const THREAD_AUTHORS = ["hum", "person"] as const;
@@ -66,7 +69,7 @@ export const ThreadEntry = z.strictObject({
 	text,
 	at: time,
 	option: text.optional(),
-	/** The step a request names: the one the item was at when the owner made it. */
+	/** The step a request names, the one the item was at when the owner made it; or the step a note goes to. */
 	step: text.optional(),
 	/** A source that cannot tell leaves it out, and the entry reads as hum's. */
 	author: z.enum(THREAD_AUTHORS).optional(),
@@ -135,8 +138,8 @@ export type Question = { readonly text: string; readonly options?: readonly stri
 
 export type Answer = { readonly text: string; readonly option?: string };
 
-/** An owner's request, made at `step`, the step the item was at as the owner saw it. */
-export type OwnerRequest = { readonly kind: RequestKind; readonly step: string };
+/** An owner's request, made at `step`, the step the item was at as the owner saw it; or their note to `step`, whose next run reads `text`. */
+export type OwnerRequest = { readonly kind: RequestKind; readonly step: string } | { readonly kind: typeof NOTE_KIND; readonly step: string; readonly text: string };
 
 export type FollowUp = { readonly title: string; readonly body: string };
 
@@ -169,7 +172,7 @@ export interface Questions {
 /** Where the owner's answers arrive. */
 export interface Answers {
 	answer(id: ItemId, answer: Answer): Promise<void>;
-	/** Puts the owner's request on the item's thread, where hum reads it as it reads answers. */
+	/** Puts the owner's request or note on the item's thread, where hum reads it as it reads answers; a note's text reads back whole. */
 	request(id: ItemId, request: OwnerRequest): Promise<void>;
 	/** The one cheap read: has anything changed since `since`. An idle call costs no rate limit. */
 	watch(since?: string): Promise<Watch>;

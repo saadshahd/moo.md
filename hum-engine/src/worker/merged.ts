@@ -5,6 +5,7 @@ import type { State } from "../state/open.ts";
 import type { Landing } from "../state/saved.ts";
 import { dropEvidence } from "./evidence.ts";
 import { dropReviews, mergedHandoff } from "./owner-handoff.ts";
+import { endNotes, noteWrites } from "./step-notes.ts";
 
 /** Where a merged change's evidence ref is taken off: git in a repo with `remote`. */
 export type EvidenceRemote = { readonly git: Git; readonly remote: string };
@@ -38,12 +39,13 @@ export const recordMerged = async (state: State, { git, remote }: EvidenceRemote
 };
 
 /** Where an item ends once its change reached the base: the work source that lists it, and the remote its evidence ref is taken off. */
-type Ending = { readonly workSource: Pick<WorkSource, "finish"> } & EvidenceRemote;
+type Ending = { readonly workSource: WorkSource } & EvidenceRemote;
 
-/** A landed item ends at the work source, which reads what merged, so it is never listed again, its merge is recorded, so the measure counts it, and its saved state goes. */
+/** A landed item ends at the work source, which reads what merged, so it is never listed again, its merge is recorded, so the measure counts it, the notes hum kept for it are dropped, and its saved state goes. */
 const endLanded = async (state: State, { workSource, ...evidenceRemote }: Ending, { item, at, ...onBase }: OnBase & { readonly item: string; readonly at: number }): Promise<void> => {
 	await workSource.finish(ItemId.parse(item), mergedHandoff(state, item, onBase.sha));
 	await recordMerged(state, evidenceRemote, { item, at, ...onBase });
+	await endNotes({ state, writes: noteWrites(state, workSource), now: () => at }, ItemId.parse(item));
 	state.items.remove(item);
 };
 

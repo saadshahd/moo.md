@@ -7,6 +7,7 @@ import { type Kind } from "../config/schema.ts";
 import type { State } from "../state/open.ts";
 import type { Spent } from "../state/saved.ts";
 import { queuedKey } from "../worker/questions.ts";
+import { noteKey } from "../worker/step-notes.ts";
 import { OWNER_APPROVAL } from "../decide/merge.ts";
 import { SNAPSHOT_CARDS } from "../state/items.ts";
 
@@ -67,9 +68,10 @@ const WORK_CARD_CODES: ReadonlySet<string> = new Set(Object.values(SNAPSHOT_CARD
  * Takes into publish's state what a work job wrote for one item it ran, and nothing else: the item's machine state
  * when it is one a pass can reach from the inbox's, its runs, its spend where it raises publish's, its plan, whose
  * models land reads beside the ones the config gives the plan run, its pull request text, its proof, its repro,
- * the questions it queued, never offering the owner's approval, its choices, its events, its saved state's cards with
- * no action, and the usage limit cut to `usageLimitMaxMs` from now. Landings, verdicts, merges, learned rules, kinds,
- * answers and op keys stay as publish has them. Returns why the machine state was refused, or nothing once all is taken.
+ * the questions it queued, never offering the owner's approval, its choices, what became of the owner's notes, its
+ * events, its saved state's cards with no action, and the usage limit cut to `usageLimitMaxMs` from now. Landings,
+ * verdicts, merges, learned rules, kinds, answers and op keys stay as publish has them. Returns why the machine state
+ * was refused, or nothing once all is taken.
  */
 export const takeWorkRecords = (work: State, into: State, inbox: InboxItem, limits: { readonly now: number; readonly usageLimitMaxMs: number }): string | undefined => {
 	const { item, kind } = inbox;
@@ -98,6 +100,8 @@ export const takeWorkRecords = (work: State, into: State, inbox: InboxItem, limi
 	for (const queued of work.questions.list().filter((queued) => queued.item === item && queued.askedAt === undefined)) into.questions.put(queuedKey(queued), { ...queued, options: queued.options?.filter((option) => option !== OWNER_APPROVAL) });
 
 	for (const choice of work.choices.list().filter((choice) => choice.item === item)) into.choices.put(`${item}@${choice.text}`, choice);
+
+	for (const note of work.stepNotes.list().filter((note) => note.item === item)) into.stepNotes.put(noteKey(item, note.ordinal), note);
 
 	work.events.copyTo(into.events, item);
 

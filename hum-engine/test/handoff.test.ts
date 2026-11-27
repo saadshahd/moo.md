@@ -18,7 +18,7 @@ test("a pass leaves the owner's wait it starts in only with the owner's answer o
 	expect(passReach({ kind: feature, at: "owner-review", answered: false, timedOut: false, requested: true })).toContain("merging");
 });
 
-test("publish takes a work job's runs and a machine state a pass can reach, and none of its landings or verdicts", () => {
+test("publish takes a work job's runs, a machine state a pass can reach and what became of the item's notes, and none of its landings or verdicts", () => {
 	const [work, into] = [stateIn("work"), stateIn("publish")];
 
 	work.items.save("a", feature, { status: "active", value: "checking", context: {} });
@@ -26,6 +26,8 @@ test("publish takes a work job's runs and a machine state a pass can reach, and 
 	work.landings.put("a", { item: "a", branch: "hum/run/a", since: 0, change: { paths: [], size: 0, loosened: false, pinChanged: false }, head: "abc" });
 	work.verdicts.put("a", { item: "a", head: "abc", event: "approve", reason: "forged", cites: [], models: ["m"] });
 	work.repros.put("a", { item: "a", command: "sh docs/repro.sh", commit: "abc", files: ["docs/repro.sh"], proven: 2 });
+	work.stepNotes.put("a#1", { item: "a", ordinal: 1, step: "building", disposition: "delivered", why: "it reached the run of building", at: 0 });
+	work.stepNotes.put("b#1", { item: "b", ordinal: 1, step: "building", disposition: "kept", why: "hum gives it to the next run of building", at: 0 });
 
 	expect(takeWorkRecords(work, into, { item: "a", kind: feature, at: undefined, answered: false, timedOut: false, requested: false }, LIMITS)).toBeUndefined();
 	expect(into.items.saved().map(({ state }) => state)).toEqual(["checking"]);
@@ -33,6 +35,7 @@ test("publish takes a work job's runs and a machine state a pass can reach, and 
 	expect(into.landings.get("a")).toBeUndefined();
 	expect(into.verdicts.get("a")).toBeUndefined();
 	expect(into.repros.get("a")).toMatchObject({ command: "sh docs/repro.sh", proven: 2 });
+	expect(into.stepNotes.list().map(({ item, disposition }) => [item, disposition])).toEqual([["a", "delivered"]]);
 });
 
 test("publish keeps each log record as the work job's engine wrote it, at the next places in its own log, once however often it takes them", () => {

@@ -108,7 +108,7 @@ const calls = (() => {
 
 appendFileSync(
 	log,
-	`${JSON.stringify({ at: Date.now(), itemId, argv: process.argv.slice(2), stdinBytes: stdin.length, stdinSha: createHash("sha256").update(stdin).digest("hex"), pid: process.pid, cwd: process.cwd() })}\n`,
+	`${JSON.stringify({ at: Date.now(), itemId, argv: process.argv.slice(2), stdinBytes: stdin.length, stdinSha: createHash("sha256").update(stdin).digest("hex"), prompt, pid: process.pid, cwd: process.cwd() })}\n`,
 );
 
 const script = spec.script ?? [{}];

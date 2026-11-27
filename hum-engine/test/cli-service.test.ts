@@ -119,6 +119,28 @@ test("a wake on a schedule event: the item merges, the tick and hum's state are 
 	expect(sh(o.repo.remote, ["ls-tree", "-r", "--name-only", CI_STATE_REF])).toContain("merges/");
 });
 
+test("a note sent before a wake reaches its step's run across gather, work and publish, and the thread says it was kept, then delivered", async () => {
+	const o = owner({ items: { a: { writeForItem: true } } });
+
+	o.item("a");
+
+	const sent = hum(o, ["note", "a", "building", "--", "Keep it short."]);
+
+	expect(sent.err).toBe("");
+
+	const run = wake(o);
+
+	expect(run.err).toBe("");
+	expect(run.code).toBe(0);
+	expect(o.shim.calls().find(({ itemId }) => itemId === "a")?.prompt).toContain("Keep it short.");
+	expect((await savedState(o)).stepNotes.get("a#1")?.disposition).toBe("delivered");
+
+	const thread = sh(o.repo.remote, ["show", "main:.hum/work/a.md"]);
+
+	expect(thread).toContain("Note 1 kept");
+	expect(thread).toContain("Note 1 delivered");
+});
+
 test("a wake on a comment event records no tick, and the next wake starts from the state it saved, which it could not replace otherwise", () => {
 	const o = owner({});
 

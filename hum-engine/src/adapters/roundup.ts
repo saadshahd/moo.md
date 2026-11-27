@@ -12,8 +12,8 @@ import { parseArgument } from "./argument.ts";
 import { claimer, isHeldBy, isLive } from "./claim.ts";
 import { handoffPadName, handoffText } from "./handoff-pad.ts";
 import { ownerAnswers } from "./hooked-run.ts";
-import { commentText, cutLine, followUpBody, isFollowUpOf, type Marker, markedLine, optionsIn, parseComment, questionOf, questionText } from "./marked.ts";
-import { agentLink, askName, ENDED, isItemWorkstream, itemWorkstream, NEEDS_YOU, NOT_FOUND, padLink, projectKeyOf, putPad, type RailNode, railName, railTree, rootWorkstream } from "./rail.ts";
+import { commentText, cutLine, followUpBody, isFollowUpOf, type Marker, markedLine, markerOf, optionsIn, parseComment, questionOf, questionText } from "./marked.ts";
+import { agentLink, askName, ENDED, isItemWorkstream, itemWorkstream, NEEDS_YOU, NOT_FOUND, padLink, projectKeyOf, putPad, type RailNode, railName, railTree, readPad, rootWorkstream } from "./rail.ts";
 import { type RowConfig, startRow } from "./rail-rows.ts";
 import { HUM_EXT, type RoundupEvent, RoundupRefusal, roundupRpc } from "./roundup-rpc.ts";
 import { requestEntry } from "./request-entry.ts";
@@ -364,9 +364,10 @@ export const roundupAdapter = (options: RoundupOptions, { now, env, report }: Ad
 		await takeAnswers(id, nodes);
 
 		const comments = z.array(Comment).parse(await onTodo("todo.comments", id));
+		const humComments = await Promise.all(comments.filter((comment) => comment.author.id === HUM_EXT).map(({ body, created_at }) => humEntry(body, created_at)));
 
 		return [
-			...comments.flatMap((comment): ThreadEntry[] => (comment.author.id === HUM_EXT ? [{ ...parseComment(comment.body, comment.created_at), author: "hum" }] : [])),
+			...humComments,
 			...questionsOf(id).flatMap((asking): ThreadEntry[] => {
 				const taken = takenOf(asking);
 				const closed = closedOf(asking);
@@ -378,6 +379,15 @@ export const roundupAdapter = (options: RoundupOptions, { now, env, report }: Ad
 				];
 			}),
 		].sort((one, other) => one.at - other.at);
+	};
+
+	/** A comment of hum's as a thread entry: one whose marker names a Pad reads its whole text from it, and its own first words where the Pad is gone. */
+	const humEntry = async (body: string, at: number): Promise<ThreadEntry> => {
+		const entry: ThreadEntry = { ...parseComment(body, at), author: "hum" };
+		const pad = markerOf(body)?.pad;
+		const whole = pad === undefined ? undefined : await readPad(call, pad);
+
+		return whole === undefined ? entry : { ...entry, text: whole.text };
 	};
 
 	const post = async (id: string, text: string): Promise<void> => {
@@ -417,25 +427,24 @@ export const roundupAdapter = (options: RoundupOptions, { now, env, report }: Ad
 		if (!comments.some(({ author, body }) => author.id === HUM_EXT && body === line)) await post(id, line);
 	};
 
-	/** A text too long for one comment goes whole into a Pad in the item's Workstream; the comment holds its first words and the Pad's name. */
+	/** A text too long for one comment goes whole into a Pad in the item's Workstream; the comment holds its first words and the Pad's name, which a marked comment's marker carries so its thread entry reads the whole text. */
 	const postInPad = async (id: string, marker: Marker | undefined, text: string): Promise<void> => {
 		const name = `hum ${id} ${hashJson(text).slice(0, PAD_DIGEST_LENGTH)}`;
 		const { home } = await todoOf(id);
+		const { made } = await putPad(call, { name, text, visibility: "internal" });
 
-		await call("pad.create", { name, text, visibility: "internal" });
+		if (made && home) await call("pad.move", { name, home });
 
-		if (home) await call("pad.move", { name, home });
-
-		await post(id, cutLine(marker, text, ` … full text in Pad "${name}"`, COMMENT_LIMIT));
+		await post(id, cutLine(marker && { ...marker, pad: name }, text, ` … full text in Pad "${name}"`, COMMENT_LIMIT));
 	};
 
 	const postPlain = async (id: string, text: string): Promise<void> => (isOneLine(text) ? post(id, text) : postInPad(id, undefined, text));
 
-	/** A comment hum marks, on one line where it fits. */
+	/** A comment hum marks, on one line where its text is one line that fits. */
 	const postMarked = async (id: string, marker: Marker, text: string): Promise<void> => {
 		const line = markedLine(marker, text);
 
-		return isOneLine(line) ? post(id, line) : postInPad(id, marker, text);
+		return isOneLine(text.trim()) && isOneLine(line) ? post(id, line) : postInPad(id, marker, text);
 	};
 
 	/** Asks `question` in a new row, naming the handoff Pad an earlier asking of it wrote, else the one its own handoff writes now. */

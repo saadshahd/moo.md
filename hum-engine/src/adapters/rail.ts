@@ -45,16 +45,22 @@ export const agentLink = (id: string, projectKey: string): string => roundupLink
 
 export const padLink = (name: string, projectKey: string): string => roundupLink("pad", name, projectKey);
 
-/** The Pad `name` with its link, where it stands. */
-export const padLinkOf = async (call: RoundupCall, name: string, projectKey: string): Promise<PadLink | undefined> =>
+/** A Pad as `pad.read` answers it, with its text. */
+const PadRead = Pad.extend({ text: z.string() });
+
+/** The Pad `name` as roundup holds it, or undefined where none stands. */
+export const readPad = async (call: RoundupCall, name: string): Promise<z.infer<typeof PadRead> | undefined> =>
 	call("pad.read", { name }).then(
-		() => ({ name, link: padLink(name, projectKey) }),
+		(pad) => PadRead.parse(pad),
 		(error: Error) => {
 			if (error instanceof RoundupRefusal && error.code === NOT_FOUND) return undefined;
 
 			throw error;
 		},
 	);
+
+/** The Pad `name` with its link, where it stands. */
+export const padLinkOf = async (call: RoundupCall, name: string, projectKey: string): Promise<PadLink | undefined> => ((await readPad(call, name)) === undefined ? undefined : { name, link: padLink(name, projectKey) });
 
 /** The status of a row that waits on the owner. */
 export const NEEDS_YOU = "needs-you";

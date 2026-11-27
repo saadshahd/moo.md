@@ -2,6 +2,7 @@ import { z } from "zod";
 import { AlignmentAnswer } from "../decide/alignment.ts";
 import { REQUEST_KINDS } from "../adapter-api.ts";
 import { DISPOSITIONS, RESOLUTION_SOURCES } from "../decide/answer.ts";
+import { NOTE_DISPOSITIONS } from "../decide/note.ts";
 import { REQUEST_DISPOSITIONS } from "../decide/request.ts";
 import { Cite, PlanFile } from "../decide/prose.ts";
 import { Change } from "../decide/risk.ts";
@@ -198,6 +199,20 @@ export const SettledRequest = z.object({
 });
 
 export type SettledRequest = z.infer<typeof SettledRequest>;
+
+/** What became of one owner's note to a step, saved before each reply is posted; the thread holds its text. */
+export const SettledNote = z.object({
+	item: name,
+	/** The note's number among the thread's notes. */
+	ordinal: z.int().positive(),
+	/** The step it goes to; a hand-written marker may name none. */
+	step: name.optional(),
+	disposition: z.enum(NOTE_DISPOSITIONS),
+	why: name,
+	at: time,
+});
+
+export type SettledNote = z.infer<typeof SettledNote>;
 
 /** The option a settled answer picked, when its source names one. */
 export const optionOf = (answer: SettledAnswer): string | undefined => ("option" in answer ? answer.option : undefined);

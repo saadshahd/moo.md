@@ -17,6 +17,8 @@ const BegunRecord = RunKey.extend({
 	name: z.string().min(1),
 	/** The Claude session id: set ahead in CI, learned after launch on the Mac. */
 	sessionId: z.string().min(1).optional(),
+	/** The numbers of the owner's notes hum built into the run's prompt: a run hum takes over read these and no later one. */
+	notes: z.array(z.int().positive()).optional(),
 	savedAt: z.int().nonnegative(),
 });
 
@@ -31,6 +33,9 @@ export const RunRecord = z.union([
 ]);
 
 export type RunRecord = z.infer<typeof RunRecord>;
+
+/** What a run is saved with before it launches: its name, the session id set ahead, and the notes its prompt holds. */
+export type RunLaunch = { readonly name: string; readonly sessionId?: string; readonly notes?: readonly number[] };
 
 /** A run saved before its launch, and the two writes that follow it. */
 export type BegunRun = {
@@ -62,8 +67,8 @@ export class RunRecords {
 	}
 
 	/** Saves the run before it launches. When one is already saved for this key, returns it unchanged, so the caller adopts it. */
-	begin(key: RunKey, { name, sessionId }: { readonly name: string; readonly sessionId?: string }): BegunRun {
-		const record = RunRecord.parse({ ...key, name, sessionId, savedAt: this.#now() });
+	begin(key: RunKey, { name, sessionId, notes }: RunLaunch): BegunRun {
+		const record = RunRecord.parse({ ...key, name, sessionId, notes, savedAt: this.#now() });
 		const created = createOnce(this.#path(record), `${JSON.stringify(record)}\n`);
 		const saved = created ? record : this.get(key);
 

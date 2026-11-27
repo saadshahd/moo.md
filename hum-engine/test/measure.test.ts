@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { tmpdir } from "node:os";
+import { FakeProvider } from "../src/adapters/fake.ts";
 import { type Git, gitIn } from "../src/adapters/git.ts";
 import type { Pull } from "../src/adapters/pull-requests.ts";
 import { BOUNDARIES, SHIPPED_DEFAULTS } from "../src/config/schema.ts";
@@ -162,7 +163,7 @@ test("a merge whose log holds a record a newer engine wrote reads its way of rea
 /** A pull request open, or merged as `merge-a` on the base, and a work source that writes each item it finishes into `finished`. */
 const pull = (state: "OPEN" | "MERGED", finished: string[]) => ({
 	pulls: { find: async (): Promise<Pull> => ({ id: "p", number: 1, url: "u", autoMerge: true, behind: false, labels: [], ...(state === "MERGED" ? { state, mergeCommit: "merge-a" } : { state }) }) },
-	workSource: { finish: async (id: string) => void finished.push(id) },
+	workSource: { ...new FakeProvider().adapter().workSource!, finish: async (id: string) => void finished.push(id) },
 	git: gitIn(tmpdir(), { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }),
 	remote: "origin",
 });

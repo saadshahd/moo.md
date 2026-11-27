@@ -34,6 +34,8 @@ import { NO_REVIEW_FILES, readReviewFiles } from "./review-files.ts";
 import { forgetProgress, keepKind, kindAnswered, pickKind } from "./kind.ts";
 import { type OwnerAnswer, planChangingAnswers, settleAnswers } from "./answers.ts";
 import { settleRequests, standOf } from "./requests.ts";
+import { deliverNotes, type KeptNote, keptNotes, NOTE_REPLY_SCOPE, noteStandOf, noteWrites, settleNotes } from "./step-notes.ts";
+import { noteFrom, notesSection } from "../decide/note.ts";
 import { queueQuestion } from "./questions.ts";
 import { answerToLatest, latestQuestionAt, openQuestion } from "./thread.ts";
 import { memorySection, readMemory, rulesUsed } from "../loop/memory.ts";
@@ -304,6 +306,9 @@ export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gather
 	const wait = asking ? o.state.items.savedOf(id) : undefined;
 	const answered = asking ? answerTo(item, wait?.savedAt) : onSnapshot ? undefined : answerTo(item);
 	const requested = await settleRequests({ state: o.state, workSource: o.workSource, questions: o.questions, now }, item, standOf(kind, o.state.items.savedOf(id), { answered: answered !== undefined, parked: false }));
+
+	await settleNotes({ state: o.state, writes: noteWrites(o.state, o.workSource), now }, item, noteStandOf(kind, o.config.hum.roles, noteFrom(kind, at, { running: false, landing: o.state.landings.get(id) !== undefined, parked: false })));
+
 	const isHeldAtWait = asking && answered === undefined && requested === undefined;
 	const timedOut = isHeldAtWait && wait !== undefined && isDue(o.state, { kind, saved: wait }, now()) ? wait : undefined;
 
@@ -568,7 +573,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	/** The item as its runs read it: its own words, then what the owner settled in its ideate and shape rows and in answers before the one this pass goes on from. */
 	const talked = (): ItemText => ({ id, title: item.title, body: talkedBody(item.body, { ...savedTalk(), answers: d.ownerAnswers.filter(({ at }) => at !== d.answered?.at) }) });
 
-	const prompt = async (role: string, change: StepKind): Promise<string> => {
+	const prompt = async (role: string, change: StepKind, notes: StepNotes): Promise<string> => {
 		const plan = state.plans.get(id);
 		const repro = state.repros.get(id);
 
@@ -588,8 +593,31 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 		if (change === "fix") parts.push(`## What to fix\n${lastFailure.slice(-config.hum.failureTail)}\nFix the cause.`);
 
-		return parts.join("\n\n");
+		return [...parts, ...noteParts(notes)].join("\n\n");
 	};
+
+	const noteContext = { state, writes: d.outbox.calls(NOTE_REPLY_SCOPE), now: d.now };
+
+	/**
+	 * The notes hum keeps for `step`, from the thread read again just before the step's runs, so a note the owner sent
+	 * while the pass ran reaches them. A read that fails goes on with the thread the pass gathered: the work source's
+	 * guard already raised its card, and a note the read missed waits for the next.
+	 */
+	const notesAt = async (step: string): Promise<StepNotes> => {
+		const read = await d.workSource.read(id).catch(() => item);
+
+		await settleNotes(noteContext, read, noteStandOf(kind, config.hum.roles, { from: step, launched: false, parked: false }));
+
+		return { step, kept: keptNotes(state, read, step) };
+	};
+
+	/** A state's invoked run that reads the owner's notes to that state, read once as it starts, so every run this visit launches reads the same notes. */
+	const noted = (body: (visit: Visit) => Promise<void>) =>
+		invoked(async ({ signal }) => {
+			const step = String(actor.getSnapshot().value);
+
+			return body({ signal, notes: await notesAt(step) });
+		});
 
 
 
@@ -613,17 +641,29 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	 * came to: a run that stopped with hum, waits on the owner, or ended with no answer keeps it, so the next pass asks
 	 * for the same run by its name and takes its row over.
 	 */
-	const launch = async (role: string, text: string, schema: JsonSchema, signal: AbortSignal, { place = { folder: clone, env: d.env }, judged, run = role }: Launch = {}): Promise<RunOutcome> => {
+	const launch = async (role: string, text: string, schema: JsonSchema, signal: AbortSignal, { place = { folder: clone, env: d.env }, judged, run = role, notes }: Launch = {}): Promise<RunOutcome> => {
 		const purpose = purposeOf(config, role);
 		const key = state.runs.keyFor(id, run);
 		const held = purpose === "build" || purpose === "fix" ? readMemory(join(clone, ".hum", "memory.md"), config.hum.memoryMaxBytes).entries : [];
 		const prefix = config.hum.roles[role]?.file ?? role;
 		const prompt = `${text}${memorySection(held)}`;
 		const tier = await tierFor(role);
-		const named = { name: runName(key), sessionId: d.newSessionId() };
+		const given = notes?.kept.map(({ ordinal }) => ordinal) ?? [];
+		const named = { name: runName(key), sessionId: d.newSessionId(), notes: given.length === 0 ? undefined : given };
 
 		const { begun, outcome } = await runs.add(() => answerOnce(state, { key, launch: named, machineVersion: version, question: judged && { prompt, ...tier, ...judged } }, async (begun) => {
 			const lease = await d.gate?.enter(prefix, signal);
+			let delivering: Promise<void> | undefined;
+
+			/**
+			 * The notes saved with the run's record are delivered once its model read the prompt: those hum built into it. A run
+			 * hum takes over read the prompt it began with, so a note kept since stays kept for the next run hum launches.
+			 */
+			const deliver = (): void => {
+				const built = begun.record.notes ?? [];
+
+				if (notes !== undefined && built.length > 0) delivering ??= deliverNotes(noteContext, id, notes.step, built);
+			};
 
 			const ran = await runner
 				.run({
@@ -640,9 +680,20 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 					sessionId: begun.adopted ? undefined : begun.record.sessionId,
 					signal,
 					onSession: (sessionId) => begun.saveSession(sessionId),
-					onFirstToken: () => lease?.opened(),
+					onFirstToken: () => {
+						lease?.opened();
+						deliver();
+					},
 				})
-				.finally(() => lease?.release());
+				.finally(async () => {
+					lease?.release();
+					await delivering;
+				});
+
+			if (hasRead(ran)) {
+				deliver();
+				await delivering;
+			}
 
 			if (!isPaused(ran)) tally.spend(ran.tokens);
 
@@ -676,7 +727,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	};
 
 	/** One agent run of the item in its clone, as `settle` takes what it came to. */
-	const runAgent = async (role: string, text: string, schema: JsonSchema, signal: AbortSignal, judged?: Judged): Promise<Finished> => settle(await launch(role, text, schema, signal, { judged }));
+	const runAgent = async (role: string, text: string, schema: JsonSchema, signal: AbortSignal, launched: Pick<Launch, "judged" | "notes">): Promise<Finished> => settle(await launch(role, text, schema, signal, launched));
 
 	/** The owner is asked, or the run's choice stands and is listed under the choices made without them. */
 	const settleNeed = async (wants: z.infer<typeof Wants>): Promise<{ asked: Pending } | { chose: string }> => {
@@ -753,7 +804,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 	/** A run of `role` that changes files: a build or a fix of the change, or the repro's check. */
 	const step = (role: string, change: StepKind) =>
-		invoked(async ({ signal }) => {
+		noted(async ({ signal, notes }) => {
 			/* An answer at the repro's wait objects to it, so a new repro run reads the owner's words. */
 			if (change === "repro" && !d.answered && (await isReproduced())) return;
 
@@ -770,7 +821,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 				/* Every fix run since the owner last answered counts, over every pass and wake and each run again after a choice hum made: the item's log holds them all. */
 				if (change === "fix" && fixRunsOf(config, foldItem(state.events.list(id))) >= maxFixes) throw failed(`the checks still fail after ${maxFixes} fixes`);
 
-				const outcome = await runAgent(role, `${await prompt(role, change)}${chosenSection(chosen)}`, RUN_SCHEMA, signal);
+				const outcome = await runAgent(role, `${await prompt(role, change, notes)}${chosenSection(chosen)}`, RUN_SCHEMA, signal, { notes });
 
 				if (!hasSucceeded(outcome)) throw failed(`the ${role} run ended as ${outcome.subtype}: ${outcome.text.slice(0, CARD_EXCERPT)}${await unreadyAfter()}`);
 
@@ -902,7 +953,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	 * from it. A run in the clone that only judges leaves the clone as it found it.
 	 */
 	const decision = (role: string, purpose: ProsePurpose) =>
-		invoked(async ({ signal }) => {
+		noted(async ({ signal, notes }) => {
 			const isOwn = role === purpose;
 			const isReview = purpose === "review" && isOwn;
 			const diff = purpose === "review" ? await branchDiff() : "";
@@ -924,12 +975,12 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 			const { pick, models } = await decideProse({
 				purpose,
-				prompt: PROSE_PROMPTS[purpose](config, talked(), diff, role, read.files),
+				prompt: PROSE_PROMPTS[purpose](config, talked(), diff, role, read.files, noteParts(notes)),
 				diff,
 				model: (await tierFor(role)).model,
 				run: async (text, schema) => {
 					const key = state.runs.keyFor(id, role);
-					const answered = await runAgent(role, text, schema, signal, { head });
+					const answered = await runAgent(role, text, schema, signal, { judged: { head }, notes });
 
 					if (isReview) keepReview(state, { item: id, head, diff, run: key, outcome: answered, at: d.now() });
 
@@ -954,14 +1005,14 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	 * A run the owner talks to, under its own name, in its own talk copy, whose answer must match `answer`: undefined
 	 * while its row waits on the owner. Only a runner whose runs are Rail rows hosts one.
 	 */
-	const talk = async <Answer>(role: string, run: string, contract: string, answer: z.ZodType<Answer>, signal: AbortSignal): Promise<Answer | undefined> => {
+	const talk = async <Answer>(role: string, run: string, contract: string, answer: z.ZodType<Answer>, { signal, notes }: { readonly signal: AbortSignal; readonly notes: StepNotes }): Promise<Answer | undefined> => {
 		if (runner.talks !== true) throw failed(`the ${run} run talks with the owner, which only a Rail row can host: run hum as its roundup Project's program`);
 
 		if (d.talkCopy === undefined) throw failed(`the ${run} run talks with the owner in a talk copy of its own, which only run slots give`);
 
 		const head = (await g(["rev-parse", "HEAD"])).trim();
 		const place = await d.talkCopy({ item: id, run, prepared: config.hum.roles[role]?.prepared === true }).catch((error: Error) => Promise.reject(failed(`the ${run} run has no talk copy: ${error.message}`)));
-		const outcome = await launch(role, [roleOf(config, role), itemHeading(talked()), contract].join("\n\n"), jsonSchemaOf(answer), signal, { place, judged: { head }, run });
+		const outcome = await launch(role, [roleOf(config, role), itemHeading(talked()), ...noteParts(notes), contract].join("\n\n"), jsonSchemaOf(answer), signal, { place, judged: { head }, run, notes });
 
 		if (outcome.kind === "waiting") return undefined;
 
@@ -981,10 +1032,10 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 	/** The ideate state: the owner talks with its row until they take a work order, which the item keeps, so a kept order runs nothing again. */
 	const ideate = (role: string) =>
-		invoked(async ({ signal }) => {
+		noted(async (visit) => {
 			if (savedTalk().order !== undefined) return;
 
-			const answered = await talk(role, role, TALK_CONTRACTS.ideate(), IdeateAnswer, signal);
+			const answered = await talk(role, role, TALK_CONTRACTS.ideate(), IdeateAnswer, visit);
 
 			if (answered === undefined) return waitOnOwner();
 
@@ -995,8 +1046,8 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	const pickRoles = Object.entries(config.hum.roles).flatMap(([name, { purpose }]) => (purpose === "pick" ? [name] : []));
 
 	/** The choices a shape run names with the owner, which the item keeps; undefined while its row waits on the owner. */
-	const nameChoices = async (role: string, signal: AbortSignal): Promise<readonly BuildChoice[] | undefined> => {
-		const answered = await talk(role, role, TALK_CONTRACTS.design(pickRoles), choicesAnswer(pickRoles), signal);
+	const nameChoices = async (role: string, visit: Visit): Promise<readonly BuildChoice[] | undefined> => {
+		const answered = await talk(role, role, TALK_CONTRACTS.design(pickRoles), choicesAnswer(pickRoles), visit);
 
 		if (answered !== undefined) keepTalk({ choices: answered.choices });
 
@@ -1004,10 +1055,10 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	};
 
 	/** The owner's pick on the choice at `at`, settled in a row of the role it names, under a name of its own, which the item keeps; false while that row waits on the owner. */
-	const pickFor = async (choice: BuildChoice, at: number, signal: AbortSignal): Promise<boolean> => {
+	const pickFor = async (choice: BuildChoice, at: number, visit: Visit): Promise<boolean> => {
 		if (choice.role === undefined) throw failed(`the choice "${choice.title}" names neither the owner's pick nor a role whose row settles it`);
 
-		const picked = await talk(choice.role, `${choice.role} ${at + 1}`, TALK_CONTRACTS.pick(choice), PickAnswer, signal);
+		const picked = await talk(choice.role, `${choice.role} ${at + 1}`, TALK_CONTRACTS.pick(choice), PickAnswer, visit);
 
 		if (picked !== undefined) keepTalk({ choices: savedTalk().choices?.map((kept, index) => (index === at ? { ...kept, ...picked } : kept)) });
 
@@ -1021,12 +1072,12 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	 * state, and the picks the others settle stay. Choices and picks the item kept run nothing again.
 	 */
 	const design = (role: string) =>
-		invoked(async ({ signal }) => {
-			const choices = savedTalk().choices ?? (await nameChoices(role, signal));
+		noted(async (visit) => {
+			const choices = savedTalk().choices ?? (await nameChoices(role, visit));
 
 			if (choices === undefined) return waitOnOwner();
 
-			const settled = await Promise.allSettled(choices.map((choice, at) => (choice.pick === undefined ? pickFor(choice, at, signal) : true)));
+			const settled = await Promise.allSettled(choices.map((choice, at) => (choice.pick === undefined ? pickFor(choice, at, visit) : true)));
 			const failure = settled.find((one) => one.status === "rejected");
 
 			if (failure !== undefined) throw failure.reason;
@@ -1235,8 +1286,20 @@ const TALKS: ReadonlySet<Purpose> = new Set(TALK_PURPOSES);
  */
 type Judged = { readonly head: string };
 
-/** Where a run works, what it judges, and the name it runs under, past its role's own: the clone, nothing, and its role by default. */
-type Launch = { readonly place?: Workspace; readonly judged?: Judged; readonly run?: string };
+/** Where a run works, what it judges, the name it runs under, past its role's own, and the owner's notes it reads: the clone, nothing, its role and none by default. */
+type Launch = { readonly place?: Workspace; readonly judged?: Judged; readonly run?: string; readonly notes?: StepNotes };
+
+/** The notes hum keeps for the step a visit's runs start at, which each run it launches reads. */
+type StepNotes = { readonly step: string; readonly kept: readonly KeptNote[] };
+
+/** A run of a visit to a step: its signal, and the notes it reads. */
+type Visit = { readonly signal: AbortSignal; readonly notes: StepNotes };
+
+/** What a run's prompt says of the notes it reads, as its own part: no part where there are none, so the prompt stays as it was. */
+const noteParts = ({ step, kept }: StepNotes): string[] => (kept.length === 0 ? [] : [notesSection(step, kept.map(({ text }) => text))]);
+
+/** Whether a run read its prompt: it ended, passed its token cap, or waits on the owner in its row; one held, limited or stopped may have stopped before. */
+const hasRead = (outcome: RunOutcome): boolean => !isPaused(outcome) || outcome.kind === "waiting";
 
 /** What a run reads from its config: the settings and the role files. */
 export type RunConfig = Pick<Config, "hum" | "roles">;
@@ -1255,18 +1318,20 @@ const roleOf = (config: RunConfig, name: string): string => {
 
 
 /**
- * What a plan or review run is told. The review's prompt quotes only the item, the files named for its review and the
- * diff, so no author's reasoning reaches it through the prompt.
+ * What a plan or review run is told, with the owner's notes to its step. The review's prompt quotes only the item, the
+ * files named for its review, the diff and those notes, so no author's reasoning reaches it through the prompt: the owner
+ * is no author.
  */
 export const PROSE_PROMPTS = {
-	plan: (config: RunConfig, item: ItemText, _diff = "", role = "plan"): string =>
+	plan: (config: RunConfig, item: ItemText, _diff = "", role = "plan", _files: readonly ReadFile[] = [], notes: readonly string[] = []): string =>
 		[
 			roleOf(config, role),
 			itemHeading(item),
+			...notes,
 			"Plan the change: read the repo, edit nothing. A plan-ready answer holds the plan; a needs-split answer names each part: its title, the files it may touch, the earlier parts it waits on by their place in the list from 1, and the one command that proves it; a plan-blocked answer asks the owner one question.",
 		].join("\n\n"),
-	review: (config: RunConfig, item: ItemText, diff: string, role = REVIEW_ROLE, files: readonly ReadFile[] = []): string => [roleOf(config, role), reviewInput(item, diff, config.hum, files)].join("\n\n"),
-} as const satisfies Record<ProsePurpose, (config: RunConfig, item: ItemText, diff: string, role?: string, files?: readonly ReadFile[]) => string>;
+	review: (config: RunConfig, item: ItemText, diff: string, role = REVIEW_ROLE, files: readonly ReadFile[] = [], notes: readonly string[] = []): string => [roleOf(config, role), reviewInput(item, diff, config.hum, files), ...notes].join("\n\n"),
+} as const satisfies Record<ProsePurpose, (config: RunConfig, item: ItemText, diff: string, role?: string, files?: readonly ReadFile[], notes?: readonly string[]) => string>;
 
 /** A pick as the item's log keeps it: a split's parts by title, which is all a measure reads of them. */
 const keptPick = (pick: EventPick) => ({ ...pick, parts: pick.parts.map(({ title }) => title) });

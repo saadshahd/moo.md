@@ -25,6 +25,10 @@ const specs = {
 	answer: { summary: "Write the owner's answer into the item, commit it and push it with hooks off.", args: "<item> <text...>", flags: [{ flag: "--option <word>" }] },
 	skip: { summary: "Ask hum to skip the step an item is at, named as the owner saw it; only a wait its kind file lets the owner skip, and the worker checks again before it acts.", args: "<item> <step>" },
 	"run-now": { summary: "Ask hum to fire now the timer of the wait an item is at, named as the owner saw it, as if it were due; only a timer that leads on to work, never to a stuck step, and the worker checks again before it acts.", args: "<item> <step>" },
+	note: {
+		summary: "Send the owner's note to a step the item can still reach, whose next run reads it: the text is one argument after --, kept whole with its newlines; the worker checks the step again, keeps the note until the item reaches it, and replies on the thread.",
+		args: "<item> <step> <text>",
+	},
 	watch: { summary: "Say whether anything changed since the last watch; costs no rate limit when idle.", args: "", flags: [{ flag: "--since <token>" }] },
 	"file-follow-up": { summary: "File a ready item from another item; the same title from the same item files once.", args: "<from-item> <title>", flags: [{ flag: "--body <text>" }] },
 	decide: { summary: "Record a choice made without the owner.", args: "<item> <text...>" },

@@ -33,6 +33,7 @@ import type { Config } from "../config/load.ts";
 import type { Boundary, Kind, PURPOSES } from "../config/schema.ts";
 import { pickTier } from "../config/checks.ts";
 import { doOverlap, footprintOf } from "./scheduler.ts";
+import { endNotes, noteWrites } from "./step-notes.ts";
 import { alignedPlacement, alignmentQuestion, doesGateAlignment } from "../decide/alignment.ts";
 import {
 	doesApprove,
@@ -416,14 +417,15 @@ const endedByChange = async ({ git, dir, id }: LandContext): Promise<boolean> =>
 };
 
 /**
- * The change is on the base: its item ends at the work source unless the change ended it, then the merge is recorded.
- * A failed end leaves the landing saved, so the next pass ends it again.
+ * The change is on the base: its item ends at the work source unless the change ended it, then the merge is recorded
+ * and the notes hum kept for the item are dropped. A failed end leaves the landing saved, so the next pass ends it again.
  */
 const finish = async (ctx: LandContext, onBase: OnBase): Promise<ThinResult> => {
 	const { state, git, id, item, workSource, now } = ctx;
 
 	if (!(await endedByChange(ctx))) await workSource.finish(item.id, mergedHandoff(state, id, onBase.sha));
 	await recordMerged(state, { git, remote: "origin" }, { item: id, at: now(), ...onBase });
+	await endNotes({ state, writes: noteWrites(state, workSource), now }, item.id);
 
 	return { outcome: "merged", item: id };
 };

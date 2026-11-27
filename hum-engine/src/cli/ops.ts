@@ -1,6 +1,6 @@
 import { Command, CommanderError, Option } from "commander";
 import { z } from "zod";
-import { type ClaimResult, Holder, type Item, ItemId, type ItemRef, PermanentError, type RequestKind, Watch } from "../adapter-api.ts";
+import { type ClaimResult, Holder, type Item, ItemId, type ItemRef, NOTE_KIND, type OwnerRequest, PermanentError, type RequestKind, Watch } from "../adapter-api.ts";
 import { parseArgument } from "../adapters/argument.ts";
 import { pushArgs } from "../adapters/git.ts";
 import { resolveAdapters, type Slot } from "../adapters/registry.ts";
@@ -54,6 +54,8 @@ type Call = {
 	readonly item: string;
 	/** The second positional argument. */
 	readonly second: string;
+	/** The third positional argument, whole. */
+	readonly third: string;
 	/** Every positional argument after the first, as one text. */
 	readonly text: string;
 	readonly flags: Flags;
@@ -87,15 +89,18 @@ const idOf = (item: string): ItemId => parseArgument(ItemId, item);
 
 const Step = z.string().min(1);
 
+const NoteText = z.string().regex(/\S/, "a note holds words");
+
 /**
- * Puts the owner's request on the item's thread and wakes the worker, once the local status row allows it: a request
- * the row refuses writes nothing. The worker checks every request again against the item's saved state.
+ * Puts the owner's request or note on the item's thread and wakes the worker, once the local status row allows it: one
+ * the row refuses writes nothing. The worker checks every request and note again against the item's saved state.
  */
 const requestOf =
-	(kind: RequestKind): Handler =>
-	async ({ slot, item, second, statusPath, inbox, settings }) => {
+	(requested: (call: Call) => OwnerRequest): Handler =>
+	async (call) => {
+		const { slot, item, statusPath, inbox, settings } = call;
 		const id = idOf(item);
-		const request = { kind, step: parseArgument(Step, second) };
+		const request = requested(call);
 		const read = readStatus(statusPath);
 
 		if (!read.ok && read.reason === "unreadable") throw new PermanentError(read.message);
@@ -109,6 +114,11 @@ const requestOf =
 
 		return OK;
 	};
+
+/** A request made at the step the second argument names. */
+const stepRequest =
+	(kind: RequestKind) =>
+	({ second }: Call): OwnerRequest => ({ kind, step: parseArgument(Step, second) });
 
 const handlers = {
 	"list-ready": ({ slot }) => slot("work-source", (a) => a.workSource).listReady(),
@@ -127,8 +137,9 @@ const handlers = {
 
 		return OK;
 	},
-	skip: requestOf("skip"),
-	"run-now": requestOf("run-now"),
+	skip: requestOf(stepRequest("skip")),
+	"run-now": requestOf(stepRequest("run-now")),
+	note: requestOf(({ second, third }) => ({ kind: NOTE_KIND, step: parseArgument(Step, second), text: parseArgument(NoteText, third) })),
 	watch: ({ slot, stateDir, inbox, flags, settings }) => {
 		const answers = slot("answers", (a) => a.answers);
 
@@ -165,6 +176,7 @@ const callOf = async (positionals: readonly string[], flags: Flags, io: Io): Pro
 	return {
 		item,
 		second: rest[0] ?? "",
+		third: rest[1] ?? "",
 		text: rest.join(" "),
 		flags,
 		options: [flags.option ?? []].flat(),
