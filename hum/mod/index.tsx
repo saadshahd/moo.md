@@ -6,7 +6,7 @@ import type { Dismissal } from "../types";
 import { dismiss, lookDismissed, NOTHING_DISMISSED_SEEN } from "./dismissed.ts";
 import { drawRows } from "./draw.tsx";
 import { humSays } from "./says.ts";
-import { type PressContext, openPane } from "./press.ts";
+import { type PressContext, openLink, openPane } from "./press.ts";
 import { viewSettings } from "./settings.ts";
 import { bandRow } from "./view/band.ts";
 import type { ViewInput } from "./view/input.ts";
@@ -26,6 +26,8 @@ const unfolded = atom({ plugin: "hum", key: "unfolded" } as const, [], { shape: 
 const unread = atom({ plugin: "hum", key: "unread" } as const, null, { shape: "unread-1" });
 
 const dismissed = atom({ plugin: "hum", key: "dismissed" } as const, null, { shape: "dismissed-1" });
+
+const feed = atom({ plugin: "hum", key: "feed" } as const, null, { shape: "feed-1" });
 /* oxlint-enable anti-slop/no-shape-in-symbol-names */
 
 const toggled = (ids: readonly string[], id: string): string[] => (ids.includes(id) ? ids.filter((one) => one !== id) : [...ids, id]);
@@ -55,6 +57,9 @@ const pressed = ($: EngineInterface, context: PressContext) => async (press: Pre
 		case "open":
 			await openPane($, PANE, context);
 			break;
+		case "link":
+			await openLink($, press.url).catch(showOnce($));
+			break;
 		case "dismiss":
 			await dismissCards($, press.cards, context).catch(showOnce($));
 			break;
@@ -69,7 +74,7 @@ async function viewInput($: EngineInterface, drawing: Pick<ViewInput, "width" | 
 
 	if (found.kind === "unserved") return undefined;
 
-	return { ...drawing, read: readOf(found), now: await $.clock.now(), unread: (await read($, unread)) ?? undefined, dismissed: (await read($, dismissed))?.cards ?? [] };
+	return { ...drawing, read: readOf(found), now: await $.clock.now(), unread: (await read($, unread)) ?? undefined, dismissed: (await read($, dismissed))?.cards ?? [], feed: (await read($, feed)) ?? undefined };
 }
 
 export const register: Register = (on, options) => {
@@ -123,8 +128,14 @@ export const register: Register = (on, options) => {
 
 		const asking = exclusive(ask);
 
+		const item = await $.env.get("HUM_FEED_ITEM");
+
+		await update($, feed, () => item ?? null);
 		await look();
 		asking();
+
+		if (item !== undefined) await $.ui.open({ id: PANE, title: PANE }).catch(showOnce($));
+
 		$.clock.every(pollSeconds * MS, exclusive(look));
 		$.clock.every(watchSeconds * MS, asking);
 

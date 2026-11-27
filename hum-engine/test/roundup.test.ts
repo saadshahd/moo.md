@@ -72,3 +72,16 @@ test.each([
 	expect(existsSync(claim)).toBe(true);
 	await adapter.close();
 });
+
+test("a won claim starts the item's feed row in its Workstream once, with hum's plugin on, the item named and no order or prompt", async () => {
+	const { daemon, adapter, id } = await claimedTodo();
+
+	await adapter.workSource.renew(id, HOLDER, 60_000);
+
+	const spawns = daemon.calls.filter(({ method }) => method === "agent.spawn").map(({ params }) => params);
+	const home = daemon.calls.find(({ method, params }) => method === "todo.move" && String(params.id) === id)?.params.home;
+
+	expect(home).toBeString();
+	expect(spawns).toEqual([{ cwd: expect.any(String), parent: home, name: `hum ${id} feed`, settings: { enabledPlugins: { "hum@moo.md": true }, env: { HUM_FEED_ITEM: id } }, visibility: "shown" }]);
+	await adapter.close();
+});

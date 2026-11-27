@@ -44,7 +44,7 @@ const Settings = z.looseObject({ env: z.record(z.string(), z.string()).default({
 const settings = Settings.parse(JSON.parse(readFileSync(args[args.indexOf("--settings") + 1] ?? "", "utf8")));
 const env = { ...process.env, ...settings.env };
 const rig = env.HUM_ROWS_RIG ?? "";
-const scenario = env.HUM_RUN?.split(" ")[2] ?? "none";
+const scenario = env.HUM_RUN?.split(" ")[2] ?? (env.HUM_FEED_ITEM === undefined ? "none" : "feed");
 const session = crypto.randomUUID();
 const transcript = join(rig, `transcript-${session}.jsonl`);
 const log = (line: string): void => appendFileSync(join(rig, `stub-${scenario}.log`), `${line}\n`);

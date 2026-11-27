@@ -12,6 +12,13 @@ export type PressContext = Omit<ViewInput, "now">;
 /** The cells an inline pane's frame takes from the band's width: its border and one cell of its own padding at each side. */
 const INLINE_FRAME_CELLS = 4;
 
+/** Opens `url` with the system's opener, as the roundup App takes its own links; a failure says why. */
+export async function openLink($: Engine, url: string): Promise<void> {
+	const opened = await $.process.run(["open", url]);
+
+	if (opened.exitCode !== 0) throw new Error(`hum could not open ${url}: ${opened.stderr.trim() || `open exited ${opened.exitCode}`}`);
+}
+
 /** Opens the pane as tall as its header and first card need at the width the inline pane will have, so the first card's buttons are in view. */
 export async function openPane($: Engine, pane: string, context: PressContext): Promise<void> {
 	const rows = openingRows({ ...context, now: await $.clock.now(), width: Math.max(0, context.width - INLINE_FRAME_CELLS) });

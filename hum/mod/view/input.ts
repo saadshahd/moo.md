@@ -13,6 +13,8 @@ export type ViewInput = {
 	readonly unread?: Unread;
 	/** The fault cards dismissed in any pane on the repo. */
 	readonly dismissed: readonly Dismissal[];
+	/** In an item's feed row, the item its pane shows alone. */
+	readonly feed?: string;
 };
 
 /** The clock and the amber limit, which every age's text and colour come from. */

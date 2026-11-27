@@ -8,13 +8,14 @@ import { shortenings } from "./fit.ts";
 import type { ViewInput } from "./input.ts";
 import { GLYPHS, SEPARATOR } from "./glyphs.ts";
 import { dismissalsOf } from "./faults.ts";
+import { OPEN, opening } from "./links.ts";
 import { type Press, type Row, type Tone, span } from "./row.ts";
 
 const RULE_LEAD = 2;
 const RULE_TAIL_MIN = 2;
 
 /** The top border with the title in it. Parts of the title drop from the end until it fits; the first part is cut last. */
-const titleRule = (parts: readonly string[], width: number): Row => {
+export const titleRule = (parts: readonly string[], width: number): Row => {
 	const room = width - RULE_LEAD - RULE_TAIL_MIN - 2;
 	const title = shortenings(parts).map((kept) => kept.join(SEPARATOR)).find((candidate) => cells(candidate) <= room) ?? ellipsize(parts.join(SEPARATOR), room);
 	const tail = Math.max(0, width - RULE_LEAD - cells(title) - 2);
@@ -27,17 +28,20 @@ type CardInput = Pick<ViewInput, "now" | "width">;
 
 const paragraph = (text: string, width: number, tone: Tone): Row[] => wrap(text, width).map((line) => [span(line, tone)]);
 
-/** A question card: the question is never cut, only wrapped; each button fills the prompt with an answer to finish. */
-export const questionCardRows = ({ item, text, options, since }: Question, { now, width }: CardInput): Row[] => [
-	titleRule([displayId(item), sinceText(since, now)], width),
-	...paragraph(text, width, "plain"),
+type Labeled = { readonly label: string; readonly press: Press };
+
+/** Where the owner answers a question: in the row that asks it, which the one button opens, else here, where each button fills the prompt with an answer to finish. */
+const questionButtons = ({ item, options, row }: Question): Labeled[] => (row === undefined ? buttonWords({ options }).map((word) => ({ label: word, press: { kind: "fill", item, word } })) : [{ label: OPEN, press: opening(row) }]);
+
+/** A question card: the question is never cut, only wrapped; then where the owner answers it. */
+export const questionCardRows = (question: Question, { now, width }: CardInput): Row[] => [
+	titleRule([displayId(question.item), sinceText(question.since, now)], width),
+	...paragraph(question.text, width, "plain"),
 	...buttonRows(
-		buttonWords({ options }).map((word, index) => button({ label: word, press: { kind: "fill", item, word }, isPrimary: index === 0 })),
+		questionButtons(question).map(({ label, press }, index) => button({ label, press, isPrimary: index === 0 })),
 		width,
 	),
 ];
-
-type Labeled = { readonly label: string; readonly press: Press };
 
 type Notice = { readonly title: readonly string[]; readonly cause: string; readonly fix: string; readonly buttons: readonly Labeled[] };
 

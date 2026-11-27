@@ -3,7 +3,9 @@ import { rmSync, writeFileSync } from "node:fs";
 import { railRunner, refusalCard, TALK_WATCH_CODE } from "../src/adapters/rail-rows.ts";
 import type { Runner } from "../src/adapters/claude-p.ts";
 import { type RoundupCall, RoundupRefusal } from "../src/adapters/roundup-rpc.ts";
+import { agentLink, NOT_FOUND, padLink } from "../src/adapters/rail.ts";
 import { keepTalkRun, runFolder } from "../src/adapters/run-answer.ts";
+import type { Json } from "../src/config/json.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { PROGRAM_FIX } from "../src/service/program.ts";
 import { openState } from "../src/state/open.ts";
@@ -73,4 +75,32 @@ test("a row roundup refused gets a card whose cause says what roundup's reason m
 	expect(new Set(cards.map(({ said, cause }) => cause.slice(0, -said.length))).size).toBe(REFUSALS.length);
 	expect(cards.map(({ fix }) => fix === PROGRAM_FIX)).toEqual([true, true, false, false, false, false, false]);
 	expect(new Set(cards.slice(2).map(({ fix }) => fix)).size).toBe(REFUSALS.length - 2);
+});
+
+test("where the owner opens an item: each row of its Workstream but its feed row, its newest live question row, and its handoff Pad where one stands", async () => {
+	const state = openState(tempDir("rail-rows"), { now: Date.now });
+	const workstream = (id: string, name: string) => ({ id, name, kind: "workstream", parent: null });
+	const agent = (id: string, name: string, parent: string, kind: string) => ({ id, name, kind: "agent", parent, status: { kind } });
+	const nodes = [workstream("1", "#7 Add export"), workstream("2", "#8 Other"), agent("3", "hum 7 build", "1", "done"), agent("4", "hum 7 ask 1", "1", "needs-you"), agent("5", "hum 7 feed", "1", "idle"), agent("6", "hum 7 ask 2", "1", "done"), agent("7", "hum 8 build", "2", "working")];
+
+	const call: RoundupCall = async (method, params): Promise<Json> => {
+		if (method === "rail.tree") return nodes;
+
+		if (method === "daemon.ping") return { projectKey: "key" };
+
+		if (method === "pad.read" && params?.name === "#7 handoff") return { name: "#7 handoff", text: "" };
+
+		throw new RoundupRefusal(NOT_FOUND, method, `not found: ${JSON.stringify(params)}`);
+	};
+
+	const links = await railRunner({ call, repo: tempDir("repo"), state, config: SHIPPED_DEFAULTS, fallback: unused, now: Date.now }).links?.(["7", "8", "9"]);
+	const row = (id: string, name: string, kind: string) => ({ name, agent: id, state: kind, link: agentLink(id, "key") });
+
+	expect(links).toEqual(
+		new Map([
+			["7", { rows: [row("3", "hum 7 build", "done"), row("4", "hum 7 ask 1", "needs-you"), row("6", "hum 7 ask 2", "done")], ask: row("4", "hum 7 ask 1", "needs-you"), handoff: { name: "#7 handoff", link: padLink("#7 handoff", "key") } }],
+			["8", { rows: [row("7", "hum 8 build", "working")], ask: undefined, handoff: undefined }],
+			["9", { rows: [], handoff: undefined }],
+		]),
+	);
 });

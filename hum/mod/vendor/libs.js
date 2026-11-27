@@ -2538,6 +2538,8 @@ var Controls = object({
   runNow: boolean2(),
   noteTo: array(name)
 });
+var ItemRow = object({ name, agent: name, state: name, link: name });
+var PadLink = object({ name, link: name });
 var OpenItem = object({
   item: name,
   title: optional(name),
@@ -2548,9 +2550,11 @@ var OpenItem = object({
   passed: optional(array(name)),
   since: time2,
   running: boolean2(),
-  controls: Controls
+  controls: Controls,
+  rows: optional(array(ItemRow)),
+  handoff: optional(PadLink)
 });
-var Question = object({ item: name, text: name, options: array(name), since: time2 });
+var Question = object({ item: name, text: name, options: array(name), since: time2, row: optional(ItemRow) });
 var Merged = object({ item: name, title: name, level: optional(name), mergedAt: time2 });
 var CHOICE_RESULTS = ["merged", "stuck", "review"];
 var Choice = object({ item: name, text: name, at: time2, why: optional(name), files: optional(array(name)), result: optional(_enum(CHOICE_RESULTS)) });

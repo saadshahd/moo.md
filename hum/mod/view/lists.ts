@@ -16,6 +16,8 @@ export type ListEntry = {
 	readonly meta: readonly Span[];
 	/** Lines an unfolded row shows under its title. */
 	readonly detail?: readonly string[];
+	/** Rows an unfolded row draws under its detail, made for the list's width, such as its runs with the control that opens each. */
+	readonly below?: readonly Row[];
 };
 
 /**
@@ -37,7 +39,7 @@ export const listRows = (entry: ListEntry, { isUnfolded, width }: { readonly isU
 
 	const head: Row = [span(id, "strong", press), span(spaces(width - cells(id) - rowCells(meta)), "plain"), ...meta];
 
-	if (isUnfolded) return [head, ...wrap(entry.title, width).map((line) => [span(line, "plain", press)]), ...(entry.detail ?? []).flatMap((detail) => wrap(detail, width).map((line) => [span(line, "dim", press)]))];
+	if (isUnfolded) return [head, ...wrap(entry.title, width).map((line) => [span(line, "plain", press)]), ...(entry.detail ?? []).flatMap((detail) => wrap(detail, width).map((line) => [span(line, "dim", press)])), ...(entry.below ?? [])];
 
 	const title = ellipsize(entry.title, width);
 

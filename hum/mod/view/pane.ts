@@ -1,9 +1,11 @@
 import type { Card, Status } from "../../../hum-engine/src/status/format.ts";
-import { blankRow, faultCardRows, noticeCardRows, questionCardRows, unreadCardRows } from "./cards.ts";
+import { displayId } from "../item.ts";
+import { blankRow, faultCardRows, noticeCardRows, questionCardRows, titleRule, unreadCardRows } from "./cards.ts";
 import { shownFaultGroups } from "./faults.ts";
 import { reportedUnread, sinceText } from "./freshness.ts";
 import { headerRow, measureRow } from "./header.ts";
 import type { ViewInput } from "./input.ts";
+import { handoffRow, itemTitle, runRows } from "./links.ts";
 import { type ListEntry, listRows } from "./lists.ts";
 import { innerWidth, padded, type Row, span } from "./row.ts";
 import { problemWords } from "./summary.ts";
@@ -30,14 +32,16 @@ const listSection = (title: string, entries: readonly ListEntry[], input: PaneIn
 		input.width,
 	);
 
-const inFlightEntries = ({ open }: Status, now: number): ListEntry[] =>
+/** An item in flight: its step and age; unfolded, its runs, each with the control that opens it. */
+const inFlightEntries = ({ open }: Status, { now, width }: Pick<ViewInput, "now" | "width">): ListEntry[] =>
 	open
 		.filter(({ running }) => running)
-		.map(({ item, title = "", at, since }) => ({
+		.map(({ item, title = "", at, since, rows = [] }) => ({
 			foldId: `in-flight:${item}`,
 			item,
 			title,
 			meta: [span(at, "plain"), span(sinceText(since, now), "dim")],
+			below: runRows(item, rows, width),
 		}));
 
 const mergedEntries = ({ merged }: Status, now: number): ListEntry[] =>
@@ -72,6 +76,18 @@ const cardBlocks = (status: Status, input: ViewInput): Row[][] => [
 	...shownFaultGroups(status, input.dismissed).map((group) => faultCardRows(group, input)),
 ];
 
+/** The status as the feed row of `item` shows it: only that item's questions and cards. */
+const ofItem = (status: Status, item: string): Status => ({ ...status, questions: status.questions.filter((question) => question.item === item), cards: status.cards.filter((card) => card.item === item) });
+
+/** The feed row's blocks: the item's title line and its runs, then its cards, then its handoff Pad; a line that says so where hum holds no such open item. */
+const feedBlocksOf = (status: Status, item: string, input: ViewInput) => {
+	const open = status.open.find((found) => found.item === item);
+	const [first = [], ...cards] = cardBlocks(ofItem(status, item), input);
+	const head = open === undefined ? wrap(`hum holds no open item ${displayId(item)}`, input.width).map((line): Row => [span(line, "dim")]) : [titleRule(itemTitle(open), input.width), ...runRows(item, open.rows ?? [], input.width)];
+
+	return { lead: [head, first], rest: [...cards, open?.handoff === undefined ? [] : [handoffRow(open.handoff, input.width)]] };
+};
+
 /** The rows above the first card: the header's two lines. */
 const headerRows = (status: Status, input: ViewInput): Row[] => [headerRow(status, input), measureRow(status.measure, input.width)];
 
@@ -82,13 +98,16 @@ const blocksOf = (input: PaneInput) => {
 	if (read.kind !== "status") return { lead: [...unreadBlocks(input), wrap(problemWords(read), width).map((line): Row => [span(line, "amber")])], rest: [] };
 
 	const { status } = read;
+
+	if (input.feed !== undefined) return feedBlocksOf(status, input.feed, input);
+
 	const [first = [], ...cards] = cardBlocks(status, input);
 
 	return {
 		lead: [headerRows(status, input), first],
 		rest: [
 			...cards,
-			listSection("in flight", inFlightEntries(status, now), input),
+			listSection("in flight", inFlightEntries(status, input), input),
 			listSection("merged", mergedEntries(status, now), input),
 			listSection("choices made without you", choiceEntries(status, now), input),
 		],

@@ -9,6 +9,7 @@ export type Press =
 	| { readonly kind: "fold"; readonly id: string }
 	| { readonly kind: "fill"; readonly item: string; readonly word: string }
 	| { readonly kind: "open" }
+	| { readonly kind: "link"; readonly url: string }
 	| { readonly kind: "dismiss"; readonly cards: readonly Dismissal[] };
 
 export type Span = { readonly text: string; readonly tone: Tone; readonly press?: Press };

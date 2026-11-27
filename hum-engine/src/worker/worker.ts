@@ -34,7 +34,7 @@ import { type StaleScore, staleScores } from "../measure/judges.ts";
 import type { Measured, Measurement } from "../measure/remeasure.ts";
 import { emptyStatus, readStatus, writeHeartbeat, writeStatus } from "../status/file.ts";
 import { type Flow, type FlowAt, flowOf } from "../status/flow.ts";
-import type { Choice, OpenItem, Status } from "../status/format.ts";
+import type { Choice, ItemLinks, OpenItem, Status } from "../status/format.ts";
 import { newestChoices, openQuestions } from "../status/sections.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { SECOND_MS } from "../time.ts";
@@ -174,6 +174,9 @@ const JUDGE_CODE = "judge-changed";
 
 /** The card for an engine update that waits on the owner or failed. */
 const ENGINE_CODE = "engine-update";
+
+/** The card for a read of where the owner opens each item that failed, so the status shows no links until one goes through. */
+export const LINKS_CODE = "item-links";
 
 const staleText = (stale: readonly StaleScore[]): string => stale.map(({ boundary, model, score }) => `${boundary} on ${model} at ${score.rate.toFixed(2)}`).join(", ");
 
@@ -969,7 +972,9 @@ export class Worker {
 		const memory = readMemory(join(this.#o.repo, ".hum", "memory.md"), config.hum.memoryMaxBytes);
 
 		this.#showRefusedMemory(memory.refused);
-		const [latest, ci] = await Promise.all([this.#latest(), this.#ciTick()]);
+		const open = this.#openItems();
+		const questions = openQuestions(state.questions.list(), state.answers.list());
+		const [latest, ci, links] = await Promise.all([this.#latest(), this.#ciTick(), this.#links([...new Set([...open.map(({ item }) => item), ...questions.map(({ item }) => item)])])]);
 		writeStatus(state.statusPath, {
 			...before,
 			writtenAt: t,
@@ -980,16 +985,36 @@ export class Worker {
 				configSchema: SCHEMA_VERSION,
 				latest,
 			},
-			questions: openQuestions(state.questions.list(), state.answers.list()),
+			questions: questions.map((question) => ({ ...question, row: links.get(question.item)?.ask })),
 			choices: newestChoices(state.choices.list(), config.hum.choicesShown).map((choice) => ({ ...choice, result: this.#resultOf(choice.item) })),
 			cards: state.faults.list(),
-			open: this.#openItems(),
+			open: open.map((item) => ({ ...item, rows: links.get(item.item)?.rows, handoff: links.get(item.item)?.handoff })),
 			merged: [...this.#merged.splice(0), ...before.merged].slice(0, this.#o.config.hum.mergedShown),
 			possibleRepeats: state.possibleRepeats.list().map(({ a, b }) => ({ a, b })),
 			unusedMemory: this.#unusedMemory(memory.entries),
 			measure: measureOf({ ...measureInputsOf(state), window: config.hum.measureWindow, globs: config.hum.paths.map(({ glob }) => glob) }) ?? null,
 			rules: state.learned.list().map(({ glob, level, item, at, commit }) => ({ glob, level, item, at, undo: { label: "Undo", command: `git revert ${commit}` } })),
 		});
+	}
+
+	/** Where the owner opens each of `items`, where the runner has such places; a read that fails raises one card, and the status shows no links until a read goes through. */
+	async #links(items: readonly string[]): Promise<ReadonlyMap<string, ItemLinks>> {
+		const { runner, state } = this.#o;
+
+		if (runner.links === undefined) return new Map();
+
+		return runner.links(items).then(
+			(links) => {
+				state.faults.clear({ code: LINKS_CODE });
+
+				return links;
+			},
+			(error: Error) => {
+				state.faults.raise({ code: LINKS_CODE, cause: `hum could not read where you open each item's rows: ${error.message}`.slice(0, ERROR_EXCERPT), fix: "hum reads them again at its next tick." });
+
+				return new Map();
+			},
+		);
 	}
 
 	/** Where the saved item's flow stands, as the kind it was saved under runs it; undefined where the state folder keeps no such kind. */

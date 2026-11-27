@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { type AdapterContext, Holder, ItemId } from "../../src/adapter-api.ts";
 import { runContract } from "../../src/adapters/contract.ts";
 import { railRunner, roundupProgram } from "../../src/adapters/rail-rows.ts";
-import { railName, railTree, rootWorkstream } from "../../src/adapters/rail.ts";
+import { feedName, isItemWorkstream, railName, railTree, rootWorkstream } from "../../src/adapters/rail.ts";
 import { roundupAdapter } from "../../src/adapters/roundup.ts";
 import { roundupRpc } from "../../src/adapters/roundup-rpc.ts";
 import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
@@ -266,7 +266,7 @@ const talkWorld = async (workstream: string, slot: string) => {
 		const nodes = await railTree(seeder.call);
 		const own = nodes.find(({ kind, name }) => kind === "workstream" && name.startsWith(`#${item} `));
 
-		return nodes.filter(({ parent }) => parent !== undefined && parent === own?.id);
+		return nodes.filter(({ parent, name }) => parent !== undefined && parent === own?.id && name !== feedName(item));
 	};
 
 	/** The item's rows once its plan row started: the passes stop there, as the plan row waits. */
@@ -308,6 +308,40 @@ const split = async (): Promise<object> => {
 	return { parent, ...(await world.rowsToPlan(part.id)) };
 };
 
+/**
+ * Claims and renews an item as the Project's program, which starts its feed row once, reads that row once its claude
+ * started, with the argv roundup started it with, then finishes the item and reads what of it is left on the Rail.
+ */
+const feed = async (): Promise<object> => {
+	const seeder = roundupRpc(socket);
+	const hum = rootWorkstream(await railTree(seeder.call), SHIPPED_DEFAULTS.roundupWorkstream)?.id;
+
+	if (!hum) return { error: "no hum Workstream" };
+
+	const { id } = z.looseObject({ id: z.int() }).parse(await seeder.call("todo.create", { title: "feed item" }));
+
+	await seeder.call("todo.move", { id, home: hum });
+
+	const item = ItemId.parse(String(id));
+	const adapter = adapterOn("state-feed");
+	const argv = join(rig, "argv-feed.txt");
+
+	await adapter.workSource.claim(item, Holder.parse("rig"), ANSWER_WAIT_MS);
+	await adapter.workSource.renew(item, Holder.parse("rig"), ANSWER_WAIT_MS);
+
+	for (const deadline = Date.now() + ANSWER_WAIT_MS; !existsSync(argv) && Date.now() < deadline; ) await Bun.sleep(100);
+
+	await Bun.sleep(3000);
+
+	const rows = (await railTree(seeder.call)).filter(({ name }) => name === feedName(item));
+
+	await adapter.workSource.finish(item);
+
+	const left = (await railTree(seeder.call)).filter((node) => isItemWorkstream(item, node) || node.name === feedName(item));
+
+	return { feed: { rows, argv: existsSync(argv) ? readFileSync(argv, "utf8").split("\n") : [], left } };
+};
+
 /** Every check of the adapter contract, with items seeded in the hum Workstream. */
 const contract = async (): Promise<object> => {
 	const seeder = roundupRpc(socket);
@@ -330,7 +364,7 @@ const contract = async (): Promise<object> => {
 	return { results };
 };
 
-const SCENARIOS = new Map(Object.entries({ question: questionIn("state-question", "b"), "question-words": questionIn("state-question-words", OWN_WORDS), "question-stopped": questionIn("state-question-stopped", "b", { stopsFirst: true }), "question-worktrees": questionIn("state-question-worktrees", "b"), park, handoff, contract, talk: talkIn("hum talk", "s1"), "talk-worktrees": talkIn("hum talk worktrees", "s3"), split }));
+const SCENARIOS = new Map(Object.entries({ question: questionIn("state-question", "b"), "question-words": questionIn("state-question-words", OWN_WORDS), "question-stopped": questionIn("state-question-stopped", "b", { stopsFirst: true }), "question-worktrees": questionIn("state-question-worktrees", "b"), park, handoff, contract, talk: talkIn("hum talk", "s1"), "talk-worktrees": talkIn("hum talk worktrees", "s3"), split, feed }));
 
 const result = JSON.stringify(await (SCENARIOS.get(scenario) ?? (async () => ({ error: `no scenario ${scenario}` })))().catch((error: Error) => ({ error: error.stack ?? error.message })));
 

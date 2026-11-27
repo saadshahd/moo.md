@@ -60,6 +60,19 @@ export const Controls = z.object({
 
 export type Controls = z.infer<typeof Controls>;
 
+/** A Rail row of an item's Workstream on roundup: its name, its Agent id, its Status there, and the link that opens its pane in the roundup App. */
+export const ItemRow = z.object({ name, agent: name, state: name, link: name });
+
+export type ItemRow = z.infer<typeof ItemRow>;
+
+/** A Pad the owner opens in the roundup App: its name and its link. */
+export const PadLink = z.object({ name, link: name });
+
+export type PadLink = z.infer<typeof PadLink>;
+
+/** Where the owner opens an item on roundup: the rows of its Workstream, the row of its newest question, and its handoff Pad where one stands. */
+export type ItemLinks = { readonly rows: ItemRow[]; readonly ask?: ItemRow; readonly handoff?: PadLink };
+
 /**
  * An item with a saved state that has not ended: its kind file and that flow's version, the flow's steps as the item
  * runs it, the step it is in since `since`, whether a pass runs on it now, and what the owner may do there. A wait a run
@@ -78,12 +91,15 @@ export const OpenItem = z.object({
 	since: time,
 	running: z.boolean(),
 	controls: Controls,
+	/** On roundup, the rows of the item's Workstream, oldest first, and its handoff Pad where one stands. */
+	rows: z.optional(z.array(ItemRow)),
+	handoff: z.optional(PadLink),
 });
 
 export type OpenItem = z.infer<typeof OpenItem>;
 
-/** A question to the owner: its text and the option words an answer may pick, none for a free answer. */
-export const Question = z.object({ item: name, text: name, options: z.array(name), since: time });
+/** A question to the owner: its text and the option words an answer may pick, none for a free answer; on roundup, the row the owner answers it in. */
+export const Question = z.object({ item: name, text: name, options: z.array(name), since: time, row: z.optional(ItemRow) });
 
 export type Question = z.infer<typeof Question>;
 
