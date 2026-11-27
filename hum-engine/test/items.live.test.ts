@@ -46,6 +46,7 @@ const Result = z.looseObject({
 			itemHome: z.string().optional(),
 			atReview: z.looseObject({ text: z.string(), home: z.string().nullish(), visibility: z.string() }).optional(),
 			brief: z.string().optional(),
+			reBrief: z.string().optional(),
 			atLand: z.looseObject({ text: z.string(), home: z.string().nullish() }).optional(),
 			comments: z.array(z.string()),
 		})
@@ -190,7 +191,7 @@ test.skipIf(!live)("a parked item asks a row with the owner's park actions, and 
 	expect(runs[1]).toBeGreaterThan(runs[0] ?? Infinity);
 }, RIG_MS);
 
-test.skipIf(!live)("a change that waits on the owner's review gets a shown handoff Pad its question names, and once it lands the Pad says what merged, outlives the item's Workstream and is named on its Todo", async () => {
+test.skipIf(!live)("a change that waits on the owner's review gets a shown handoff Pad its question names, asked again too, and once it lands the Pad says what merged, outlives the item's Workstream and is named on its Todo", async () => {
 	const { outcomes = [], handoff } = await run("handoff");
 	const link = padLink(`#${handoff?.item} handoff`, z.looseObject({ projectKey: z.string() }).parse(await rig.user.call("daemon.ping")).projectKey);
 
@@ -201,6 +202,7 @@ test.skipIf(!live)("a change that waits on the owner's review gets a shown hando
 	expect(handoff?.atReview?.text).toContain("**Decide:** approve, or retry.");
 	expect(handoff?.atReview?.text).toContain("`README.md` is not on");
 	expect(handoff?.brief).toContain(`Read the Pad "#${handoff?.item} handoff" first: ${link}`);
+	expect(handoff?.reBrief).toContain(`Read the Pad "#${handoff?.item} handoff" first: ${link}`);
 	expect(handoff?.atLand?.home).toBe(handoff?.home ?? "the scenario's Workstream");
 	expect(handoff?.atLand?.text).toContain(": merged at ");
 	expect(handoff?.atLand?.text).toContain("## Open follow-ups");

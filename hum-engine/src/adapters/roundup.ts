@@ -63,7 +63,7 @@ const Kept = z.strictObject({ holder: Holder, expiresAt: z.number() });
 const Taken = z.strictObject({ text: z.string(), option: z.string().optional(), at: z.number() });
 
 /** A question hum asked as a row, named `name`. */
-const Asked = z.strictObject({ item: z.string(), name: z.string(), text: z.string(), at: z.number() });
+const Asked = z.strictObject({ item: z.string(), name: z.string(), text: z.string(), at: z.number(), handoff: z.strictObject({ name: z.string(), link: z.string() }).optional() });
 
 const RowRecord = z.looseObject({ id: z.string() });
 
@@ -345,7 +345,7 @@ export const roundupAdapter = (options: RoundupOptions, { now, env, report }: Ad
 
 		const newest = questionsOf(id).toSorted((one, other) => other.asked.at - one.asked.at)[0];
 
-		if (newest !== undefined && endedUnanswered(newest, nodes)) await ask(ItemId.parse(id), questionOf(newest.asked.text));
+		if (newest !== undefined && endedUnanswered(newest, nodes)) await ask(ItemId.parse(id), questionOf(newest.asked.text), newest.asked.handoff);
 	};
 
 	const threadOf = async (id: string, nodes: readonly RailNode[]): Promise<ThreadEntry[]> => {
@@ -416,25 +416,26 @@ export const roundupAdapter = (options: RoundupOptions, { now, env, report }: Ad
 
 	const postPlain = async (id: string, text: string): Promise<void> => (isOneLine(text) ? post(id, text) : postInPad(id, undefined, text));
 
-	const ask = async (id: ItemId, question: Question): Promise<void> => {
+	/** Asks `question` in a new row, naming the handoff Pad an earlier asking of it wrote, else the one its own handoff writes now. */
+	const ask = async (id: ItemId, question: Question, handoff?: Linked): Promise<void> => {
 		const name = `hum ${id} ask ${questionsOf(id).length + 1}`;
 		const root = join(dirs.questions, slug(name));
 		const folder: RunFolder = runFolderAt(root);
 		const todo = await todoOf(id);
 		const workstream = await itemWorkstream(call, { id, title: todo.title });
-		const handoff = question.handoff && (await writeHandoff(id, { title: todo.title, handoff: question.handoff, question: question.text, home: workstream }));
+		const pad = handoff ?? (question.handoff && (await writeHandoff(id, { title: todo.title, handoff: question.handoff, question: question.text, home: workstream })));
 
 		/* The row's hooks write into this folder and do not make it. */
 		mkdirSync(folder.hooks, { recursive: true });
 
-		const request = { prompt: askPrompt(question, handoff), cwd: options.repo, model: options.config.models.light, effort: QUESTION_EFFORT } as const;
+		const request = { prompt: askPrompt(question, pad), cwd: options.repo, model: options.config.models.light, effort: QUESTION_EFFORT } as const;
 
 		await stopOpen(id);
 
 		const row = await startRow(call, { repo: options.repo, stateDir: options.stateDir, config: options.config }, { name, folder, request, answer: { by: "question" }, workstream });
 
 		/* Asked when roundup started the row, on the clock its comments carry, so the thread keeps their order. */
-		atomicWrite(join(root, "question.json"), JSON.stringify({ item: id, name, text: questionText(question), at: row.status?.since ?? now() }));
+		atomicWrite(join(root, "question.json"), JSON.stringify({ item: id, name, text: questionText(question), at: row.status?.since ?? now(), handoff: pad }));
 	};
 
 	return {

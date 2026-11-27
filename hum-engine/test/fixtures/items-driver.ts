@@ -136,7 +136,8 @@ const PadRead = z.looseObject({ text: z.string(), home: z.string().nullish(), vi
 /**
  * A whole worker over the roundup adapter at a level a review run clears: the review asks for a change to a file the
  * branch never touches, so the change parks for the owner's review, and its question row names the shown handoff Pad.
- * The owner's approve in that row lands the change, and the Pad then says what merged, in the scenario's Workstream.
+ * The owner stops that first row once it asked them, and the row hum asks again names the Pad too; their approve there
+ * lands the change, and the Pad then says what merged, in the scenario's Workstream.
  */
 const handoff = async (): Promise<object> => {
 	const seeder = roundupRpc(socket);
@@ -167,16 +168,23 @@ const handoff = async (): Promise<object> => {
 	};
 
 	const pad = `#${item} handoff`;
+
+	writeFileSync(join(rig, `go-ask-${item}`), "approve");
+	writeFileSync(join(rig, `unanswered-hum-${item}-ask-1`), "");
+
 	const atReview = await tickUntil(() => padOf(pad));
 	const brief = await tickUntil(() => padOf(`hum ${item} ask 1 brief`));
 	const itemHome = (await railTree(seeder.call)).find((node) => node.kind === "workstream" && node.name.startsWith(`#${item} `))?.id;
 
-	writeFileSync(join(rig, `go-ask-${item}`), "approve");
+	await stopOnceAsked("state-handoff", `hum ${item} ask 1`);
+
+	const reBrief = await tickUntil(() => padOf(`hum ${item} ask 2 brief`));
+
 	await tickUntil(async () => (w.results.at(-1)?.outcome === "merged" ? true : undefined));
 
 	return {
 		outcomes: w.results.map(({ outcome }) => outcome),
-		handoff: { item, home, itemHome, atReview, brief: brief?.text, atLand: await padOf(pad), comments: z.array(z.looseObject({ body: z.string() })).parse(await seeder.call("todo.comments", { id })).map(({ body }) => body) },
+		handoff: { item, home, itemHome, atReview, brief: brief?.text, reBrief: reBrief?.text, atLand: await padOf(pad), comments: z.array(z.looseObject({ body: z.string() })).parse(await seeder.call("todo.comments", { id })).map(({ body }) => body) },
 	};
 };
 
