@@ -66,14 +66,19 @@ const worstCards: Card[] = [
 	{ kind: "waiting", key: "emoji", item: "75", code: "review", cause: EMOJI_TITLE, fix: RTL_TITLE, action: { label: "x".repeat(14), answer: "x".repeat(14) }, since: 0 },
 ];
 
-const flightsOf = (count: number): Status["inFlight"] =>
+const LONG_STEP = "awaiting-owner-review-of-the-release-workflow-change";
+
+const flightsOf = (count: number): Status["open"] =>
 	Array.from({ length: count }, (_, index) => ({
 		item: index === 0 ? LONGEST_ID : String(1000 + index),
-		title: [CJK_TITLE, EMOJI_TITLE, "x".repeat(120), UNBROKEN_PATH, "a", RTL_TITLE, `Rename the release script and update every workflow that calls it ${"and then some ".repeat(6)}`][index % 7] ?? "",
-		level: index % 3 === 0 ? undefined : ["low", "medium", "critical"][index % 3],
-		state: ["building", "awaiting-owner-review-of-the-release-workflow-change", "checking", "x"][index % 4] ?? "",
+		title: index % 8 === 7 ? undefined : ([CJK_TITLE, EMOJI_TITLE, "x".repeat(120), UNBROKEN_PATH, "a", RTL_TITLE, `Rename the release script and update every workflow that calls it ${"and then some ".repeat(6)}`][index % 7] ?? ""),
+		kind: "feature",
+		flowVersion: "x".repeat(40),
+		steps: [{ name: LONG_STEP, waitsOnOwner: true }],
+		at: ["building", LONG_STEP, "checking", "x"][index % 4] ?? "",
 		since: ago(index * 37),
-		unclear: index % 5 === 0,
+		running: true,
+		controls: { choices: [], answer: false, skip: false, runNow: false, noteTo: [LONG_STEP] },
 	}));
 
 const noticesOf = (count: number): Card[] =>
@@ -112,7 +117,7 @@ const worstWith = (flights: number, notices: number, merged: number, choices: nu
 	engine: { version: "0.3.0-beta.12+build.20261111.abcdef0", adapterApi: 1, configSchema: 1, latest: "10.20.30-rc.1" },
 	questions: worstQuestions,
 	cards: [...worstCards, ...noticesOf(notices)],
-	inFlight: flightsOf(flights),
+	open: flightsOf(flights),
 	merged: mergedOf(merged),
 	choices: choicesOf(choices),
 	rules: [],

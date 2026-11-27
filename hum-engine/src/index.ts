@@ -34,12 +34,13 @@ export {
 	Kind,
 	MachineJSON,
 	OWNER_CHANGEABLE,
-	OWNER_WAIT_TAG,
 	READABLE_SCHEMA_VERSIONS,
 	SCHEMA_VERSION,
 	STUCK_TAG,
 	WAIT_TAG,
 } from "./config/schema.ts";
+
+export { KindFile } from "./config/kind-file.ts";
 
 export { migrateSnapshot, type SavedItem, unmappedItems } from "./config/state-map.ts";
 
@@ -65,7 +66,7 @@ export { type BegunRun, RunKey, RunRecord, RunRecords } from "./state/runs.ts";
 
 export { emptyStatus, readStatus, type StatusRead, writeStatus } from "./status/file.ts";
 
-export { Action, Card, CardAction, Choice, InFlight, Measure, Merged, Question, Status, STATUS_FORMAT } from "./status/format.ts";
+export { Action, Card, CardAction, Choice, Measure, Merged, OpenItem, Question, Status, STATUS_FORMAT } from "./status/format.ts";
 
 export * from "./adapter-api.ts";
 

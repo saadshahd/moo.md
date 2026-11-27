@@ -20,6 +20,10 @@ import { kindMachine } from "../src/index.ts";
 import { LOG_FORMAT, type NewEvent } from "../src/state/events.ts";
 import { slug } from "../src/state/fs.ts";
 import { SAVED_0_1_0 } from "./fixtures/saved-0-1-0.ts";
+import earlierFix from "./fixtures/fix-kind-2.json" with { type: "json" };
+import shippedFix from "../defaults/kinds/fix.json" with { type: "json" };
+import { KindFile } from "../src/config/kind-file.ts";
+import { withOverCapWaits } from "../src/config/machine.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
 const DAY = 86_400_000;
@@ -459,12 +463,30 @@ test("a reader never sees a partial status file", async () => {
 	expect(readdirSync(dir).filter((name) => !name.endsWith(".json"))).toEqual([]);
 });
 
+test("an item saved under an earlier flow, kept in a kind file written before waits named their controls, restores under the new flow at its wait", async () => {
+	const state = openState(dir, { now: () => 1 });
+	const fix = withOverCapWaits(KindFile.parse(shippedFix));
+
+	mkdirSync(join(dir, "kinds"), { recursive: true });
+	writeFileSync(join(dir, "kinds", `${slug("fix@2")}.json`), JSON.stringify(earlierFix));
+
+	const earlier = state.kinds.get("fix@2")!;
+	const waiting = createActor(kindMachine({ ...earlier, machine: { ...earlier.machine, initial: "owner-review" } })).start();
+
+	state.items.save("#68", earlier, persistedSnapshot(waiting));
+
+	const restored = await state.items.restore("#68", fix, { kindAt: (version) => state.kinds.get(`fix@${version}`) });
+
+	expect(restored.ok && restored.value?.getSnapshot().value).toBe("owner-review");
+	expect(fix.machine.version).not.toBe("2");
+});
+
 const statusFile = () => {
 	const path = join(dir, "nested", "status.json");
 	const status = emptyStatus(ENGINE_VERSION, 1000);
 
 	status.workers = { mac: 990 };
-	status.inFlight = [{ item: "#68", title: "Fix it", level: "low", state: "building", since: 900, unclear: true }];
+	status.open = [{ item: "#68", title: "Fix it", kind: "fix", flowVersion: "3", steps: [{ name: "building", waitsOnOwner: false }], at: "building", since: 900, running: true, controls: { choices: [], answer: false, skip: false, runNow: false, noteTo: ["building"] } }];
 	writeStatus(path, status);
 
 	return { path, status };
@@ -475,7 +497,7 @@ test("the status file reads back as written, with every section, the engine vers
 	const read = readStatus(path);
 
 	expect(read.ok && read.status).toEqual(status);
-	expect(Object.keys(status)).toEqual(["format", "writtenAt", "workers", "engine", "questions", "cards", "inFlight", "merged", "choices", "rules", "possibleRepeats", "unusedMemory", "measure"]);
+	expect(Object.keys(status)).toEqual(["format", "writtenAt", "workers", "engine", "questions", "cards", "open", "merged", "choices", "rules", "possibleRepeats", "unusedMemory", "measure"]);
 	expect(status.measure).toBeNull();
 	expect(status.engine.version).toBe(ENGINE_VERSION);
 });

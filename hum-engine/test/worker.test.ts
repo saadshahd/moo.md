@@ -370,6 +370,35 @@ test("each tick writes a heartbeat and the status file for the view", async () =
 	expect(next.ok && next.status.workers.mac).toBe(NOW + 1000);
 });
 
+test("the status file lists each item with a saved state: a waiting one at its wait with the controls it allows, a running one at its run", async () => {
+	const w = await workerWorld({ items: { a: { writeForItem: true, askUnlessAnswered: "Which?" }, b: { writeForItem: true, hang: true } } }, { settings: { claimExpirySeconds: 5 } });
+	const worker = w.workerWith();
+
+	w.item("a", "docs/a.md");
+	await worker.tick();
+	await worker.idle();
+
+	const b = w.item("b", "docs/b.md");
+
+	await worker.tick();
+	await until(() => w.shim.calls().some((c) => c.itemId === b));
+	await worker.tick();
+
+	const status = readStatus(w.state.statusPath);
+	const steps = (wait?: string) => ["building", "checking", "fixing", "merging", ...(wait ? [wait] : []), "stuck", "done"].map((name) => ({ name, waitsOnOwner: name === wait }));
+	const flowRow = { kind: "docs", flowVersion: w.config.kinds.docs!.machine.version, since: NOW };
+
+	expect(status.ok && status.status.open.toSorted((x, y) => x.item.localeCompare(y.item))).toEqual([
+		{ ...flowRow, item: "a", title: "a", steps: steps("asking"), at: "asking", running: false, controls: { choices: [], answer: true, skip: false, runNow: true, noteTo: ["building", "checking", "fixing", "merging", "asking", "stuck"] } },
+		{ ...flowRow, item: "b", title: "b", steps: steps(), at: "building", running: true, controls: { choices: [], answer: false, skip: false, runNow: false, noteTo: ["building", "checking", "fixing", "merging", "stuck"] } },
+	]);
+
+	w.clock.at += 10_000;
+	await w.adapter.workSource!.claim(b, Holder.parse("worker-2"), 5000);
+	await worker.tick();
+	await worker.idle();
+});
+
 test("the claim of a run in flight is renewed each tick, and a run whose claim is gone stops", async () => {
 	const w = await workerWorld({ items: { a: { writeForItem: true, spend: 5, hang: true } } }, { settings: { claimExpirySeconds: 5 } });
 	const id = w.item("a", "docs/a.md");

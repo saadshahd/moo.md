@@ -1,6 +1,6 @@
 import { join, resolve } from "node:path";
 import { gitIn } from "../adapters/git.ts";
-import { Kind } from "../config/schema.ts";
+import { KindFile } from "../config/kind-file.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
 import { EventLog } from "./events.ts";
 import { Faults } from "./faults.ts";
@@ -56,7 +56,7 @@ export const openState = (dir: string, { now, ...codec }: StateOptions) => {
 		parked: new Records(join(dir, "parked"), Parked),
 		spent: new Records(join(dir, "spent"), Spent),
 		/** Earlier kinds by `<machine id>@<version>`, for `items.restore`. */
-		kinds: new Records(join(dir, "kinds"), Kind),
+		kinds: new Records(join(dir, "kinds"), KindFile),
 		limit: new Records(join(dir, "limit"), Limit),
 		ready: new Records(join(dir, "ready"), ReadyList),
 		/** The run slots, by name. */

@@ -1,5 +1,5 @@
-import { OWNER_WAIT_TAG, STUCK_TAG, WAIT_TAG, type Kind, type StateNodeJSON } from "../config/schema.ts";
-import { earliestTimeout } from "../config/machine.ts";
+import { STUCK_TAG, WAIT_TAG, type Kind, type StateNodeJSON } from "../config/schema.ts";
+import { earliestTimeout, isOwnerWait } from "../config/machine.ts";
 import { HOUR_MS } from "../time.ts";
 import { WAIT_HOURS } from "./tables.ts";
 
@@ -12,17 +12,15 @@ export type WaitAnswers = Readonly<Record<string, number>>;
 /** The key a wait's answer sits under. */
 const waitKey = ({ kind, state }: Pick<Wait, "kind" | "state">): string => `${kind}/${state}`;
 
-const isOwnerWait = (tags: readonly string[] | undefined): boolean => tags?.includes(OWNER_WAIT_TAG) ?? false;
-
-const isWait = (tags: readonly string[] | undefined): boolean => isOwnerWait(tags) || (tags?.includes(WAIT_TAG) ?? false);
+const isWait = (node: StateNodeJSON): boolean => isOwnerWait(node) || (node.tags?.includes(WAIT_TAG) ?? false);
 
 /** Every waiting state of the kinds, each with a proposed timeout and where it leads; setup asks the owner one question per wait. */
 export const waitsOf = (kinds: Readonly<Record<string, Kind>>): Wait[] =>
 	Object.entries(kinds).flatMap(([kind, config]) =>
 		Object.entries(config.machine.states).flatMap(([state, node]): Wait[] => {
-			if (!isWait(node.tags)) return [];
+			if (!isWait(node)) return [];
 
-			const waitsOn = isOwnerWait(node.tags) ? "owner" : "other";
+			const waitsOn = isOwnerWait(node) ? "owner" : "other";
 			const shipped = earliestTimeout(node);
 
 			return [{ kind, state, waitsOn, hours: shipped?.hours ?? WAIT_HOURS[waitsOn], leadsTo: shipped?.transitions[0]?.target ?? stuckStateOf(config) }];

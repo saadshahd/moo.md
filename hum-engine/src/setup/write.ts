@@ -9,7 +9,8 @@ import { hashJson } from "../config/hash.ts";
 import { asJson, Json } from "../config/json.ts";
 import { migrateConfig } from "../config/migrate.ts";
 import { noGitIdentity, type Refusal, type Result } from "../config/refusal.ts";
-import { type HumConfig, Kind, READABLE_SCHEMA_VERSIONS, SCHEMA_VERSION } from "../config/schema.ts";
+import { KindFile } from "../config/kind-file.ts";
+import { type HumConfig, type Kind, READABLE_SCHEMA_VERSIONS, SCHEMA_VERSION } from "../config/schema.ts";
 import { isGitHubHosted } from "../config/wake-job.ts";
 import { which } from "../exec.ts";
 import { ciWorkflows } from "../service/workflows.ts";
@@ -240,7 +241,7 @@ export const upgradeSetup = (repo: string, env: SetupEnv): Result<readonly strin
 const parsedKinds = (raw: RawConfig): Record<string, Kind> =>
 	Object.fromEntries(
 		Object.entries(raw.kinds).flatMap(([name, file]) => {
-			const kind = Kind.safeParse(file);
+			const kind = KindFile.safeParse(file);
 
 			return kind.success ? [[name, kind.data]] : [];
 		}),

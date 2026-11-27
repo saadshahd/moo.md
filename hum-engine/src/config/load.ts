@@ -8,7 +8,8 @@ import { invalidConfig, type Problem, type Result } from "./refusal.ts";
 import { orMissing, readJson } from "../state/fs.ts";
 import { Json } from "./json.ts";
 import { withOverCapWaits } from "./machine.ts";
-import { HumConfig, Kind } from "./schema.ts";
+import { KindFile } from "./kind-file.ts";
+import { HumConfig, type Kind } from "./schema.ts";
 
 /** A config as read from disk, before any check: `.hum/` files by their path. */
 export type RawConfig = {
@@ -56,7 +57,7 @@ export const loadConfig = (raw: RawConfig, { env, ...migration }: LoadOptions): 
 			continue;
 		}
 
-		const kind = Kind.safeParse(file);
+		const kind = KindFile.safeParse(file);
 
 		if (!kind.success) return malformed(`kinds/${name}.json`, kind.error);
 		kinds[name] = withOverCapWaits(kind.data);

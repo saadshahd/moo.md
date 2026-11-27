@@ -75,7 +75,7 @@
 	},
 	"machine": {
 		"id": "hotfix",
-		"version": "1",
+		"version": "2",
 		"initial": "building",
 		"states": {
 			"building": {
@@ -122,15 +122,26 @@
 				}
 			},
 			"owner-review": {
-				"tags": [
-					"owner-wait"
-				],
 				"on": {
 					"owner-approved": {
 						"target": "merging"
 					},
 					"owner-rejected": {
 						"target": "fixing"
+					}
+				},
+				"meta": {
+					"interaction": {
+						"label": "Review the change",
+						"choices": [
+							{
+								"label": "Approve",
+								"event": {
+									"type": "owner-approved"
+								}
+							}
+						],
+						"textEvent": "owner-rejected"
 					}
 				}
 			},
@@ -142,12 +153,15 @@
 				}
 			},
 			"asking": {
-				"tags": [
-					"owner-wait"
-				],
 				"on": {
 					"answered": {
 						"target": "building"
+					}
+				},
+				"meta": {
+					"interaction": {
+						"label": "Answer the run's question",
+						"textEvent": "answered"
 					}
 				}
 			},

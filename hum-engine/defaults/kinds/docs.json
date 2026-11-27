@@ -75,7 +75,7 @@
 	},
 	"machine": {
 		"id": "docs",
-		"version": "1",
+		"version": "2",
 		"initial": "building",
 		"states": {
 			"building": {
@@ -129,12 +129,15 @@
 				}
 			},
 			"asking": {
-				"tags": [
-					"owner-wait"
-				],
 				"on": {
 					"answered": {
 						"target": "building"
+					}
+				},
+				"meta": {
+					"interaction": {
+						"label": "Answer the run's question",
+						"textEvent": "answered"
 					}
 				}
 			},

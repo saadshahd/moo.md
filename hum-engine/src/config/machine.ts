@@ -3,7 +3,7 @@ import { toDirectedGraph } from "xstate/graph";
 import { z } from "zod";
 import { HOUR_MS } from "../time.ts";
 import type { Json } from "./json.ts";
-import { isFixedPart, type Kind, type StateNodeJSON } from "./schema.ts";
+import { type Interaction, isFixedPart, type Kind, type StateNodeJSON } from "./schema.ts";
 
 const placeholder = createAsyncLogic({ run: async () => {} });
 
@@ -44,6 +44,24 @@ export const TOKEN_CAP = "token-cap";
 
 /** What the owner's answer sends the wait it was given at. */
 export const ANSWERED = "answered";
+
+/** What the owner's approval of a change sends the wait for it. */
+export const OWNER_APPROVED = "owner-approved";
+
+/** What the owner's answer other than approval sends the wait for a change's approval. */
+export const OWNER_REJECTED = "owner-rejected";
+
+/** What the state offers the owner, where it waits on them. */
+export const interactionAt = (kind: Kind, state: string | undefined): Interaction | undefined => (state === undefined ? undefined : kind.machine.states[state]?.meta?.interaction);
+
+/** Whether the state waits on the owner: it offers them an interaction. */
+export const isOwnerWait = (node: StateNodeJSON | undefined): boolean => node?.meta?.interaction !== undefined;
+
+/** Whether the item waits on the owner in this state. */
+export const isWaitingOnOwner = (kind: Kind, state: string | undefined): boolean => state !== undefined && isOwnerWait(kind.machine.states[state]);
+
+/** Whether the state waits for the owner's approval of a change: one of its options sends that approval. */
+export const isApprovalWait = (kind: Kind, state: string | undefined): boolean => interactionAt(kind, state)?.choices?.some(({ event }) => event.type === OWNER_APPROVED) ?? false;
 
 /**
  * The kind as hum runs it. A state that invokes a role's run and names no `token-cap` transition stops, past the cap,
@@ -95,6 +113,21 @@ export const earliestTimeout = (node: StateNodeJSON | undefined) => {
 /** An actor for each source the kind's machine invokes: the one `sources` gives, else `fallback`. */
 export const invokedSources = (kind: Kind, fallback: AnyActorLogic, sources: Readonly<Record<string, AnyActorLogic>> = {}): Record<string, AnyActorLogic> =>
 	Object.fromEntries(Object.values(kind.machine.states).flatMap(({ invoke }) => (invoke ? [[invoke.src, sources[invoke.src] ?? fallback]] : [])));
+
+/** Every transition a state holds, wherever it holds one. */
+export const transitionsOf = (node: StateNodeJSON) =>
+	[...Object.values(node.on ?? {}), ...Object.values(node.after ?? {}), node.always ?? [], node.onTimeout ?? [], node.invoke?.onDone ?? [], node.invoke?.onError ?? []].flat();
+
+const targetsOf = (transitions: ReturnType<typeof transitionsOf>): string[] => transitions.flatMap(({ target }) => (target === undefined ? [] : [target]));
+
+/** The waits a run stops at past its token cap: the states only the over-cap event leads to. */
+export const overCapWaits = (kind: Kind): ReadonlySet<string> => {
+	const nodes = Object.values(kind.machine.states);
+	const capped = new Set(nodes.flatMap((node) => targetsOf(node.on?.[TOKEN_CAP] ?? [])));
+	const otherwise = new Set(nodes.flatMap(({ on = {}, ...node }) => targetsOf(transitionsOf({ ...node, on: Object.fromEntries(Object.entries(on).filter(([event]) => event !== TOKEN_CAP)) }))));
+
+	return new Set([...capped].filter((state) => !otherwise.has(state)));
+};
 
 /** Each state's next states, by every transition of the kind's machine. */
 export const nextStates = (kind: Kind): ReadonlyMap<string, readonly string[]> => {

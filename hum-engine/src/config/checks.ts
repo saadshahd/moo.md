@@ -1,7 +1,7 @@
 import { APP_TOKEN_MINUTES, WAKE_OWN_ENV } from "./wake-job.ts";
 import { isProsePurpose, PROSE_STATES } from "../decide/prose.ts";
 import { z } from "zod";
-import { GUARD_PARAMS, kindMachine, nextStates, reachedFrom } from "./machine.ts";
+import { GUARD_PARAMS, isOwnerWait, kindMachine, nextStates, reachedFrom, transitionsOf } from "./machine.ts";
 import type { Problem } from "./refusal.ts";
 import {
 	FIXED_PARTS,
@@ -9,7 +9,6 @@ import {
 	isRunPart,
 	type Kind,
 	type Naming,
-	OWNER_WAIT_TAG,
 	type PathRule,
 	SIZES,
 	STUCK_TAG,
@@ -22,7 +21,7 @@ export type CheckEnv = { readonly installedSkills?: ReadonlySet<string> };
 
 type Transitions = StateNodeJSON["onTimeout"];
 
-const isWait = (node: StateNodeJSON) => node.tags?.includes(WAIT_TAG) || node.tags?.includes(OWNER_WAIT_TAG);
+const isWait = (node: StateNodeJSON) => node.tags?.includes(WAIT_TAG) || isOwnerWait(node);
 const isTerminal = (node: StateNodeJSON) => node.type === "final" || node.tags?.includes(STUCK_TAG);
 
 const doesSettle = (value: Transitions) =>
@@ -53,9 +52,6 @@ const graphProblems = (kind: string, config: Kind): Problem[] => {
 	]);
 };
 
-/** Every transition a state holds, wherever it holds one. */
-const transitionsOf = (node: StateNodeJSON) => [...Object.values(node.on ?? {}), ...Object.values(node.after ?? {}), node.always ?? [], node.onTimeout ?? [], node.invoke?.onDone ?? [], node.invoke?.onError ?? []].flat();
-
 const isGuard = (type: string): type is keyof typeof GUARD_PARAMS => Object.hasOwn(GUARD_PARAMS, type);
 
 /** Every guard a transition names is one the engine has, with the params it takes. */
@@ -71,6 +67,25 @@ const guardProblems = (kind: string, { machine }: Kind): Problem[] =>
 			return params.success ? [] : [{ problem: "guard-params", kind, state, guard: guard.type, why: z.prettifyError(params.error) }];
 		}),
 	);
+
+/** The events a state's interaction sends: each option's, and a written answer's. */
+const interactionEvents = (node: StateNodeJSON): string[] => {
+	const interaction = node.meta?.interaction;
+
+	return [...(interaction?.choices ?? []).map(({ event }) => event.type), ...(interaction?.textEvent === undefined ? [] : [interaction.textEvent])];
+};
+
+const OWNER_SOURCE = "owner";
+
+/** Every event a wait offers the owner is one the state takes and only the owner sends; a skip goes to a state there is. */
+const controlProblems = (kind: string, { machine }: Kind, hum: HumConfig): Problem[] =>
+	Object.entries(machine.states).flatMap(([state, node]): Problem[] => [
+		...interactionEvents(node).flatMap((event): Problem[] => [
+			...(node.on?.[event] === undefined ? [{ problem: "interaction-event-unhandled", kind, state, event } as const] : []),
+			...(hum.events[event]?.source === OWNER_SOURCE ? [] : [{ problem: "interaction-event-not-owner", kind, state, event } as const]),
+		]),
+		...(node.meta?.skip === undefined || node.meta.skip.target in machine.states ? [] : [{ problem: "unknown-state", kind, state: node.meta.skip.target, why: `the skip of "${state}"` } as const]),
+	]);
 
 const kindProblems = (kind: string, config: Kind, hum: HumConfig): Problem[] => {
 	const { states } = config.machine;
@@ -92,7 +107,7 @@ const kindProblems = (kind: string, config: Kind, hum: HumConfig): Problem[] => 
 				problems.push({ problem: "unknown-run-source", kind, state, src: node.invoke.src });
 			}
 
-			if (role && node.tags?.includes(OWNER_WAIT_TAG)) {
+			if (role && isOwnerWait(node)) {
 				problems.push({ problem: "run-and-owner-wait", kind, state });
 			}
 
@@ -236,7 +251,7 @@ export const checkConfig = (
 		.flatMap(({ file }): Problem[] => (roleFiles.has(file) ? [] : [{ problem: "missing-file", file }])),
 	...pathProblems(hum),
 	...defaultKindProblems(hum),
-	...Object.entries(kinds).flatMap(([name, kind]) => kindProblems(name, kind, hum)),
+	...Object.entries(kinds).flatMap(([name, kind]) => [...kindProblems(name, kind, hum), ...controlProblems(name, kind, hum)]),
 	...eventProblems(hum, kinds),
 	...skillProblems(hum, env),
 	...namingProblems(hum),

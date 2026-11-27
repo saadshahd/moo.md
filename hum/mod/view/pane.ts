@@ -30,13 +30,15 @@ const listSection = (title: string, entries: readonly ListEntry[], input: PaneIn
 		input.width,
 	);
 
-const inFlightEntries = ({ inFlight }: Status, now: number): ListEntry[] =>
-	inFlight.map(({ item, title, level, state, since, unclear }) => ({
-		foldId: `in-flight:${item}`,
-		item,
-		title,
-		meta: [span([level, unclear ? "unclear" : undefined].flatMap((word) => word ?? []).join(" "), unclear ? "amber" : "plain"), span(state, "plain"), span(sinceText(since, now), "dim")].filter(({ text }) => text !== ""),
-	}));
+const inFlightEntries = ({ open }: Status, now: number): ListEntry[] =>
+	open
+		.filter(({ running }) => running)
+		.map(({ item, title = "", at, since }) => ({
+			foldId: `in-flight:${item}`,
+			item,
+			title,
+			meta: [span(at, "plain"), span(sinceText(since, now), "dim")],
+		}));
 
 const mergedEntries = ({ merged }: Status, now: number): ListEntry[] =>
 	merged.map(({ item, title, level, mergedAt }) => ({
