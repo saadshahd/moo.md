@@ -20,7 +20,7 @@ const REQUEST_RULES = {
 	},
 	"run-now": {
 		control: "runNow",
-		refused: (step) => `${step} waits on no timer the owner may run: hum runs only the timer of a wait on the owner`,
+		refused: (step) => `${step} has no timer the owner may run: hum runs only the earliest timer of a wait on the owner, and only where it leads on to work, never to a stuck step`,
 		applied: (step) => `the timer of ${step} fires now`,
 	},
 } as const satisfies Record<RequestKind, RequestRule>;

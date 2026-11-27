@@ -36,7 +36,7 @@ export const flowOf = (kind: Kind): Flow => {
 			controls: {
 				choices: (interaction?.choices ?? []).map(({ label, event }) => ({ label, event: event.type })),
 				answer: interaction?.textEvent !== undefined,
-				...requestsAllowed(node),
+				...requestsAllowed(kind, at),
 				noteTo: shown.filter((state) => reached.has(state) && !isFinal(state)),
 			},
 		};

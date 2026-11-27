@@ -391,7 +391,7 @@ test("the status file lists each item with a saved state: a waiting one at its w
 	const flowRow = { kind: "docs", flowVersion: w.config.kinds.docs!.machine.version, since: NOW };
 
 	expect(status.ok && status.status.open.toSorted((x, y) => x.item.localeCompare(y.item))).toEqual([
-		{ ...flowRow, item: "a", title: "a", steps: steps("asking"), at: "asking", passed: ["building"], running: false, controls: { choices: [], answer: true, skip: false, runNow: true, noteTo: ["building", "checking", "fixing", "merging", "asking", "stuck"] } },
+		{ ...flowRow, item: "a", title: "a", steps: steps("asking"), at: "asking", passed: ["building"], running: false, controls: { choices: [], answer: true, skip: false, runNow: false, noteTo: ["building", "checking", "fixing", "merging", "asking", "stuck"] } },
 		{ ...flowRow, item: "b", title: "b", steps: steps(), at: "building", passed: [], running: true, controls: { choices: [], answer: false, skip: false, runNow: false, noteTo: ["building", "checking", "fixing", "merging", "stuck"] } },
 	]);
 

@@ -3,7 +3,7 @@ import { toDirectedGraph } from "xstate/graph";
 import { z } from "zod";
 import { HOUR_MS } from "../time.ts";
 import type { Json } from "./json.ts";
-import { type Interaction, isFixedPart, type Kind, type StateNodeJSON } from "./schema.ts";
+import { type Interaction, isFixedPart, type Kind, STUCK_TAG, type StateNodeJSON } from "./schema.ts";
 
 const placeholder = createAsyncLogic({ run: async () => {} });
 
@@ -66,11 +66,20 @@ export const isWaitingOnOwner = (kind: Kind, state: string | undefined): boolean
 /** Where the owner's skip takes the state: only a wait on the owner, which a pass restores, skips; undefined where the state does not. */
 export const skipTargetOf = (node: StateNodeJSON | undefined): string | undefined => (isOwnerWait(node) ? node?.meta?.skip?.target : undefined);
 
-/** Whether the owner may run the state's timer now: a wait on the owner with an `after` timeout. */
-const canRunNow = (node: StateNodeJSON | undefined): boolean => isOwnerWait(node) && timeoutsOf(node).length > 0;
+/** Whether the owner may run the state's timer now: a wait on the owner whose earliest `after` timeout leads to no stuck state, so running it moves the item on to work. */
+const canRunNow = (kind: Kind, node: StateNodeJSON | undefined): boolean => {
+	const [earliest] = timeoutsOf(node);
+	const isStuck = (state: string): boolean => kind.machine.states[state]?.tags?.includes(STUCK_TAG) ?? false;
 
-/** The requests the state lets the owner make: a skip, and running its timer now. */
-export const requestsAllowed = (node: StateNodeJSON | undefined) => ({ skip: skipTargetOf(node) !== undefined, runNow: canRunNow(node) });
+	return isOwnerWait(node) && earliest !== undefined && !targetsOf([earliest.transitions].flat()).some(isStuck);
+};
+
+/** The requests the item's state lets the owner make: a skip, and running its timer now. */
+export const requestsAllowed = (kind: Kind, state: string | undefined) => {
+	const node = state === undefined ? undefined : kind.machine.states[state];
+
+	return { skip: skipTargetOf(node) !== undefined, runNow: canRunNow(kind, node) };
+};
 
 /** Whether the state waits for the owner's approval of a change: one of its options sends that approval. */
 export const isApprovalWait = (kind: Kind, state: string | undefined): boolean => interactionAt(kind, state)?.choices?.some(({ event }) => event.type === OWNER_APPROVED) ?? false;

@@ -17,7 +17,7 @@ const keyOf = (item: string, ordinal: number): string => `${item}#${ordinal}`;
 export const standOf = (kind: Kind | undefined, saved: SavedSnapshot | undefined, { answered, parked }: Pick<RequestStand, "answered" | "parked">): RequestStand => ({
 	at: saved?.state,
 	savedAt: saved?.savedAt,
-	controls: requestsAllowed(saved?.state === undefined ? undefined : kind?.machine.states[saved.state]),
+	controls: kind === undefined ? { skip: false, runNow: false } : requestsAllowed(kind, saved?.state),
 	answered,
 	parked,
 });

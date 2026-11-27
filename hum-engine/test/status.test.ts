@@ -55,11 +55,13 @@ test("at a wait, the flow names every step it shows, which of them wait on the o
 	});
 });
 
-test("a step allows a skip and a timer run now only where it waits on the owner, which a pass restores", () => {
+test("a step allows a skip and a timer run now only where it waits on the owner, which a pass restores, and a run now only where its earliest timer leads on to work, not to a stuck step", () => {
 	const flow = flowOf(fixWith((states) => (states.building.meta = { skip: { target: "checking" } })));
+	const toStuck = flowOf(fixWith((states) => (states.objecting.after = { "3600000": { target: "stuck" }, "86400000": { target: "building" } })));
 
 	expect(flow("building", [])?.controls).toMatchObject({ skip: false, runNow: false });
 	expect(flow("objecting", [])?.controls).toMatchObject({ skip: false, runNow: true });
+	expect(toStuck("objecting", [])?.controls).toMatchObject({ runNow: false });
 });
 
 test("a wait a run stops at past its token cap is a step only while the item is in it, and a final step has no flow", () => {

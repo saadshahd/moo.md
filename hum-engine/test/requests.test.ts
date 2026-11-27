@@ -30,7 +30,7 @@ test("a request is refused with its reason: no step, a parked item, a step left 
 	expect(why(request("skip", "building"))).toBe("the item is at objecting now, not building");
 	expect(why(request("skip", "objecting"), { ...atWait, at: undefined, savedAt: undefined })).toBe("the item has no saved step");
 	expect(why(request("skip", "objecting"), { ...atWait, controls: { skip: false, runNow: true } })).toContain("objecting is not a step the owner may skip");
-	expect(why(request("run-now", "objecting"), { ...atWait, controls: { skip: true, runNow: false } })).toContain("objecting waits on no timer the owner may run");
+	expect(why(request("run-now", "objecting"), { ...atWait, controls: { skip: true, runNow: false } })).toContain("objecting has no timer the owner may run");
 	expect(why(request("skip", "objecting"), { ...atWait, answered: true })).toBe("the owner's answer at objecting came first");
 	expect(why(request("skip", "objecting"), atWait, true)).toBe("an earlier request at objecting applies");
 });
