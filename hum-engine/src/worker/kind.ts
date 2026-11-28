@@ -7,7 +7,7 @@ import type { State } from "../state/open.ts";
 import type { ItemKind } from "../state/saved.ts";
 import { dropReviews } from "./owner-handoff.ts";
 import { queuedKey, queueQuestion } from "./questions.ts";
-import { pickedAnswer } from "./thread.ts";
+import { pickedChoice } from "./answers.ts";
 
 export type KindContext = {
 	readonly state: State;
@@ -55,10 +55,10 @@ export const keepKind = (o: Pick<KindContext, "state" | "config" | "now">, item:
 };
 
 /** The kind the owner named in answer to the kind question, for an item still on its fallback kind. */
-export const kindAnswered = (known: ItemKind, item: Item, kinds: readonly string[]): ItemKind | undefined => {
-	const answer = known.from === "fallback" ? pickedAnswer(item.thread, kinds) : undefined;
+export const kindAnswered = (state: Pick<State, "answers" | "events">, known: ItemKind, item: Item, kinds: readonly string[]): ItemKind | undefined => {
+	const answer = known.from === "fallback" ? pickedChoice(state, item, kinds) : undefined;
 
-	return answer?.option === undefined ? undefined : { item: item.id, kind: answer.option, from: "source" };
+	return answer === undefined ? undefined : { item: item.id, kind: answer.choice, from: "source" };
 };
 
 /** Whether hum started the item and its next pass goes on from what it saved: a snapshot or a landing. */

@@ -31,7 +31,3 @@ export const answerToLatest = (thread: Thread): ThreadEntry | undefined => {
 
 /** Hum's latest question, while neither an applied answer nor hum's close follows it. */
 export const openQuestion = (thread: Thread): ThreadEntry | undefined => (answerToLatest(thread) === undefined && latestCloseAt(thread) < 0 ? thread[latestQuestionAt(thread)] : undefined);
-
-/** The latest applied answer that picks one of `options`, from `since` on. */
-export const pickedAnswer = (thread: Thread, options: readonly string[], since = 0): ThreadEntry | undefined =>
-	thread.findLast((entry) => entry.kind === "answer" && entry.at >= since && entry.option !== undefined && options.includes(entry.option));

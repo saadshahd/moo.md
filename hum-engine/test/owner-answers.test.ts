@@ -5,7 +5,8 @@ import type { ModelCall } from "../src/adapters/model-call.ts";
 import { OWNER_APPROVAL } from "../src/decide/merge.ts";
 import type { Wait } from "../src/state/events.ts";
 import { openState } from "../src/state/open.ts";
-import { settleAnswers, withSettledAnswers } from "../src/worker/answers.ts";
+import { pickedChoice, planChangingAnswers, settleAnswers, withSettledAnswers } from "../src/worker/answers.ts";
+import { kindAnswered } from "../src/worker/kind.ts";
 import { settleRequests } from "../src/worker/requests.ts";
 import { settleNotes } from "../src/worker/step-notes.ts";
 import { answerTo } from "../src/worker/thin-path.ts";
@@ -109,4 +110,34 @@ test("an answer hum 0.33 settled before it kept answers in the log is kept from 
 	expect(w.kept()).toEqual([{ wait: VISIT, choice: "object", text: "ship it", at: 120, read: "model" }]);
 	expect(answerTo(w.state.events, item, VISIT)?.option).toBe("object");
 	expect(await w.replies()).toEqual([]);
+});
+
+test("a pick at landing is the choice the kept answer holds, given since the change was saved: an edited comment keeps what hum read, and an answer from before the change counts for none", async () => {
+	const w = world();
+
+	await w.settle([question(["approve", "object"]), reply("approve")]);
+
+	const edited = w.itemOf([question(["approve", "object"]), reply("object")]);
+
+	expect(pickedChoice(w.state, edited, [OWNER_APPROVAL], 120)?.choice).toBe(OWNER_APPROVAL);
+	expect(pickedChoice(w.state, edited, ["object"], 120)).toBeUndefined();
+	expect(pickedChoice(w.state, edited, [OWNER_APPROVAL], 121)).toBeUndefined();
+});
+
+test("the kind the owner named for an item on its fallback kind is the kept answer's choice, though the comment is edited after", async () => {
+	const w = world();
+	const asked: ThreadEntry = { kind: "question", text: "Which kind of work is this?\n\nOptions: docs, fix", at: 110, author: "hum" };
+
+	await w.settle([asked, reply("fix")], { stage: "waiting" });
+
+	expect(kindAnswered(w.state, { item: w.id, kind: "feature", from: "fallback", why: "unsure" }, w.itemOf([asked, reply("docs")]), ["docs", "fix"])).toEqual({ item: w.id, kind: "fix", from: "source" });
+});
+
+test("an answer that changed the plan reaches the next run in the words hum kept, though the comment is edited after", async () => {
+	const w = world();
+	const asked: ThreadEntry = { kind: "question", text: "How should the export go on?", at: 110, author: "hum" };
+
+	await w.settle([asked, reply("Write one file per day.")], { stage: "waiting" });
+
+	expect(planChangingAnswers(w.state, w.itemOf([asked, reply("never mind")]), new Set())).toEqual([{ question: asked.text, answer: "Write one file per day.", at: 120 }]);
 });
