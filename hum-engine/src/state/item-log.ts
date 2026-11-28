@@ -136,3 +136,10 @@ export const doneByOf = ({ merged, picks, landing }: ItemFold): DoneBy | undefin
 
 	return picks.plan?.pick.event === SPLIT ? "split" : landing?.doneBy;
 };
+
+/** How the item reached done, from its log; unknown where a newer engine wrote some of it, which raises the item's card. */
+export const doneByIn = (events: EventLog, item: string): DoneBy | undefined => {
+	const log = events.read(item);
+
+	return log.ok ? doneByOf(foldItem(log.value)) : undefined;
+};

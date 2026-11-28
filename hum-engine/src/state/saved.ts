@@ -55,6 +55,10 @@ export const Landing = z.object({
 	files: z.array(ChangedFile).optional(),
 	/** By the head each of the item's reviews judged, the files that changed from it to `head`; a head git could not read is left out. */
 	changedSince: z.record(name, z.array(name)).optional(),
+	/** The pull request the run branch waits in, once landing opened one. */
+	pullRequest: z.string().optional(),
+	/** Why that pull request waits for the owner's approval; absent while it merges itself once its checks pass. */
+	awaitsOwner: z.string().optional(),
 });
 
 export type Landing = z.infer<typeof Landing>;

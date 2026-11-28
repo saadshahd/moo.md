@@ -20,7 +20,7 @@ const job = async (repo: WorkRepo, name: string) => {
 	return { dir, read, state: openState(dir, { now: () => NOW }), save: (from = read) => saveCiState({ ...where, ...from, identity: OWNER, at: NOW }) };
 };
 
-test("a wake that parks a stuck item and spends tokens saves both, and the next wake, in a fresh clone, reads them back and runs the item no more", async () => {
+test("a wake that parks a stuck item and spends tokens saves both, and the next wake, in a fresh clone, reads them back and runs the item no more, with none of the files the job keeps to itself", async () => {
 	const repo = new WorkRepo();
 	const first = await job(repo, "wake-1");
 
@@ -28,7 +28,9 @@ test("a wake that parks a stuck item and spends tokens saves both, and the next 
 
 	tallyOf(first.state, "seed-1").spend(900_000);
 	first.state.parked.put("seed-1", { item: "seed-1", why: "stuck", cause: "the checks still fail after 3 fixes", since: NOW });
-	writeFileSync(join(first.dir, "heartbeat.json"), "{}");
+
+	for (const kept of ["heartbeat.json", "waits.json", "looked.json"]) writeFileSync(join(first.dir, kept), "{}");
+
 	await first.save();
 
 	const second = await job(repo, "wake-2");
@@ -36,7 +38,7 @@ test("a wake that parks a stuck item and spends tokens saves both, and the next 
 	expect(second.read.read).toBe(sh(repo.remote, ["rev-parse", CI_STATE_REF]).trim());
 	expect(second.state.parked.get("seed-1")?.why).toBe("stuck");
 	expect(tallyOf(second.state, "seed-1").sinceAnswer()).toBe(900_000);
-	expect(existsSync(join(second.dir, "heartbeat.json"))).toBe(false);
+	expect(["heartbeat.json", "waits.json", "looked.json"].filter((kept) => existsSync(join(second.dir, kept)))).toEqual([]);
 });
 
 test("each save replaces the ref with one commit and no parent, so the ref never grows", async () => {

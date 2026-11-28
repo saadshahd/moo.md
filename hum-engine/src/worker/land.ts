@@ -481,6 +481,11 @@ const throughPullRequest = async (
 	const labels = await growthLabelsOf(ctx.git, { base: `origin/${base}`, head: "HEAD" }, config.hum.growthLabels);
 	const pull = await pullFor(pulls, { head: branch, base, ...pullRequestOf(ctx, autoMerge ? `Level ${route.level.name}: it merges once the required checks pass.` : `Not merged by hum: ${why}.`) }, labels);
 
+	const landing = ctx.state.landings.get(id);
+	const awaitsOwner = autoMerge ? undefined : why;
+
+	if (landing !== undefined && (landing.pullRequest !== pull.url || landing.awaitsOwner !== awaitsOwner)) ctx.state.landings.put(id, { ...landing, pullRequest: pull.url, awaitsOwner });
+
 	if (pull.state === "MERGED") return finish(ctx, mergedThrough(ctx.state.landings.get(id), pull.mergeCommit));
 
 	if (pull.state === "CLOSED")

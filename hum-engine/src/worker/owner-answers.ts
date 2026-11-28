@@ -1,12 +1,9 @@
 import type { ThreadEntry } from "../adapter-api.ts";
 import { hashJson } from "../config/hash.ts";
 import { asJson } from "../config/json.ts";
-import type { EventLog, KeptAnswer, Wait } from "../state/events.ts";
+import { type EventLog, type KeptAnswer, OWNER_SOURCE, type Wait } from "../state/events.ts";
 import type { SavedSnapshot } from "../state/items.ts";
 import type { Parked } from "../state/saved.ts";
-
-/** The source every owner's answer is kept under in an item's log. */
-const OWNER_SOURCE = "owner";
 
 /** The key an owner's entry is kept under: its source's own id, else the hash of the entry as its source gave it. */
 export const answerKey = (entry: ThreadEntry): string => entry.id ?? hashJson(asJson(entry));

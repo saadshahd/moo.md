@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { CI_TICK_REF, readCiTick, recordCiTick } from "../src/service/ci-tick.ts";
 import { backoffFor, type Child, EXIT_UPDATED, supervise, type Supervision } from "../src/service/supervise.ts";
@@ -11,6 +11,7 @@ import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { alone } from "../src/state/alone.ts";
 import { openState } from "../src/state/open.ts";
 import { emptyStatus, readStatus, writeHeartbeat } from "../src/status/file.ts";
+import { Waits } from "../src/status/waits.ts";
 import { configWith } from "./fixtures/config.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { until } from "./fixtures/process.ts";
@@ -63,7 +64,7 @@ const hangs = (): Child => {
 	return { exited: ended.promise, kill: () => ended.resolve(0) };
 };
 
-test("a worker that exits at start is restarted until the crash limit, then one card shows and no worker starts while the script looks at the installed engine each tick, until another one ends it as an update", async () => {
+test("a worker that exits at start is restarted until the crash limit, then one card shows in the status and the waits and no worker starts while the script looks at the installed engine each tick, until another one ends it as an update", async () => {
 	let spawns = 0;
 	let looks = 0;
 	const u = unit({ spawn: () => (spawns++, exited(1)), hasNewEngine: () => ++looks === 3 });
@@ -74,6 +75,7 @@ test("a worker that exits at start is restarted until the crash limit, then one 
 	expect(u.cardsInStatus()).toHaveLength(1);
 	expect(u.cardsInStatus()[0]).toMatchObject({ code: "worker-down" });
 	expect(u.cardsInStatus()[0]?.cause).toContain("Restarts have stopped");
+	expect(Waits.parse(JSON.parse(readFileSync(u.state.waitsPath, "utf8"))).waits).toMatchObject([{ from: "hum", code: "worker-down" }]);
 	expect(readdirSync(join(u.state.dir, "faults"))).toHaveLength(1);
 });
 

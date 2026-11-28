@@ -598,7 +598,7 @@ test("a pull request whose change grows a growth label's files gets the label on
 	expect(await labelled({ label: "grow", paths: ["**/*.md"], except: ["docs/**"] })).toEqual({ labels: [], labelCalls: 0 });
 });
 
-test("a change that waits for the owner runs on its level's tier and opens the same pull request without auto-merge; the owner's approval arms it", async () => {
+test("a change that waits for the owner runs on its level's tier and opens the same pull request without auto-merge, whose link and wait its landing keeps; the owner's approval arms it and ends the wait", async () => {
 	const w = await world({ script: [{}, NOTE] }, { config: configWith((raw) => void (raw.hum.paths = [{ glob: "docs/**", level: "high" }])) });
 	const github = new FakeGitHub();
 	const pulls = github.client();
@@ -607,12 +607,14 @@ test("a change that waits for the owner runs on its level's tier and opens the s
 	github.requiresPullRequest = true;
 	expect(await runThinPath(w.thinPath({ pulls }))).toMatchObject({ outcome: "landing", item: id });
 	expect(github.pulls()).toMatchObject([{ autoMerge: false, state: "OPEN" }]);
+	expect(w.state.landings.get(id)).toMatchObject({ pullRequest: `https://github.com/me/scratch/pull/${github.pulls()[0]?.number}`, awaitsOwner: expect.any(String) });
 	expect(w.shim.calls().at(-1)?.argv).toContain(SHIPPED_DEFAULTS.models.top);
 
 	await w.adapter.answers!.answer(id, { text: "approve", option: "approve" });
 	w.clock.at += TTL;
 	expect(await runThinPath(w.thinPath({ pulls, itemId: id }))).toMatchObject({ outcome: "landing", item: id });
 	expect(github.pulls()).toMatchObject([{ autoMerge: true }]);
+	expect(w.state.landings.get(id)?.awaitsOwner).toBeUndefined();
 });
 
 test("the owner's approval holds for the same change rebased onto a moved base, so it merges without a second ask", async () => {

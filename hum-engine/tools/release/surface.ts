@@ -40,7 +40,7 @@ const PACKAGE_ROOT = resolve(import.meta.dir, "../..");
 
 const ADAPTER_API_FILES = ["src/adapter-api.ts"];
 
-const SAVED_STATE_FILES = ["src/state/format.ts", "src/status/format.ts"];
+const SAVED_STATE_FILES = ["src/state/format.ts", "src/status/format.ts", "src/status/waits.ts"];
 
 const EXPORTED_TYPE_FILES = ["src/index.ts"];
 

@@ -2,7 +2,7 @@ import { createActor, createAsyncLogic, setup, toPromise } from "xstate";
 import { z } from "zod";
 import { ENGINE_VERSION } from "../state/format.ts";
 import type { State } from "../state/open.ts";
-import { readHeartbeat, writeCards } from "../status/file.ts";
+import { readHeartbeat, type StatusPlaces, writeCards } from "../status/file.ts";
 import { MINUTE_MS, SECOND_MS } from "../time.ts";
 import { CARD_CODES, CARD_KINDS } from "./cards.ts";
 
@@ -17,7 +17,7 @@ export const EXIT_UPDATED = 75;
 export type Child = { readonly exited: Promise<number>; readonly kill: () => void };
 
 export type Supervision = {
-	readonly state: Pick<State, "faults" | "heartbeatPath" | "statusPath">;
+	readonly state: Pick<State, "faults" | "heartbeatPath"> & StatusPlaces;
 	readonly spawn: () => Child;
 	readonly now: () => number;
 	/** The time between heartbeat looks, and the worker's tick interval until it writes a heartbeat. */
@@ -46,12 +46,14 @@ type Context = z.infer<typeof Context>;
 type Card = ReturnType<(typeof CARD_KINDS)["workerSilent"]> | undefined;
 
 /** Shows `card` as the only worker-down card, or none; the status file is written here because no worker is there to write it. */
-const showWorkerDown = ({ faults, statusPath }: Supervision["state"], card: Card, now: number): void => {
+const showWorkerDown = (state: Supervision["state"], card: Card, now: number): void => {
+	const { faults } = state;
+
 	faults.clear({ code: CARD_CODES.workerDown });
 
 	if (card) faults.raise(card);
 
-	writeCards(statusPath, faults.list(), ENGINE_VERSION, now);
+	writeCards(state, ENGINE_VERSION, now);
 };
 
 const isUpdateExit = (exitCode: number): boolean => exitCode === EXIT_UPDATED;
