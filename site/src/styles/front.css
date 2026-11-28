@@ -25,9 +25,14 @@ ul.front { padding: 0; }
 .band-copy > .lead { margin-top: var(--moo-space-4); }
 .band-copy > p:not(.lead, .actions) { margin-top: var(--moo-space-3); }
 .band-copy > .actions { margin-top: var(--moo-space-5); }
-@media (min-width: 68rem) {
+@media (width > 68rem) {
   :root:has(.front) .band h2 { font-size: min(3.5rem, 10.3cqw); max-width: 24ch; }
   .band-copy { container-type: inline-size; }
+}
+/* Where the column is narrower than 75rem the figure grows taller than the
+   copy, so the copy spreads its lines down to the figure's height. */
+@media (68rem < width < 75rem) {
+  .band-copy { display: flex; flex-direction: column; justify-content: space-between; align-self: stretch; }
 }
 @media (max-width: 40rem) {
   :root:has(.front) .band h2 { font-size: 2.25rem; }
