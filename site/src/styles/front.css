@@ -26,7 +26,8 @@ ul.front { padding: 0; }
 .band-copy > p:not(.lead, .actions) { margin-top: var(--moo-space-3); }
 .band-copy > .actions { margin-top: var(--moo-space-5); }
 @media (min-width: 68rem) {
-  :root:has(.front) .band h2 { font-size: 3.5rem; max-width: 24ch; }
+  :root:has(.front) .band h2 { font-size: min(3.5rem, 10.3cqw); max-width: 24ch; }
+  .band-copy { container-type: inline-size; }
 }
 @media (max-width: 40rem) {
   :root:has(.front) .band h2 { font-size: 2.25rem; }
