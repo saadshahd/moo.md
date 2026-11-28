@@ -65,7 +65,7 @@ npx skills@latest add saadshahd/moo.md
 ### 2. Run the loop
 
 ```
-/hope:full <your seed>
+/hope:compose <your seed>
 ```
 
 Or run the stages directly — `/hope:intent <your seed>`, then `/hope:shape <your intent>`.
