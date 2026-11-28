@@ -172,16 +172,31 @@ export const settleAnswers = async (ctx: AnswerContext, item: Item, { stage, opt
 /** One of hum's questions on an item's thread, the owner's answer to it, and when the owner gave it. */
 export type OwnerAnswer = QuestionAnswer & { readonly at: number };
 
+/** A reply on the item's thread that hum settled, with the owner's answer its log keeps for it and what became of it. */
+type KeptReply = { readonly reply: Reply; readonly kept: KeptAnswer; readonly record: SettledAnswer };
+
+/** Every reply on the item's thread that hum settled, oldest first, read from the owner's answers its log keeps. */
+const keptReplies = (state: Pick<State, "answers" | "events">, item: Item): KeptReply[] =>
+	numberedReplies(item.thread).flatMap((reply) => {
+		const record = state.answers.get(keyOf(item.id, reply.ordinal));
+		const kept = keptAnswer(state.events, item.id, reply.entry);
+
+		return record && kept ? [{ reply, kept, record }] : [];
+	});
+
+/** The latest of the owner's answers that took effect picking one of `choices`, given from `since` on, as the item's log keeps it. */
+export const pickedChoice = (state: Pick<State, "answers" | "events">, item: Item, choices: readonly string[], since = 0): KeptAnswer | undefined =>
+	keptReplies(state, item).findLast(({ kept, record }) => record.disposition === "applied" && kept.at >= since && choices.includes(kept.choice))?.kept;
+
 /**
- * The owner's answers on the item's thread, as read from its source, that changed the plan, oldest first, each with
- * hum's question before it. Picks of `steering`, hum's own options, are not among them.
+ * The owner's answers that changed the plan, oldest first, in their words as the item's log keeps them, each with
+ * hum's question before it on the thread. Picks of `steering`, hum's own options, are not among them.
  */
-export const planChangingAnswers = (state: Pick<State, "answers">, item: Item, steering: ReadonlySet<string>): OwnerAnswer[] =>
-	numberedReplies(item.thread).flatMap(({ entry, ordinal, index }) => {
-		const record = state.answers.get(keyOf(item.id, ordinal));
+export const planChangingAnswers = (state: Pick<State, "answers" | "events">, item: Item, steering: ReadonlySet<string>): OwnerAnswer[] =>
+	keptReplies(state, item).flatMap(({ reply: { index }, kept, record }) => {
 		const asked = item.thread.slice(0, index).findLast(isHumQuestion);
 
-		return record && asked && changesPlan(record, steering) ? [{ question: asked.text, answer: entry.text, at: entry.at }] : [];
+		return asked && changesPlan({ disposition: record.disposition, option: kept.choice === "" ? undefined : kept.choice }, steering) ? [{ question: asked.text, answer: kept.text, at: kept.at }] : [];
 	});
 
 /**

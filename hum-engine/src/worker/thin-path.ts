@@ -289,7 +289,7 @@ export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gather
 	const read = await o.workSource.read(id);
 	const savedWait = o.state.items.savedOf(id);
 	const item = await settleAnswers({ state: o.state, workSource: o.workSource, judge, now }, read, { stage, wait: savedWait && waitOf(savedWait) });
-	const named = known && kindAnswered(known, item, o.config.hum.kinds);
+	const named = known && kindAnswered(o.state, known, item, o.config.hum.kinds);
 
 	if (named) o.state.itemKinds.put(id, named);
 
