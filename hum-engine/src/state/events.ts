@@ -38,11 +38,14 @@ const LOG_MIGRATIONS: Steps<LogRecord> = {
 /** What every format of a record carries: enough to place it in its log, and to refuse one from a newer engine before reading the rest. */
 const Placed = z.looseObject({
 	format: z.int().nonnegative().default(0),
+	/** The engine that wrote the record; one from before hum 0.5.0 names none. */
 	engineVersion: name.optional(),
+	/** Where the event came from, such as a thread comment id: a second read of it adds nothing. */
 	source: name,
 	sourceId: name,
 	itemId: name,
 	receivedAt: count,
+	/** The event's place in its item's log. An event saved before hum kept places has none, and comes first, by when it arrived. */
 	seq: count.optional(),
 });
 
@@ -109,18 +112,8 @@ export const KeptAnswer = z.object({ wait: Wait.optional(), choice: z.string(), 
 
 export type KeptAnswer = z.infer<typeof KeptAnswer>;
 
-const envelope = {
-	format: z.literal(LOG_FORMAT),
-	/** The engine that wrote the record; one from before hum 0.5.0 names none. */
-	engineVersion: name.optional(),
-	/** Where the event came from, such as a thread comment id: a second read of it adds nothing. */
-	source: name,
-	sourceId: name,
-	itemId: name,
-	receivedAt: count,
-	/** The event's place in its item's log. An event saved before hum kept places has none, and comes first, by when it arrived. */
-	seq: count.optional(),
-};
+/** What a record at this engine's format carries to place it: the same fields as at any format, at this format alone. */
+const envelope = { ...Placed.shape, format: z.literal(LOG_FORMAT) };
 
 /** The version of the item's kind machine the record was made under. */
 const machineVersion = name;
