@@ -23,9 +23,9 @@ import {
   isRepoBound,
   parseFindings,
   register,
+  newestByKey,
   sortRepeats,
   touchedFiles,
-  withReject,
   verdict,
 } from "./slop.tsx";
 import type { Finding, Slop } from "../slop.d.ts";
@@ -249,21 +249,21 @@ describe("sortRepeats", () => {
       { kind: "show", finding: found[1] },
     ]);
   });
-  test("a finding still waiting for a decision shows, to take its newer change", () => {
-    const s = addFindings(empty, [F({ rule: "naming" })]);
+  test("a finding this session showed goes on as shown, never to the model or the hidden list", () => {
+    const s = { ...empty, seen: [findingKey(F({ rule: "naming" }))!] };
     expect(
       sortRepeats([F({ rule: "naming", line: 9 })], [reject], s, repo)[0].kind,
     ).toBe("show");
   });
 });
 
-describe("withReject", () => {
-  test("the newest reject goes last, once per key, and only the newest are kept", () => {
+describe("newestByKey", () => {
+  test("each key stays once, at its newest place, and only the newest cap are kept", () => {
     const many = Array.from({ length: KEPT_REJECTS }, (_, i) =>
       F({ rule: `r${i}` }),
     );
     const again = F({ rule: "r1", claim: "newer" });
-    const kept = withReject(many, again);
+    const kept = newestByKey([...many, again], findingKey, KEPT_REJECTS);
     expect(kept.length).toBe(KEPT_REJECTS);
     expect(kept.at(-1)).toEqual(again);
     expect(kept.filter((r) => r.rule === "r1")).toEqual([again]);
@@ -895,11 +895,16 @@ test("the review: accept on a file that is gone sends the finding to Claude", as
   expect(now().chosen).toEqual([{ finding: gone }]);
 });
 
-/** hope's store, held here, and git saying the session root "/r" is the repo "/r/.git". */
-function repoStore(on: On, entries: Record<string, unknown> = {}) {
+/** hope's store, held here, refusing every write when given a refusal, and git saying the session root "/r" is the repo "/r/.git". */
+function repoStore(
+  on: On,
+  entries: Record<string, unknown> = {},
+  refusal?: string,
+) {
   const store = new Map(Object.entries(entries));
   on("store.get", (_: unknown, e: any) => ({ value: store.get(e.key) }) as any);
   on("store.set", (_: unknown, e: any) => {
+    if (refusal) throw new Error(refusal);
     store.set(e.key, e.value);
     return { value: undefined } as any;
   });
@@ -936,6 +941,34 @@ test("the review: reject stores the finding for the repo, its file relative to t
   ]);
 });
 
+test("the review: a reject the store refuses shows once and keeps the review going", async ($, on) => {
+  const now = slopState(on, waiting([F(), F({ file: "b.ts" })]));
+  fileSystem(on, {});
+  promptBox(on);
+  repoStore(on, {}, "over the limit");
+  const toasts: string[] = [];
+  on("ui.toast", (_: unknown, e: any) => {
+    toasts.push(e.text);
+    return { value: undefined } as any;
+  });
+  const row = await $.ui.mount({
+    plugin: "hope",
+    surface: "terminal",
+    component: "AbovePrompt",
+    props: { hasSurvey: false } as any,
+  });
+  await row.press({ key: "slop-reject" });
+  await settle();
+  await row.redraw();
+  await row.press({ key: "slop-reject" });
+  await settle();
+  expect(now().findings).toEqual([]);
+  expect(toasts.length).toBe(1);
+  expect(toasts[0]).toStartWith(
+    "hope slop: a reject could not be stored, so it lasts this session only:",
+  );
+});
+
 test("the row: hidden repeats wait behind a count, and its pane lists each with the reject it repeats", async ($, on) => {
   const repeats = F({ rule: "no var", claim: "var again." });
   slopState(on, {
@@ -968,11 +1001,14 @@ test("the row: hidden repeats wait behind a count, and its pane lists each with 
   ).toBeDefined();
 });
 
-test("/forget-slop-rejects forgets the repo's rejects and this session's hidden repeats", async ($, on) => {
+test("/forget-slop-rejects forgets the repo's rejects and this session's, keeping what still waits", async ($, on) => {
+  const waits = F({ file: "w.ts" });
   const now = slopState(on, {
-    ...waiting([]),
+    ...waiting([F(), waits]),
+    cursor: 1,
+    marks: [{ kind: "reject" }],
     hidden: [{ finding: F(), repeats: F(), by: "rule" }],
-    seen: [findingKey(F())!, "error|x"],
+    seen: [findingKey(F())!, findingKey(waits)!, "error|x"],
   } as Slop);
   fileSystem(on, {});
   const store = repoStore(on, { [`${REJECTS}/r/.git`]: [F()] });
@@ -983,7 +1019,7 @@ test("/forget-slop-rejects forgets the repo's rejects and this session's hidden 
   expect(text).toBe("Forgot 1 rejected slop findings in /r.");
   expect(store.size).toBe(0);
   expect(now().hidden).toEqual([]);
-  expect(now().seen).toEqual(["error|x"]);
+  expect(now().seen).toEqual([findingKey(waits)!, "error|x"]);
 });
 
 /** /fix-slops as the person types it at the terminal. */
