@@ -17,6 +17,21 @@ ul.front { padding: 0; }
 .front code { font-family: var(--__sl-font-mono); font-size: 0.875em; background: none; padding: 0; }
 .front a:has(> code) { color: var(--sl-color-text-accent); text-underline-offset: 0.2em; }
 
+/* The copy sits tight so it fits its figure. Beside the figure (68rem up) it
+   shrinks to the figure's height: the heading at 3.5rem on two lines, which
+   holds because the figure's height holds. Stacked over the figure on a phone
+   the heading drops one step so the figure's two answers show on the first
+   screen. */
+.band-copy > .lead { margin-top: var(--moo-space-4); }
+.band-copy > p:not(.lead, .actions) { margin-top: var(--moo-space-3); }
+.band-copy > .actions { margin-top: var(--moo-space-5); }
+@media (min-width: 68rem) {
+  :root:has(.front) .band h2 { font-size: 3.5rem; max-width: 24ch; }
+}
+@media (max-width: 40rem) {
+  :root:has(.front) .band h2 { font-size: 2.25rem; }
+}
+
 /* The line under the band's actions links in its own grey. */
 .band-copy .quiet a { color: inherit; text-underline-offset: 0.2em; }
 
