@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { ThreadEntry } from "../src/adapter-api.ts";
-import { decideRequest, pendingRequest, type RequestStand, requestsOn } from "../src/decide/request.ts";
+import { decideRequest, type KeptRequest, keptRequestOf, pendingRequest, type RequestStand, requestsOn, requestWait } from "../src/decide/request.ts";
 
 const SAVED_AT = 100;
 
@@ -8,8 +8,11 @@ const atWait: RequestStand = { at: "objecting", savedAt: SAVED_AT, controls: { s
 
 const request = (kind: "skip" | "run-now", step: string | undefined, at = SAVED_AT + 1): ThreadEntry => ({ kind, text: `${kind} ${step}`, at, step, author: "hum" });
 
+/** The thread's requests as hum keeps them when it first reads them where the item stands at `stand`. */
+const keptAt = (thread: readonly ThreadEntry[], stand: RequestStand = atWait): KeptRequest[] => requestsOn(thread).map(({ ordinal, entry }) => keptRequestOf(ordinal, { choice: entry.kind, wait: requestWait(entry, stand) }));
+
 const decided = (entry: ThreadEntry, stand: RequestStand = atWait, earlierApplies = false) => {
-	const [found] = requestsOn([entry]);
+	const [found] = keptAt([entry], stand);
 
 	if (found === undefined) throw new Error("the entry is no request");
 
@@ -37,10 +40,10 @@ test("a request is refused with its reason: no step, a parked item, a step left 
 
 test("the request that acts now is the first applied one made at this visit, and none acts once an answer released the wait", () => {
 	const thread = [request("skip", "objecting", SAVED_AT - 1), { kind: "comment", text: "a remark", at: SAVED_AT + 1 } satisfies ThreadEntry, request("run-now", "objecting"), request("skip", "objecting", SAVED_AT + 2)];
-	const requests = requestsOn(thread);
+	const requests = keptAt(thread);
 	const applied = () => ({ disposition: "applied", why: "ok" }) as const;
 
-	expect(requests.map(({ ordinal, entry }) => [ordinal, entry.kind])).toEqual([[1, "skip"], [2, "run-now"], [3, "skip"]]);
+	expect(requests.map(({ ordinal, kind }) => [ordinal, kind])).toEqual([[1, "skip"], [2, "run-now"], [3, "skip"]]);
 	expect(pendingRequest(requests, applied, atWait)).toBe("run-now");
 	expect(pendingRequest(requests, applied, { ...atWait, answered: true })).toBeUndefined();
 	expect(pendingRequest(requests, applied, { ...atWait, at: "building" })).toBeUndefined();

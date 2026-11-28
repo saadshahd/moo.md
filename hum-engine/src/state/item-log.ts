@@ -24,8 +24,8 @@ export const machineStarted = ({ itemId, machineVersion, afresh }: MachineOf & {
 /** The item's change no longer held on the newest base, so its progress is dropped and its next pass builds it there again. */
 export const rebuilt = (itemId: string, why: string): NewEvent => ({ source: "landing", itemId, type: "rebuilt", payload: { why } });
 
-/** The owner's answer on the item's thread, keyed by when it came, so every read of it adds one entry. */
-export const ownerAnswered = (itemId: string, at: number): NewEvent => ({ source: "thread", sourceId: `answer:${at}`, itemId, type: "answered", payload: {} });
+/** The owner's answer took effect on the item, keyed by when they gave it, so applying it again adds nothing. */
+export const answerApplied = (itemId: string, at: number): NewEvent => ({ source: "thread", sourceId: `answer:${at}`, itemId, type: "answer-applied", payload: {} });
 
 /** What one model run is asked, and whether an answer the log keeps to the same question stands in for running it. */
 export type Ask = {
@@ -102,6 +102,8 @@ const stepItem = (fold: ItemFold, entry: SavedEvent): ItemFold => {
 		case "landing-found":
 			return { ...fold, landing: entry.payload };
 		case "answered":
+			return fold;
+		case "answer-applied":
 			return { ...fold, runs: {}, rebuilds: 0, answers: {} };
 		case "merged":
 			return { ...fold, merged: true };

@@ -212,7 +212,7 @@ test("an item whose log holds a record a newer engine wrote is held with that en
 
 	w.state.landings.put(id, { item: id, branch: runBranch(SHIPPED_DEFAULTS, id), since: NOW, change: { paths: ["docs/note.md"], size: 1, loosened: false, pinChanged: false }, head: "abc" });
 
-	openState(w.state.dir, { engineVersion: "99.0.0", now: Date.now }).events.add({ source: "thread", sourceId: "a1", itemId: id, type: "answered", payload: {} });
+	openState(w.state.dir, { engineVersion: "99.0.0", now: Date.now }).events.add({ source: "thread", sourceId: "a1", itemId: id, type: "answer-applied", payload: {} });
 
 	expect(await runThinPath(w.thinPath({ itemId: id }))).toMatchObject({ outcome: "held", why: expect.stringContaining("hum 99.0.0") });
 	expect(w.state.faults.list().map(({ code }) => code)).toEqual(["snapshot-from-newer-engine"]);

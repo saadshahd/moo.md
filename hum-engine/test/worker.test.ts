@@ -521,7 +521,7 @@ test("an item id in the inbox folder wakes a waiting item at once and its questi
 	const openAfter = readStatus(w.state.statusPath);
 
 	expect(openAfter.ok && openAfter.status.questions).toEqual([]);
-	expect(w.state.events.list("a").map((e) => e.type)).toContain("answered");
+	expect(w.state.events.list("a").map((e) => e.type)).toContain("answer-applied");
 });
 
 test("an item that waits on the owner in a talk row holds no runner: another item builds meanwhile, and once the row's answer counts the waiting item runs again and takes it", async () => {

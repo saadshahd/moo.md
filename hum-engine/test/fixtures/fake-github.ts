@@ -24,7 +24,7 @@ export const STRANGER: Author = { authorAssociation: "NONE", author: { __typenam
 /** The bot a workflow's own token posts as. */
 export const WORKFLOW_BOT: Author = { authorAssociation: "NONE", author: { __typename: "Bot", login: "github-actions" } };
 
-type Comment = Author & { body: string; createdAt: string };
+type Comment = Author & { id: string; body: string; createdAt: string };
 
 /** Whether a pull request's body closes issue `number` by one of GitHub's keywords. */
 const closesIssue = (body: string, number: number): boolean => new RegExp(`\\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?) #${number}\\b`, "i").test(body);
@@ -360,7 +360,7 @@ export class FakeGitHub {
 
 		if (issue instanceof Refused) return issue;
 
-		this.#comments.set(number, [...this.comments(number), { ...by, body: text, createdAt: new Date(1_700_000_000_000 + ++this.#tick * 1000).toISOString() }]);
+		this.#comments.set(number, [...this.comments(number), { ...by, id: `IC_${++this.#tick}`, body: text, createdAt: new Date(1_700_000_000_000 + this.#tick * 1000).toISOString() }]);
 		this.#version++;
 
 		return undefined;

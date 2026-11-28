@@ -5,7 +5,7 @@ import type { AlignmentAnswer } from "../../src/decide/alignment.ts";
 export const SOUND: AlignmentAnswer = { alignment: "sound", verification: "sound" };
 
 /** What a scripted cheap model call answers; a boundary left out abstains. */
-export type Scripted = { readonly kind?: { readonly kind: string }; readonly alignment?: AlignmentAnswer };
+export type Scripted = { readonly kind?: { readonly kind: string }; readonly alignment?: AlignmentAnswer; readonly "reply-option"?: { readonly option: string } };
 
 /** A cheap model call that answers each boundary from a script, read through the question's own schema. */
 export const scriptedJudge =

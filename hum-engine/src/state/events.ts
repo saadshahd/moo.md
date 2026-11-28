@@ -1,8 +1,10 @@
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { hashJson } from "../config/hash.ts";
 import { Json } from "../config/json.ts";
 import { climb, type Steps } from "../config/migrate.ts";
+import { RESOLUTION_SOURCES } from "../decide/answer.ts";
 import { DONE_BY } from "../decide/merge.ts";
 import type { Faults, Outcome } from "./faults.ts";
 import { updateEngineStep } from "../engine.ts";
@@ -11,7 +13,7 @@ import { createOnce, listRecords, readJson, slug } from "./fs.ts";
 import { SNAPSHOT_CARDS } from "./items.ts";
 
 /** The record shape this engine writes to an item's log. A change here is public surface: every later engine reads each format an earlier one wrote. */
-export const LOG_FORMAT = 1;
+export const LOG_FORMAT = 2;
 
 const name = z.string().min(1);
 const count = z.int().nonnegative();
@@ -25,20 +27,25 @@ type LogRecord = z.infer<typeof LogRecord>;
 /**
  * One step per earlier format, each rewriting a record at that format into the next one's shape, with no clock and no
  * I/O. Format 0 is every record hum wrote before 0.5.0, an `answered` or a `merged` with no format and no engine: it
- * reads as format 1 unchanged.
+ * reads as format 1 unchanged. Format 1's `answered` kept only that the owner's answer took effect, with an empty
+ * payload: it reads as format 2's `answer-applied`.
  */
 const LOG_MIGRATIONS: Steps<LogRecord> = {
 	0: (record) => record,
+	1: (record) => (record.type === "answered" ? { ...record, type: "answer-applied" } : record),
 };
 
 /** What every format of a record carries: enough to place it in its log, and to refuse one from a newer engine before reading the rest. */
 const Placed = z.looseObject({
 	format: z.int().nonnegative().default(0),
+	/** The engine that wrote the record; one from before hum 0.5.0 names none. */
 	engineVersion: name.optional(),
+	/** Where the event came from, such as a thread comment id: a second read of it adds nothing. */
 	source: name,
 	sourceId: name,
 	itemId: name,
 	receivedAt: count,
+	/** The event's place in its item's log. An event saved before hum kept places has none, and comes first, by when it arrived. */
 	seq: count.optional(),
 });
 
@@ -87,18 +94,26 @@ const Picked = z.discriminatedUnion("judge", [
 	z.object({ judge: z.literal("alignment"), head: name, alignment: z.union([z.object({ graded: z.object({ alignment: grade, verification: grade }) }), z.object({ abstained: name })]) }),
 ]);
 
-const envelope = {
-	format: z.literal(LOG_FORMAT),
-	/** The engine that wrote the record; one from before hum 0.5.0 names none. */
-	engineVersion: name.optional(),
-	/** Where the event came from, such as a thread comment id: a second read of it adds nothing. */
-	source: name,
-	sourceId: name,
-	itemId: name,
-	receivedAt: count,
-	/** The event's place in its item's log. An event saved before hum kept places has none, and comes first, by when it arrived. */
-	seq: count.optional(),
-};
+/**
+ * The owner wait an answer was given at: the step, where the machine's state has a plain name, and when the item
+ * entered it, where the answer came during that visit. An answer counts only for the wait it names, so one given at an
+ * earlier visit never applies to a later one.
+ */
+export const Wait = z.object({ step: name.optional(), since: count.optional() });
+
+export type Wait = z.infer<typeof Wait>;
+
+/**
+ * The owner's answer, request or note, read once from the surface that gave it: the wait it was given at, absent where
+ * it came at no wait hum knows; the choice it picks, empty for words alone; the owner's words as written; when they
+ * gave it; and how its choice was read, so a model's reading stays told apart from the owner's own pick.
+ */
+export const KeptAnswer = z.object({ wait: Wait.optional(), choice: z.string(), text: z.string(), at: count, read: z.enum(Object.values(RESOLUTION_SOURCES)) });
+
+export type KeptAnswer = z.infer<typeof KeptAnswer>;
+
+/** What a record at this engine's format carries to place it: the same fields as at any format, at this format alone. */
+const envelope = { ...Placed.shape, format: z.literal(LOG_FORMAT) };
 
 /** The version of the item's kind machine the record was made under. */
 const machineVersion = name;
@@ -109,7 +124,8 @@ export const SavedEvent = z.discriminatedUnion("type", [
 	z.object({ ...envelope, machineVersion, type: z.literal("model-answered"), payload: z.object({ run: name, attempt: count, question: name.optional(), outcome: KeptOutcome }) }),
 	z.object({ ...envelope, type: z.literal("picked"), payload: Picked }),
 	z.object({ ...envelope, type: z.literal("landing-found"), payload: z.object({ head: name, doneBy: z.enum(DONE_BY) }) }),
-	z.object({ ...envelope, type: z.literal("answered"), payload: z.object({}) }),
+	z.object({ ...envelope, type: z.literal("answered"), payload: KeptAnswer }),
+	z.object({ ...envelope, type: z.literal("answer-applied"), payload: z.object({}) }),
 	z.object({ ...envelope, type: z.literal("merged"), payload: z.object({}) }),
 	z.object({ ...envelope, type: z.literal("rebuilt"), payload: z.object({ why: z.string() }) }),
 ]);
@@ -189,6 +205,11 @@ export class EventLog {
 	/** Copies an item's records into another log as their writers wrote them, each at the next place there; a record already there stays. */
 	copyTo(into: EventLog, itemId: string): void {
 		for (const { record, placed } of this.#records(itemId)) createOnce(into.#path(placed), `${JSON.stringify({ ...record, seq: into.#nextPlace(itemId) })}\n`);
+	}
+
+	/** One record, or undefined where the log keeps none under this key; one a newer engine wrote, or one this engine cannot read, throws. */
+	find(key: Pick<SavedEvent, "itemId" | "source" | "sourceId">): SavedEvent | undefined {
+		return existsSync(this.#path(key)) ? this.get(key) : undefined;
 	}
 
 	/** One record; one a newer engine wrote, or one this engine cannot read, throws. */

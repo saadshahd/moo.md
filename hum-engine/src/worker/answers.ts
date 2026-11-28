@@ -5,8 +5,10 @@ import { onceCalls } from "../adapters/once.ts";
 import { dispose, type Disposition, matchOption, NONE_OF_THESE, replyQuestion, replyStem, replyText, type Resolution, STAGE_ACTIONS, type Stage } from "../decide/answer.ts";
 import type { QuestionAnswer } from "../decide/talk.ts";
 import { visibleText } from "../adapters/marked.ts";
+import type { KeptAnswer, Wait } from "../state/events.ts";
 import type { State } from "../state/open.ts";
-import { changesPlan, optionOf, type SettledAnswer } from "../state/saved.ts";
+import { changesPlan, type SettledAnswer } from "../state/saved.ts";
+import { answerKey, givenAt, keepAnswer, keptAnswer, type Reading } from "./owner-answers.ts";
 import { hasReplyOn, isFromHum, isHumQuestion, latestCloseAt, latestQuestionAt } from "./thread.ts";
 
 export type AnswerContext = {
@@ -23,6 +25,8 @@ export type AnswerScope = {
 	readonly options?: readonly string[];
 	/** When the card was raised: an answer applied before it never drops a reply to the card. */
 	readonly since?: number;
+	/** The wait the item is in: its saved step, or its card where it is parked. An answer counts only for the wait it was given at. */
+	readonly wait?: Wait;
 };
 
 /** A marked answer, or a person's reply typed without a marker. */
@@ -68,37 +72,50 @@ const recordOf = (item: string, { entry, ordinal }: Reply, resolution: Resolutio
 	...savedResolution(resolution),
 });
 
-const resolutionOf = (record: SettledAnswer): Resolution => {
-	switch (record.source) {
+/** How a resolution reads the owner's answer: the option it picked, empty where it picked none, and how. */
+const readingOf = (resolution: { readonly source: Resolution["source"]; readonly option?: string }): Pick<Reading, "choice" | "read"> => ({ choice: resolution.option ?? "", read: resolution.source });
+
+/** The resolution a kept answer was read as. */
+const resolutionOf = ({ read, choice }: Pick<KeptAnswer, "read" | "choice">): Resolution => {
+	switch (read) {
 		case "abstained":
-			return { source: record.source, why: record.why };
+			return { source: read, why: "" };
 		case "marker":
-			return { source: record.source, option: record.option };
+			return choice === "" ? { source: read } : { source: read, option: choice };
 		case "first-word":
 		case "model":
-			return { source: record.source, option: record.option };
+			return { source: read, option: choice };
 		case "free":
 		case "none-of-these":
-			return { source: record.source };
+			return { source: read };
 	}
 };
 
 const isFinal = ({ disposition }: SettledAnswer): boolean => disposition !== "held";
 
-/** The answer as the engine reads it from here on: the option it picked, or no longer an answer at all. */
-const normalized = (entry: ThreadEntry, record: SettledAnswer): ThreadEntry =>
-	record.disposition === "applied" ? { ...entry, kind: "answer", option: optionOf(record) } : { ...entry, kind: "comment", option: undefined };
+/** The answer as the engine reads it from here on: the choice its kept answer picked, keyed to that answer, or no longer an answer at all. */
+const normalized = (entry: ThreadEntry, record: SettledAnswer, kept: KeptAnswer | undefined): ThreadEntry =>
+	record.disposition === "applied" && kept !== undefined ? { ...entry, kind: "answer", option: kept.choice === "" ? undefined : kept.choice, id: answerKey(entry) } : { ...entry, kind: "comment", option: undefined };
 
 const SUPERSEDED: Disposition = { disposition: "dropped", why: "A newer question replaced the one this answered." };
 
-type Settling = { readonly ctx: AnswerContext; readonly item: Item; readonly question: string; readonly options: readonly string[]; readonly stage: Stage };
+type Settling = { readonly ctx: AnswerContext; readonly item: Item; readonly question: string; readonly options: readonly string[]; readonly stage: Stage; readonly wait: Wait | undefined };
 
 const CLOSED: Disposition = { disposition: "dropped", why: "hum closed the question before this answer, as its wait ended without one." };
 
-/** One reply's record: kept once final, else decided again from where the item stands now; a reply to a question hum closed is dropped. */
-const settleOne = async ({ ctx, item, question, options, stage }: Settling, { reply, answeredBefore, closed }: { readonly reply: Reply; readonly answeredBefore: boolean; readonly closed: boolean }): Promise<{ record: SettledAnswer; resolution: Resolution }> => {
+/**
+ * One reply's record: kept once final, else decided again from where the item stands now; a reply to a question hum
+ * closed is dropped. The reply is read once, into the owner's answer the item's log keeps, and decided from that.
+ */
+const settleOne = async ({ ctx, item, question, options, stage, wait }: Settling, { reply, answeredBefore, closed }: { readonly reply: Reply; readonly answeredBefore: boolean; readonly closed: boolean }): Promise<{ record: SettledAnswer; resolution: Resolution }> => {
 	const saved = ctx.state.answers.get(keyOf(item.id, reply.ordinal));
-	const resolution = saved ? resolutionOf(saved) : await resolveReply(ctx, { itemId: item.id, question, options, stage, reply });
+
+	const kept = await keepAnswer(ctx.state.events, item.id, reply.entry, async () => ({
+		wait: givenAt(wait, reply.entry.at),
+		...readingOf(saved ?? (await resolveReply(ctx, { itemId: item.id, question, options, stage, reply }))),
+	}));
+
+	const resolution = resolutionOf(kept);
 
 	if (saved && isFinal(saved)) return { record: saved, resolution };
 
@@ -116,7 +133,7 @@ const dropSuperseded = async ({ ctx, item }: Settling, current: ReadonlySet<numb
 		if (held.item !== item.id || held.disposition !== "held" || current.has(held.ordinal)) continue;
 
 		ctx.state.answers.put(keyOf(item.id, held.ordinal), { ...held, disposition: SUPERSEDED.disposition, why: SUPERSEDED.why });
-		await onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource: ctx.workSource }, ctx.state.ops, { run: "answer-reply", attempt: 0 }).workSource?.comment(item.id, replyText(held.ordinal, SUPERSEDED, resolutionOf(held), [], held.text));
+		await onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource: ctx.workSource }, ctx.state.ops, { run: "answer-reply", attempt: 0 }).workSource?.comment(item.id, replyText(held.ordinal, SUPERSEDED, resolutionOf(readingOf(held)), [], held.text));
 	}
 };
 
@@ -126,10 +143,10 @@ const dropSuperseded = async ({ ctx, item }: Settling, current: ReadonlySet<numb
  * Returns the item with its thread as the engine reads it: an applied reply is an answer carrying its option, any
  * other is a comment.
  */
-export const settleAnswers = async (ctx: AnswerContext, item: Item, { stage, options: cardOptions, since }: AnswerScope): Promise<Item> => {
+export const settleAnswers = async (ctx: AnswerContext, item: Item, { stage, options: cardOptions, since, wait }: AnswerScope): Promise<Item> => {
 	const asked = latestQuestionAt(item.thread);
 	const questionText = asked < 0 ? "" : (item.thread[asked]?.text ?? "");
-	const settling: Settling = { ctx, item, question: visibleText(questionText), options: cardOptions ?? optionsIn(questionText), stage };
+	const settling: Settling = { ctx, item, question: visibleText(questionText), options: cardOptions ?? optionsIn(questionText), stage, wait };
 	const calls = onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource: ctx.workSource }, ctx.state.ops, { run: "answer-reply", attempt: 0 });
 	const settled = new Map<number, SettledAnswer>();
 	const replies = repliesOn(item.thread, asked);
@@ -169,10 +186,10 @@ export const planChangingAnswers = (state: Pick<State, "answers">, item: Item, s
 
 /**
  * The item with its thread as the engine reads it, from the answers `state` saved and with no call: a reply to hum's
- * latest question whose saved answer applied is an answer carrying its option, one whose saved answer did not is a
- * comment, and one with no saved answer stays as the source gave it.
+ * latest question whose saved answer applied is an answer carrying the choice of the owner's answer its log keeps,
+ * one whose saved answer did not is a comment, and one with no saved answer stays as the source gave it.
  */
-export const withSettledAnswers = (state: Pick<State, "answers">, item: Item): Item => {
+export const withSettledAnswers = (state: Pick<State, "answers" | "events">, item: Item): Item => {
 	const saved = new Map(
 		repliesOn(item.thread, latestQuestionAt(item.thread)).flatMap(({ ordinal, index }) => {
 			const record = state.answers.get(keyOf(item.id, ordinal));
@@ -184,7 +201,7 @@ export const withSettledAnswers = (state: Pick<State, "answers">, item: Item): I
 	const asEngineReads = (entry: ThreadEntry, index: number): ThreadEntry => {
 		const record = saved.get(index);
 
-		return record ? normalized(entry, record) : entry;
+		return record ? normalized(entry, record, keptAnswer(state.events, item.id, entry)) : entry;
 	};
 
 	return { ...item, thread: item.thread.map(asEngineReads) };

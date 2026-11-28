@@ -76,8 +76,14 @@ export type NoteStand = { readonly at: string; readonly reach: ReadonlySet<strin
 
 const refused = (why: string): NoteOutcome => ({ disposition: "refused", why });
 
-/** What becomes of a note no saved record settles yet: hum keeps one whose step the item can still reach, for that step's next run. */
-export const decideNote = ({ entry: { step } }: ThreadNote, { at, reach, parked }: NoteStand): NoteOutcome => {
+/** The choice a note to `step` makes, as the owner's kept answer holds it; a note that names no step makes the bare one. */
+export const noteChoice = (step: string | undefined): string => (step === undefined ? NOTE_KIND : `${NOTE_KIND}:${step}`);
+
+/** The step a note's choice sends it to; none where it names none. */
+export const noteStepOf = (choice: string): string | undefined => (choice.startsWith(`${NOTE_KIND}:`) ? choice.slice(NOTE_KIND.length + 1) : undefined);
+
+/** What becomes of a note to `step` no saved record settles yet: hum keeps one whose step the item can still reach, for that step's next run. */
+export const decideNote = (step: string | undefined, { at, reach, parked }: NoteStand): NoteOutcome => {
 	if (step === undefined) return refused("it names no step");
 
 	if (parked) return refused("the item is parked: act on its card first");

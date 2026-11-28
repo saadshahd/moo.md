@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { openState, type State } from "../src/index.ts";
 import type { RunOutcome } from "../src/adapters/claude-p.ts";
 import { shippedConfig } from "../src/setup/shipped.ts";
-import { answerOnce, doneByOf, foldItem, keepLanding, keepPick, machineStarted, ownerAnswered } from "../src/state/item-log.ts";
+import { answerOnce, doneByOf, foldItem, keepLanding, keepPick, machineStarted, answerApplied } from "../src/state/item-log.ts";
 import { finished } from "./fixtures/records.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
@@ -32,7 +32,7 @@ test("fix runs count from the owner's last answer, over passes that start the ma
 	await fixRun(state);
 	expect(folded(state).runs.fix).toBe(2);
 
-	state.events.add(ownerAnswered(ITEM, 1));
+	state.events.add(answerApplied(ITEM, 1));
 	await fixRun(state);
 	expect(folded(state).runs.fix).toBe(1);
 });
@@ -67,7 +67,7 @@ test("how landing found the change stands through later passes until landing fin
 
 	keepLanding(state.events, { itemId: ITEM, head: "abc", doneBy: "checks" });
 	state.events.add(machineStarted({ itemId: ITEM, machineVersion: VERSION, afresh: true }));
-	state.events.add(ownerAnswered(ITEM, 1));
+	state.events.add(answerApplied(ITEM, 1));
 	planPicked(state, "plan-ready");
 	keepLanding(state.events, { itemId: ITEM, head: "abc", doneBy: "checks" });
 	merged(state);
@@ -119,7 +119,8 @@ const planAsker = (state: State, answer: () => RunOutcome) => {
 test.each([
 	["a pass that starts the machine over reads it back", machineStarted({ itemId: ITEM, machineVersion: VERSION, afresh: false }), 1],
 	["a pass that starts the item afresh asks again", machineStarted({ itemId: ITEM, machineVersion: VERSION, afresh: true }), 2],
-	["the owner's answer makes the next run ask again", ownerAnswered(ITEM, 1), 2],
+	["the owner's answer makes the next run ask again", answerApplied(ITEM, 1), 2],
+	["the owner's words hum kept and did not apply leave the kept answer standing", { source: "owner", sourceId: "IC_1", itemId: ITEM, type: "answered", payload: { choice: "", text: "later, maybe", at: 1, read: "free" } }, 1],
 ] as const)("an answer the log keeps to the same question: %s", async (_, between, times) => {
 	const state = openState(dir, { now: Date.now });
 	const plan = planAsker(state, () => finished({ structured: { event: "plan-ready" } }));

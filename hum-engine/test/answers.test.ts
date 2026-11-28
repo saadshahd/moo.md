@@ -228,7 +228,7 @@ test("an answer after hum closed its question applies to no later wait: it is dr
 
 	const item = await settleAnswers({ state: w.state, workSource: w.adapter.workSource!, judge, now: () => w.clock.at }, await w.adapter.workSource!.read(a), { stage: "waiting" });
 
-	expect(answerTo(item)).toBeUndefined();
+	expect(answerTo(w.state.events, item)).toBeUndefined();
 	expect(await repliesOn(w, "a")).toEqual(["Answer 1 dropped: hum closed the question before this answer, as its wait ended without one."]);
 });
 

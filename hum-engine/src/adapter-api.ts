@@ -73,6 +73,8 @@ export const ThreadEntry = z.strictObject({
 	step: text.optional(),
 	/** A source that cannot tell leaves it out, and the entry reads as hum's. */
 	author: z.enum(THREAD_AUTHORS).optional(),
+	/** The source's own id for the entry, the same on every read, such as a comment's; a source with none leaves it out, and hum keys the entry by its content. */
+	id: text.optional(),
 });
 
 export type ThreadEntry = z.infer<typeof ThreadEntry>;

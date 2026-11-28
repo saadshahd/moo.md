@@ -374,7 +374,7 @@ export const roundupAdapter = (options: RoundupOptions, { now, env, report }: Ad
 
 				return [
 					{ kind: "question", text: asking.asked.text, at: asking.asked.at, author: "hum" },
-					...(taken ? [{ kind: "answer", ...taken, author: "person" } as const] : []),
+					...(taken ? [{ kind: "answer", ...taken, author: "person", id: `${asking.asked.name}@${asking.asked.at}` } as const] : []),
 					...(closed ? [{ kind: "close", ...closed, author: "hum" } as const] : []),
 				];
 			}),

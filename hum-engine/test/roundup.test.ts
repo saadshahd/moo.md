@@ -106,6 +106,29 @@ test("a request posts on the Todo as hum's own marked comment and reads back on 
 	await adapter.close();
 });
 
+test("the owner's answer in a question row reads on the thread with the row's name and when it asked as its id, the same on every read, so hum keeps it once", async () => {
+	const { daemon, adapter, id, stateDir } = await claimedTodo();
+
+	await adapter.questions.ask(id, { text: "Ship it?", options: ["yes", "no"] });
+
+	const [row] = daemon.rows();
+
+	if (row === undefined) throw new Error("asking started no row");
+
+	daemon.waitOnOwner(row.id);
+	await adapter.workSource.read(id);
+	writeFileSync(join(stateDir, "roundup", "questions", slug(askName(id, 1)), "hooks", "answer.json"), JSON.stringify({ hook_event_name: "PostToolUse", tool_name: "AskUserQuestion", tool_response: { answers: { "Ship it?": "yes" } } }));
+
+	const thread = async () => (await adapter.workSource.read(id)).thread;
+	const asked = (await thread()).find(({ kind }) => kind === "question");
+	const answers = async () => (await thread()).filter(({ kind }) => kind === "answer").map(({ text, id: key }) => ({ text, key }));
+	const taken = { text: "yes", key: `${askName(id, 1)}@${asked?.at}` };
+
+	expect(await answers()).toEqual([taken]);
+	expect(await answers()).toEqual([taken]);
+	await adapter.close();
+});
+
 test("a question hum closed takes no late answer from its row, which it stopped, and is never asked again: the thread reads it closed", async () => {
 	const { daemon, adapter, id, stateDir } = await claimedTodo();
 

@@ -1,9 +1,10 @@
 import { ADAPTER_API_VERSION, type Item, type ItemId, type WorkSource } from "../adapter-api.ts";
 import { type CallScope, onceCalls } from "../adapters/once.ts";
 import type { HumConfig, Kind } from "../config/schema.ts";
-import { decideNote, deliveredNote, droppedNote, ENDED_NOTE, type NoteFrom, type NoteOutcome, type NoteStand, noteReach, noteReplyStem, noteReplyText, notesOn, type ThreadNote } from "../decide/note.ts";
+import { decideNote, deliveredNote, droppedNote, ENDED_NOTE, noteChoice, type NoteFrom, type NoteOutcome, type NoteStand, noteReach, noteReplyStem, noteReplyText, notesOn, noteStepOf } from "../decide/note.ts";
 import type { State } from "../state/open.ts";
 import type { SettledNote } from "../state/saved.ts";
+import { keepAnswer, keptAnswer } from "./owner-answers.ts";
 import { hasReplyOn } from "./thread.ts";
 
 /** The scope of every reply to a note, written by the worker or through a pass's outbox alike, so each reply posts once. */
@@ -12,7 +13,7 @@ export const NOTE_REPLY_SCOPE: CallScope = { run: "note-reply", attempt: 0 };
 /** Where the replies to notes go: a comment on the item's thread. */
 export type NoteWrites = { readonly comment: (id: ItemId, text: string) => Promise<void> };
 
-export type NoteContext = { readonly state: Pick<State, "stepNotes">; readonly writes: NoteWrites; readonly now: () => number };
+export type NoteContext = { readonly state: Pick<State, "stepNotes" | "events">; readonly writes: NoteWrites; readonly now: () => number };
 
 /** Replies written straight to the work source, each once under its op key. */
 export const noteWrites = (state: Pick<State, "ops">, workSource: WorkSource): NoteWrites => {
@@ -27,35 +28,40 @@ export const noteStandOf = (kind: Kind, roles: HumConfig["roles"], from: NoteFro
 /** The key a note's record is saved under: its item and its number among the thread's notes. */
 export const noteKey = (item: string, ordinal: number): string => `${item}#${ordinal}`;
 
-const recordOf = (item: string, { ordinal, entry }: ThreadNote, outcome: NoteOutcome, at: number): SettledNote => ({ item, ordinal, step: entry.step, ...outcome, at });
+const recordOf = (item: string, ordinal: number, step: string | undefined, outcome: NoteOutcome, at: number): SettledNote => ({ item, ordinal, step, ...outcome, at });
 
 /**
- * Every note on the item's thread is saved with what became of it, and each outcome gets one reply. A new note is kept
- * or refused; a kept one whose step the item can no longer reach is dropped. A note moves no item.
+ * Every note on the item's thread is read once into the owner's answer its log keeps, saved with what became of it, and
+ * each outcome gets one reply. A new note is kept or refused; a kept one whose step the item can no longer reach is
+ * dropped. A note moves no item.
  */
 export const settleNotes = async (ctx: NoteContext, item: Item, stand: NoteStand): Promise<void> => {
-	for (const note of notesOn(item.thread)) {
-		const key = noteKey(item.id, note.ordinal);
+	for (const { ordinal, entry } of notesOn(item.thread)) {
+		const kept = await keepAnswer(ctx.state.events, item.id, entry, () => ({ wait: { step: stand.at }, choice: noteChoice(entry.step), read: "marker" }));
+		const step = noteStepOf(kept.choice);
+		const key = noteKey(item.id, ordinal);
 		const saved = ctx.state.stepNotes.get(key);
-		const outcome = saved === undefined ? decideNote(note, stand) : saved.disposition === "kept" ? droppedNote(saved.step, stand) : undefined;
-		const settled = outcome === undefined ? saved : recordOf(item.id, note, outcome, ctx.now());
+		const outcome = saved === undefined ? decideNote(step, stand) : saved.disposition === "kept" ? droppedNote(saved.step, stand) : undefined;
+		const settled = outcome === undefined ? saved : recordOf(item.id, ordinal, step, outcome, ctx.now());
 
 		if (settled === undefined) continue;
 
 		if (settled !== saved) ctx.state.stepNotes.put(key, settled);
 
-		if (!hasReplyOn(item.thread, noteReplyStem(note.ordinal, settled))) await ctx.writes.comment(item.id, noteReplyText(note.ordinal, settled));
+		if (!hasReplyOn(item.thread, noteReplyStem(ordinal, settled))) await ctx.writes.comment(item.id, noteReplyText(ordinal, settled));
 	}
 };
 
 /** A note hum keeps for `step`: its number and the owner's words. */
 export type KeptNote = { readonly ordinal: number; readonly text: string };
 
-/** The notes hum keeps for `step`, oldest first, as the item's thread holds them. */
-export const keptNotes = (state: Pick<State, "stepNotes">, item: Item, step: string): KeptNote[] =>
-	notesOn(item.thread)
-		.filter(({ ordinal, entry }) => entry.step === step && state.stepNotes.get(noteKey(item.id, ordinal))?.disposition === "kept")
-		.map(({ ordinal, entry }) => ({ ordinal, text: entry.text }));
+/** The notes hum keeps for `step`, oldest first, as the owner's answers the item's log keeps hold them. */
+export const keptNotes = (state: Pick<State, "stepNotes" | "events">, item: Item, step: string): KeptNote[] =>
+	notesOn(item.thread).flatMap(({ ordinal, entry }) => {
+		const kept = keptAnswer(state.events, item.id, entry);
+
+		return kept !== undefined && noteStepOf(kept.choice) === step && state.stepNotes.get(noteKey(item.id, ordinal))?.disposition === "kept" ? [{ ordinal, text: kept.text }] : [];
+	});
 
 /** Moves each kept note to a new outcome, saved before its reply; one already moved stays as it is. */
 const moveKept = async (ctx: NoteContext, id: ItemId, records: readonly SettledNote[], outcome: (record: SettledNote) => NoteOutcome): Promise<void> => {
