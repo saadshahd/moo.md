@@ -11,6 +11,9 @@ import {
   applyChange,
   FIX_SLOPS,
   NONE,
+  FORGET_REJECTS,
+  KEPT_REJECTS,
+  REJECTS,
   decide,
   fenced,
   findingKey,
@@ -20,7 +23,9 @@ import {
   isRepoBound,
   parseFindings,
   register,
+  sortRepeats,
   touchedFiles,
+  withReject,
   verdict,
 } from "./slop.tsx";
 import type { Finding, Slop } from "../slop.d.ts";
@@ -211,6 +216,60 @@ describe("addFindings", () => {
   });
 });
 
+describe("sortRepeats", () => {
+  const repo = { id: "/r/.git", root: "/r/sub", top: "/r" };
+  const reject = F({ file: "sub/a.ts", rule: "no var" });
+  const other = F({ file: "sub/b.ts", rule: "dry" });
+  const empty: Slop = {
+    findings: [],
+    cursor: 0,
+    marks: [],
+    reviewing: false,
+    editing: false,
+    chosen: [],
+    applied: [],
+    seen: [],
+    offset: 0,
+    unjudged: [],
+    hidden: [],
+  };
+  test("a reject's file and rule hide a finding whether its file is absolute or the session root's", () => {
+    const found = [
+      F({ file: "/r/sub/a.ts", rule: "var" }),
+      F({ rule: "No var" }),
+    ];
+    expect(
+      sortRepeats(found, [reject, other], empty, repo).map((x) => x.kind),
+    ).toEqual(["hide", "hide"]);
+  });
+  test("another rule in a file with rejects asks about that file's rejects alone; a file with none shows", () => {
+    const found = [F({ rule: "naming" }), F({ file: "c.ts" })];
+    expect(sortRepeats(found, [reject, other], empty, repo)).toEqual([
+      { kind: "ask", finding: found[0], rejects: [reject] },
+      { kind: "show", finding: found[1] },
+    ]);
+  });
+  test("a finding still waiting for a decision shows, to take its newer change", () => {
+    const s = addFindings(empty, [F({ rule: "naming" })]);
+    expect(
+      sortRepeats([F({ rule: "naming", line: 9 })], [reject], s, repo)[0].kind,
+    ).toBe("show");
+  });
+});
+
+describe("withReject", () => {
+  test("the newest reject goes last, once per key, and only the newest are kept", () => {
+    const many = Array.from({ length: KEPT_REJECTS }, (_, i) =>
+      F({ rule: `r${i}` }),
+    );
+    const again = F({ rule: "r1", claim: "newer" });
+    const kept = withReject(many, again);
+    expect(kept.length).toBe(KEPT_REJECTS);
+    expect(kept.at(-1)).toEqual(again);
+    expect(kept.filter((r) => r.rule === "r1")).toEqual([again]);
+  });
+});
+
 describe("isRepoBound", () => {
   test("tracked files stay, untracked and ignored go", () => {
     expect(isRepoBound("")).toBe(true);
@@ -370,7 +429,7 @@ describe("fixReport", () => {
 
 // ---- effects: register()'s hooks driven through a fake host ----
 
-function harness(judgeOut: string) {
+function harness(judgeOut: string, stored: Record<string, unknown> = {}) {
   const handlers: Record<string, ((...a: any[]) => any)[]> = {};
   const on = (...args: any[]) =>
     (handlers[args[0]] ??= []).push(args[args.length - 1]);
@@ -378,6 +437,8 @@ function harness(judgeOut: string) {
 
   const state: Record<string, { value: unknown; version: number }> = {};
   const runs: { argv: string[]; stdin?: string }[] = [];
+  const store = new Map(Object.entries(stored));
+  const picks: string[] = [];
   let messages: any[] = [];
 
   const $ = {
@@ -398,10 +459,24 @@ function harness(judgeOut: string) {
         return { isSet: true };
       },
     },
+    store: {
+      get: async (key: string) => store.get(key),
+      set: async (key: string, value: unknown) => void store.set(key, value),
+      delete: async (key: string) => void store.delete(key),
+      keys: async () => [...store.keys()],
+    },
+    model: {
+      classify: async (
+        text: string,
+        labels: readonly string[],
+      ): Promise<string | undefined> => (picks.push(text), labels.at(-1)),
+    },
     session: { messages: async () => messages, root: async () => "/r" },
     process: {
       run: async (argv: string[], init?: { stdin?: string }): Promise<any> => {
         runs.push({ argv, stdin: init?.stdin });
+        if (argv.includes("rev-parse"))
+          return { exitCode: 0, stdout: "/r/.git\n/r\n", stderr: "" };
         if (argv[0] === "git")
           return {
             exitCode: 0,
@@ -428,7 +503,7 @@ function harness(judgeOut: string) {
   };
   const submit = (text: string) =>
     handlers["prompt.submit"][0]($, { text }, async (e: unknown) => e);
-  return { $, handlers, runs, slop, editTurn, submit };
+  return { $, handlers, runs, store, picks, slop, editTurn, submit };
 }
 
 const FOUND = "/r/a.ts:3 | rule | wrong here.\n- old\n+ new";
@@ -470,6 +545,79 @@ describe("after a turn", () => {
       text: "",
     }));
     expect(h.runs).toEqual([]);
+  });
+});
+
+/** A reject an earlier session stored for the repo at "/r", its file relative to the repo. */
+const REJECTED: Finding = {
+  file: "a.ts",
+  line: 3,
+  rule: "Rule",
+  claim: "wrong there.",
+  before: ["old"],
+  after: ["new"],
+};
+const REJECTS_HERE = "slop:rejects:/r/.git";
+
+describe("rejects from earlier sessions", () => {
+  test("a finding with a stored reject's file and rule stays hidden, and counts as hidden", async () => {
+    const h = harness(FOUND, { [REJECTS_HERE]: [REJECTED] });
+    h.editTurn("/r/a.ts");
+    await afterTurn(h.$);
+    const s = await h.slop();
+    expect(s?.findings).toEqual([]);
+    expect(s?.hidden.map((x) => [x.finding.file, x.repeats, x.by])).toEqual([
+      ["/r/a.ts", REJECTED, "rule"],
+    ]);
+    expect(h.picks).toEqual([]);
+  });
+
+  const NEW_RULE = "/r/a.ts:5 | other wording | still wrong.\n- x\n+ y";
+  test("another rule in that file is hidden when the model picks a reject, once a session", async () => {
+    const h = harness(NEW_RULE, { [REJECTS_HERE]: [REJECTED] });
+    h.$.model.classify = async (text: string) => (h.picks.push(text), "1");
+    h.editTurn("/r/a.ts");
+    await afterTurn(h.$);
+    h.editTurn("/r/a.ts");
+    await afterTurn(h.$);
+    const s = await h.slop();
+    expect(s?.findings).toEqual([]);
+    expect(s?.hidden.map((x) => [x.repeats, x.by])).toEqual([
+      [REJECTED, "pick"],
+    ]);
+    expect(h.picks.length).toBe(1);
+  });
+  test("it shows when the model picks none", async () => {
+    const h = harness(NEW_RULE, { [REJECTS_HERE]: [REJECTED] });
+    h.editTurn("/r/a.ts");
+    await afterTurn(h.$);
+    expect((await h.slop())?.findings.map((f) => f.rule)).toEqual([
+      "other wording",
+    ]);
+  });
+  test("every finding shows when the rejects cannot be read", async () => {
+    const h = harness(FOUND, { [REJECTS_HERE]: [REJECTED] });
+    h.$.store.get = async () => {
+      throw new Error("store unreadable");
+    };
+    h.editTurn("/r/a.ts");
+    await expect(afterTurn(h.$)).rejects.toThrow("store unreadable");
+    expect((await h.slop())?.findings.map((f) => f.rule)).toEqual(["rule"]);
+  });
+  test("it shows when the model check fails, and the failure shows once", async () => {
+    const h = harness(NEW_RULE, { [REJECTS_HERE]: [REJECTED] });
+    h.$.model.classify = async () => {
+      throw new Error("overloaded");
+    };
+    h.editTurn("/r/a.ts");
+    await expect(afterTurn(h.$)).rejects.toThrow(
+      "the repeat check failed, so its findings show: overloaded",
+    );
+    h.editTurn("/r/a.ts");
+    await afterTurn(h.$);
+    expect((await h.slop())?.findings.map((f) => f.rule)).toEqual([
+      "other wording",
+    ]);
   });
 });
 
@@ -613,6 +761,8 @@ const waiting = (findings: Finding[]): Slop => ({
   applied: [],
   seen: [],
   offset: 0,
+  unjudged: [],
+  hidden: [],
 });
 const settle = () => new Promise((r) => setTimeout(r, 10));
 // The engine redraws on a state set; the state here is the test's, so the test redraws.
@@ -743,6 +893,97 @@ test("the review: accept on a file that is gone sends the finding to Claude", as
   await settle();
   expect(files).toEqual({});
   expect(now().chosen).toEqual([{ finding: gone }]);
+});
+
+/** hope's store, held here, and git saying the session root "/r" is the repo "/r/.git". */
+function repoStore(on: On, entries: Record<string, unknown> = {}) {
+  const store = new Map(Object.entries(entries));
+  on("store.get", (_: unknown, e: any) => ({ value: store.get(e.key) }) as any);
+  on("store.set", (_: unknown, e: any) => {
+    store.set(e.key, e.value);
+    return { value: undefined } as any;
+  });
+  on("store.delete", (_: unknown, e: any) => {
+    store.delete(e.key);
+    return { value: undefined } as any;
+  });
+  on("store.keys", () => ({ value: [...store.keys()] }) as any);
+  on(
+    "process.run",
+    () =>
+      ({
+        value: { exitCode: 0, stdout: "/r/.git\n/r\n", stderr: "" },
+      }) as any,
+  );
+  return store;
+}
+
+test("the review: reject stores the finding for the repo, its file relative to the repo", async ($, on) => {
+  const rejected = F({ file: "/r/a.ts", line: 2 });
+  slopState(on, waiting([rejected]));
+  fileSystem(on, {});
+  const store = repoStore(on);
+  const row = await $.ui.mount({
+    plugin: "hope",
+    surface: "terminal",
+    component: "AbovePrompt",
+    props: { hasSurvey: false } as any,
+  });
+  await row.press({ key: "slop-reject" });
+  await settle();
+  expect(store.get(`${REJECTS}/r/.git`)).toEqual([
+    { ...rejected, file: "a.ts" },
+  ]);
+});
+
+test("the row: hidden repeats wait behind a count, and its pane lists each with the reject it repeats", async ($, on) => {
+  const repeats = F({ rule: "no var", claim: "var again." });
+  slopState(on, {
+    ...waiting([]),
+    reviewing: false,
+    hidden: [{ finding: F({ claim: "uses var." }), repeats, by: "pick" }],
+  } as Slop);
+  const row = await $.ui.mount({
+    plugin: "hope",
+    surface: "terminal",
+    component: "AbovePrompt",
+    props: { hasSurvey: false } as any,
+  });
+  expect(await row.find({ type: "Button", key: "slop-open" })).toBeUndefined();
+  expect(
+    (await row.find({ type: "Button", key: "slop-hidden" }))?.props.label,
+  ).toBe("1 hidden");
+  const pane = await $.ui.mount({
+    plugin: "hope",
+    surface: "terminal",
+    component: "Pane",
+    props: {} as any,
+    requestId: "slop-hidden",
+  });
+  expect(
+    await pane.find({
+      type: "Text",
+      text: "the model matched it to your reject: no var — var again.",
+    }),
+  ).toBeDefined();
+});
+
+test("/forget-slop-rejects forgets the repo's rejects and this session's hidden repeats", async ($, on) => {
+  const now = slopState(on, {
+    ...waiting([]),
+    hidden: [{ finding: F(), repeats: F(), by: "rule" }],
+    seen: [findingKey(F())!, "error|x"],
+  } as Slop);
+  fileSystem(on, {});
+  const store = repoStore(on, { [`${REJECTS}/r/.git`]: [F()] });
+  const { text } = await $.command.run({
+    ...fixSlops,
+    command: FORGET_REJECTS,
+  });
+  expect(text).toBe("Forgot 1 rejected slop findings in /r.");
+  expect(store.size).toBe(0);
+  expect(now().hidden).toEqual([]);
+  expect(now().seen).toEqual(["error|x"]);
 });
 
 /** /fix-slops as the person types it at the terminal. */

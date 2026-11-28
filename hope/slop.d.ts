@@ -1,6 +1,7 @@
 // hope's contract: the session state the slop judge writes and its review reads.
 // Held by the host for the session only. Callers spell the ref as a literal in their own file:
-// { plugin: "hope", key: "slop" }.
+// { plugin: "hope", key: "slop" }. The findings the person rejected outlive the session in hope's
+// `$.store`, under "slop:rejects:" and the repo's git folder.
 
 /** One judge finding. A line the judge wrote in another shape keeps only its text as `claim`. */
 export type Finding = {
@@ -22,6 +23,14 @@ export type Mark =
   | { kind: "accept"; wrote: boolean }
   | { kind: "edit"; note: string }
   | { kind: "reject" };
+
+/** A finding kept from the person because it repeats one they rejected in that file: by its rule,
+ * or by the model's pick among that file's rejects. */
+export type Hidden = {
+  finding: Finding;
+  repeats: Finding;
+  by: "rule" | "pick";
+};
 
 /** A finding for Claude to fix, with the person's words when they edited it. */
 export type Chosen = { finding: Finding; note?: string };
@@ -48,6 +57,8 @@ export type Slop = {
   offset: number;
   /** Files whose judge did not run; the next run judges them with its own. */
   unjudged: string[];
+  /** This session's findings that repeat a reject, once per key. */
+  hidden: Hidden[];
 };
 
 declare module "claude-code" {
