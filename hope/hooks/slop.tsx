@@ -40,6 +40,8 @@ export const REJECTS = "slop:rejects:";
 /** The rejects a repo keeps, newest; an older one shows again. */
 export const KEPT_REJECTS = 100;
 export const PICK_MODEL = "haiku";
+/** The most rejects of one file the model picks among, newest: a short list keeps the pick sharp. */
+export const PICK_REJECTS = 20;
 export const NO_REPEAT = "none";
 
 // ---- pure ----
@@ -174,9 +176,9 @@ export type Sorted =
   | { kind: "hide"; hidden: Hidden }
   | { kind: "ask"; finding: Finding; rejects: Finding[] };
 
-/** Each finding a run found against the repo's rejects. One waiting for a decision shows, to take its
- * newer change; one with a reject's file and rule, or hidden earlier this session, is hidden; one in
- * a file with rejects asks the model whether it repeats one of them; every other shows. */
+/** Each finding a run found against the repo's rejects. One this session showed already goes on to
+ * addFindings, which knows it; one with a reject's file and rule, or hidden earlier this session, is
+ * hidden; one in a file with rejects asks the model whether it repeats one of them; every other shows. */
 export function sortRepeats(
   found: Finding[],
   rejects: Finding[],
@@ -185,14 +187,16 @@ export function sortRepeats(
 ): Sorted[] {
   const rejected = new Map(rejects.map((r) => [findingKey(r), r]));
   const earlier = new Map(s.hidden.map((h) => [findingKey(h.finding), h]));
-  const waiting = new Set(s.findings.slice(s.cursor).map(findingKey));
+  const shown = new Set(s.seen);
   return found.map((f): Sorted => {
     const k = findingKey(f);
     const stored = inRepo(f, repo);
     const repeats = rejected.get(findingKey(stored));
     const before = earlier.get(k);
-    const inFile = rejects.filter((r) => r.file === stored.file);
-    if (k === undefined || waiting.has(k)) return { kind: "show", finding: f };
+    const inFile = rejects
+      .filter((r) => r.file === stored.file)
+      .slice(-PICK_REJECTS);
+    if (k === undefined || shown.has(k)) return { kind: "show", finding: f };
     if (repeats)
       return { kind: "hide", hidden: { finding: f, repeats, by: "rule" } };
     if (before) return { kind: "hide", hidden: { ...before, finding: f } };
@@ -221,18 +225,14 @@ export function pickLabels(rejects: Finding[]): string[] {
   return [...rejects.map((_, i) => String(i + 1)), NO_REPEAT];
 }
 
-/** The repo's rejects with `f` as the newest, once per key, the newest KEPT_REJECTS kept. */
-export function withReject(rejects: Finding[], f: Finding): Finding[] {
-  const k = findingKey(f);
-  return [...rejects.filter((r) => findingKey(r) !== k), f].slice(
-    -KEPT_REJECTS,
-  );
-}
-
-/** The hidden findings with `more` added, once per key, the newer in the older one's place. */
-export function withHidden(hidden: Hidden[], more: Hidden[]): Hidden[] {
-  const keys = new Set(more.map((h) => findingKey(h.finding)));
-  return [...hidden.filter((h) => !keys.has(findingKey(h.finding))), ...more];
+/** `items` oldest first, each key once at its newest place, the newest `cap` kept. */
+export function newestByKey<T>(
+  items: T[],
+  key: (t: T) => string | undefined,
+  cap = Infinity,
+): T[] {
+  const last = new Map(items.map((t, i) => [key(t), i]));
+  return items.filter((t, i) => last.get(key(t)) === i).slice(-cap);
 }
 
 /** A git status line keeps a file when it is tracked: not untracked (??), not ignored (!!). */
@@ -429,14 +429,19 @@ async function readRejects($: any, repo: Repo): Promise<Finding[]> {
   );
 }
 
-/** Stores the rejected finding for its repo over a fresh read, since another session may have
- * stored one since. A finding with no file has nothing to match on. */
+/** Stores the rejected finding for its repo. The store has no compare-and-set, so the read just
+ * before the write narrows, and cannot close, the window where another session's reject is lost.
+ * A finding with no file has nothing to match on. */
 async function keepReject($: any, f: Finding): Promise<void> {
   if (!f.file) return;
   const repo = await repoOf($);
   await $.store.set(
     REJECTS + repo.id,
-    withReject(await readRejects($, repo), inRepo(f, repo)),
+    newestByKey(
+      [...(await readRejects($, repo)), inRepo(f, repo)],
+      findingKey,
+      KEPT_REJECTS,
+    ),
   );
 }
 
@@ -463,12 +468,8 @@ async function withoutRepeats(
   found: Finding[],
 ): Promise<{ shown: Finding[]; hidden: Hidden[]; failed?: string }> {
   const repo = await repoOf($);
-  const sorted = sortRepeats(
-    found,
-    await readRejects($, repo),
-    await readSlop($),
-    repo,
-  );
+  const [rejects, s] = await Promise.all([readRejects($, repo), readSlop($)]);
+  const sorted = sortRepeats(found, rejects, s, repo);
   const checked = await Promise.all(
     sorted.map(async (x): Promise<Sorted & { failed?: string }> => {
       if (x.kind !== "ask") return x;
@@ -530,7 +531,9 @@ async function judge($: any, files: string[]): Promise<void> {
       {
         ...s,
         unjudged: s.unjudged.filter((f) => !files.includes(f)),
-        hidden: withHidden(s.hidden, hidden),
+        hidden: newestByKey([...s.hidden, ...hidden], (h) =>
+          findingKey(h.finding),
+        ),
       },
       shown,
     ),
@@ -577,7 +580,12 @@ async function choose($: any, mark: Mark): Promise<void> {
   await change($, (s) => decide(s, mark));
   await endReview($);
   if (mark.kind === "reject" && findings[cursor])
-    await keepReject($, findings[cursor]);
+    await keepReject($, findings[cursor]).catch((err) =>
+      showOnce(
+        $,
+        `a reject could not be stored, so it lasts this session only: ${err?.message ?? err}`,
+      ),
+    );
 }
 
 /** Forgets the repo's rejects, and this session's, so each shows again when the judge finds it. */
@@ -587,11 +595,11 @@ async function forgetRejects($: any): Promise<string> {
   await $.store.delete(REJECTS + repo.id);
   await $.ui.close({ id: HIDDEN_PANE });
   await change($, (s) => {
-    const listed = new Set(s.findings.map(findingKey));
+    const waiting = new Set(s.findings.slice(s.cursor).map(findingKey));
     return {
       ...s,
       hidden: [],
-      seen: s.seen.filter((k) => k.startsWith("error|") || listed.has(k)),
+      seen: s.seen.filter((k) => k.startsWith("error|") || waiting.has(k)),
     };
   });
   return rejects.length
