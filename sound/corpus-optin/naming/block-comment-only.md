@@ -1,0 +1,5 @@
+Every comment that stays is a block comment above the code it explains; a `//` comment, trailing or stacked, never ships. Line comments pile into paragraphs of narration beside code that already says what it does. Where the code cannot say a WHY, write one block comment (`/* … */` or `/** … */`), with nothing repeated.
+_Avoid_: a `//` after code on the same line; stacked `//` lines read as a paragraph; a `//` narration rewrapped as a block comment, where the form changed and the noise stayed.
+Detect: `block-comment-only.check.mjs` flags every `//` comment except a tool directive: a lint or type-checker suppression, a triple-slash reference, a formatter, coverage or folding marker. Whether the block comment that replaces it earns its place is `comment-must-name-a-consequence`'s question.
+Not-when: a tool reads the comment as a directive and accepts only the `//` form; or the file is vendored or generated.
+Cross-ref: comment-must-name-a-consequence — that rule decides whether a comment exists; this one fixes its form. as-cast-requires-a-named-justification — the reason it asks for at the silencing site is a block comment here.
