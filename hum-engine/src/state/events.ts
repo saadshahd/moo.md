@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { hashJson } from "../config/hash.ts";
@@ -111,6 +111,9 @@ export type Wait = z.infer<typeof Wait>;
 export const KeptAnswer = z.object({ wait: Wait.optional(), choice: z.string(), text: z.string(), at: count, read: z.enum(Object.values(RESOLUTION_SOURCES)) });
 
 export type KeptAnswer = z.infer<typeof KeptAnswer>;
+
+/** The source every owner's answer, request and note is kept under in an item's log. */
+export const OWNER_SOURCE = "owner";
 
 /** What a record at this engine's format carries to place it: the same fields as at any format, at this format alone. */
 const envelope = { ...Placed.shape, format: z.literal(LOG_FORMAT) };
@@ -244,6 +247,24 @@ export class EventLog {
 		}
 
 		return { ok: true, value: events };
+	}
+
+	/**
+	 * When the owner gave the newest answer, request or note any item's log keeps, as its source gave the time; undefined
+	 * where none does. A record this engine cannot read counts for nothing here: reading its item raises its card.
+	 */
+	newestOwnerAnswer(): number | undefined {
+		const items = existsSync(this.#folder) ? readdirSync(this.#folder, { withFileTypes: true }).filter((entry) => entry.isDirectory()) : [];
+
+		const times = items.flatMap(({ name: folder }) =>
+			listRecords(join(this.#folder, folder)).flatMap((file) => {
+				const current = this.#current(this.#found(LogRecord.parse(readJson(file))));
+
+				return current.success && current.data.type === "answered" ? [current.data.payload.at] : [];
+			}),
+		);
+
+		return times.length === 0 ? undefined : Math.max(...times);
 	}
 
 	/** As `read`, for a caller past a `read` that let the item go on: a record from a newer engine, or one this engine cannot read, throws. */

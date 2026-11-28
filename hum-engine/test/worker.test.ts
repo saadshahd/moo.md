@@ -10,6 +10,7 @@ import { FakeGitHub } from "./fixtures/fake-github.ts";
 import { NOW, TTL, workerWorld, type WorkerWorld } from "./fixtures/worker-world.ts";
 import { readHeartbeat, readStatus } from "../src/status/file.ts";
 import type { ItemLinks } from "../src/status/format.ts";
+import { Waits } from "../src/status/waits.ts";
 import { FEEDS_CODE, LINKS_CODE } from "../src/worker/worker.ts";
 import { tempDir } from "./fixtures/temp.ts";
 import { WAIT_HOURS } from "../src/setup/tables.ts";
@@ -376,7 +377,7 @@ test("each tick writes a heartbeat and the status file for the view", async () =
 	expect(next.ok && next.status.workers.mac).toBe(NOW + 1000);
 });
 
-test("the status file lists each item with a saved state: a waiting one at its wait with the controls it allows, a running one at its run", async () => {
+test("the status file lists each item with a saved state: a waiting one at its wait with the controls it allows, a running one at its run; the waits beside it list the waiting one alone", async () => {
 	const w = await workerWorld({ items: { a: { writeForItem: true, askUnlessAnswered: "Which?" }, b: { writeForItem: true, hang: true } } }, { settings: { claimExpirySeconds: 5 } });
 	const worker = w.workerWith();
 
@@ -398,6 +399,7 @@ test("the status file lists each item with a saved state: a waiting one at its w
 		{ ...flowRow, item: "a", title: "a", steps: steps("asking"), at: "asking", passed: ["building"], running: false, controls: { choices: [], answer: true, skip: false, runNow: false, noteTo: ["building", "fixing"] } },
 		{ ...flowRow, item: "b", title: "b", steps: steps(), at: "building", passed: [], running: true, controls: { choices: [], answer: false, skip: false, runNow: false, noteTo: ["building", "fixing"] } },
 	]);
+	expect(Waits.parse(JSON.parse(readFileSync(w.state.waitsPath, "utf8"))).waits.map(({ from, ...entry }) => ({ from, item: "item" in entry ? entry.item : undefined }))).toEqual([{ from: "step", item: "a" }]);
 
 	w.clock.at += 10_000;
 	await w.adapter.workSource!.claim(b, Holder.parse("worker-2"), 5000);
@@ -972,6 +974,46 @@ test("a stuck item never reruns until the owner answers; the answer takes it bac
 	expect(w.state.parked.get("a")).toBeUndefined();
 	expect(w.state.faults.list().map((c) => c.code)).not.toContain("item-stuck");
 	expect(w.state.spent.get("a")).toMatchObject({ total: 802, base: 401 });
+});
+
+/** The waits file as the worker last wrote it. */
+const waitsIn = (w: WorkerWorld) => Waits.parse(JSON.parse(readFileSync(w.state.waitsPath, "utf8"))).waits;
+
+/** The wait the item's log keeps its newest owner's answer at. */
+const keptWait = (w: WorkerWorld, item: string) => w.state.events.list(item).findLast((event) => event.type === "answered")?.payload;
+
+test("an action the waits offer, sent as the owner's answer with its choice, is kept at the entry's wait and moves the item on: words at a step, and a park's run again", async () => {
+	const flag = join(tempDir("flag"), "flag");
+	const w = await workerWorld({ items: { a: { writeForItem: true, askUnlessAnswered: "Which?" }, b: { writeForItem: true, modelTokens: 400 } } }, { checks: [`test -f ${flag} || test ! -f docs/b.md`], settings: { maxFixRuns: 1 } });
+
+	w.item("a", "docs/a.md");
+	w.item("b", "docs/b.md");
+	await w.worker.tick();
+	await w.worker.idle();
+	await w.worker.tick();
+
+	const [step, park] = (["a", "b"] as const).map((item) => waitsIn(w).find((entry) => "item" in entry && entry.item === item));
+	const words = step && "actions" in step ? step.actions.find(({ choice }) => choice === "") : undefined;
+	const again = park && "actions" in park ? park.actions.find(({ choice }) => choice === RUN_AGAIN) : undefined;
+
+	expect([step?.from, words?.choice, park?.from, again?.label]).toEqual(["step", "", "card", "Run it again"]);
+
+	writeFileSync(flag, "");
+	w.clock.at += 1000;
+	await w.adapter.answers!.answer(ItemId.parse("a"), { text: "the short form" });
+	await w.adapter.answers!.answer(ItemId.parse("b"), { text: again?.label ?? "", option: again?.choice });
+
+	for (let tick = 0; tick < 2; tick++) {
+		w.clock.at += TTL + 1;
+		await w.worker.tick();
+		await w.worker.idle();
+	}
+
+	expect([keptWait(w, "a"), keptWait(w, "b")]).toMatchObject([
+		{ wait: step && "wait" in step ? step.wait : "no wait", choice: "" },
+		{ wait: park && "wait" in park ? park.wait : "no wait", choice: RUN_AGAIN },
+	]);
+	expect(w.results.filter(({ outcome }) => outcome === "merged").map(({ item }) => item).toSorted()).toEqual(["a", "b"]);
 });
 
 /** A markdown source whose owner answers only a question hum asked, as on roundup. */

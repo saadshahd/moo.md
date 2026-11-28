@@ -1,7 +1,7 @@
 import type { Label } from "../decide/risk.ts";
 import { brokenLabelOf } from "../loop/breaks.ts";
 import { commitsOf, type Merge } from "../loop/records.ts";
-import { doneByOf, foldItem } from "../state/item-log.ts";
+import { doneByIn } from "../state/item-log.ts";
 import type { State } from "../state/open.ts";
 import type { Counted } from "./measure.ts";
 
@@ -27,15 +27,8 @@ export const measureInputsOf = (state: State) => {
 	/** A merged change's label: the worst the loop saved for any of its commits, as git's label rule gave it; clean where it saved none. */
 	const labelOf = (merge: Merge): Label => brokenLabelOf(state, merge) ?? "clean";
 
-	/** How the item reached done, from its log; unknown where a newer engine wrote some of it, which raises the item's card. */
-	const reachedDoneBy = (item: string) => {
-		const log = state.events.read(item);
-
-		return log.ok ? doneByOf(foldItem(log.value)) : undefined;
-	};
-
 	return {
-		merged: merges.map((merge) => ({ item: merge.item, at: merge.at, paths: merge.paths, doneBy: reachedDoneBy(merge.item), label: labelOf(merge), ...costOf(merge.item, commitsOf(merge)) })),
+		merged: merges.map((merge) => ({ item: merge.item, at: merge.at, paths: merge.paths, doneBy: doneByIn(state.events, merge.item), label: labelOf(merge), ...costOf(merge.item, commitsOf(merge)) })),
 		abandoned: state.parked.list().flatMap(({ item, why, since }) => (why === "stuck" && !merges.some((merge) => merge.item === item) ? [{ item, since, paths: [], ...costOf(item, []) }] : [])),
 		loopTokens: spent.filter(({ item }) => item.startsWith(LOOP_SPEND_PREFIX)).reduce((total, { total: tokens }) => total + tokens, 0),
 	};

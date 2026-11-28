@@ -28,6 +28,9 @@ const REQUEST_RULES = {
 	},
 } as const satisfies Record<RequestKind, RequestRule>;
 
+/** Whether the step's controls allow the request. */
+export const allowsRequest = (kind: RequestKind, controls: RequestControls): boolean => controls[REQUEST_RULES[kind].control];
+
 /** Where an item stands for a request: the step it is at, and the requests that step allows. */
 export type RequestScope = { readonly at: string | undefined; readonly controls: RequestControls };
 
@@ -37,9 +40,7 @@ export const requestRefusal = ({ kind, step }: { readonly kind: RequestKind; rea
 
 	if (at !== step) return `the item is at ${at} now, not ${step}`;
 
-	const rule = REQUEST_RULES[kind];
-
-	return controls[rule.control] ? undefined : rule.refused(step);
+	return allowsRequest(kind, controls) ? undefined : REQUEST_RULES[kind].refused(step);
 };
 
 /**

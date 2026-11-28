@@ -32,7 +32,7 @@ import { measureInputsOf } from "../measure/inputs.ts";
 import { keepMergedCases } from "../measure/cases.ts";
 import { type StaleScore, staleScores } from "../measure/judges.ts";
 import type { Measured, Measurement } from "../measure/remeasure.ts";
-import { emptyStatus, readStatus, writeHeartbeat, writeStatus } from "../status/file.ts";
+import { emptyStatus, publishStatus, readStatus, writeHeartbeat } from "../status/file.ts";
 import { type Flow, type FlowAt, flowOf } from "../status/flow.ts";
 import type { Choice, ItemLinks, OpenItem, Status } from "../status/format.ts";
 import { newestChoices, openQuestions } from "../status/sections.ts";
@@ -1049,7 +1049,7 @@ export class Worker {
 		await this.#keepFeeds(open.map(({ item }) => item));
 
 		const [latest, ci, links] = await Promise.all([this.#latest(), this.#ciTick(), this.#links([...new Set([...open.map(({ item }) => item), ...questions.map(({ item }) => item)])])]);
-		writeStatus(state.statusPath, {
+		publishStatus(state, {
 			...before,
 			writtenAt: t,
 			workers: { ...before.workers, ci: ci ?? before.workers.ci, [where]: t },
@@ -1061,7 +1061,6 @@ export class Worker {
 			},
 			questions: questions.map((question) => ({ ...question, row: links.get(question.item)?.ask })),
 			choices: newestChoices(state.choices.list(), config.hum.choicesShown).map((choice) => ({ ...choice, result: this.#resultOf(choice.item) })),
-			cards: state.faults.list(),
 			open: open.map((item) => ({ ...item, rows: links.get(item.item)?.rows, handoff: links.get(item.item)?.handoff })),
 			merged: [...this.#merged.splice(0), ...before.merged].slice(0, this.#o.config.hum.mergedShown),
 			possibleRepeats: state.possibleRepeats.list().map(({ a, b }) => ({ a, b })),

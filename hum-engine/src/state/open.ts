@@ -15,6 +15,8 @@ import { EngineUpdate, FiledFollowUp, FiledPart, ItemKind, Landing, Learned, Lim
 
 /** Names under the state folder that other modules address by name. */
 export const STATUS_FILE = "status.json";
+export const WAITS_FILE = "waits.json";
+export const LOOKED_FILE = "looked.json";
 export const HEARTBEAT_FILE = "heartbeat.json";
 export const INBOX_DIR = "inbox";
 export const STOPS_DIR = "stops";
@@ -42,6 +44,10 @@ export const openState = (dir: string, { now, ...codec }: StateOptions) => {
 		dir,
 		/** The one status file for the repo. */
 		statusPath: join(dir, STATUS_FILE),
+		/** Every wait on the owner, built from the status file each time it is written. */
+		waitsPath: join(dir, WAITS_FILE),
+		/** When the owner last looked at the changes merged without them; only the panel writes it. */
+		lookedPath: join(dir, LOOKED_FILE),
 		/** The worker's heartbeat, one file the service unit reads. */
 		heartbeatPath: join(dir, HEARTBEAT_FILE),
 		/** The answer hook drops one file here per posted answer; its content is the item id. */

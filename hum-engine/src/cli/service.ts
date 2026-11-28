@@ -22,7 +22,7 @@ import { alone } from "../state/alone.ts";
 import { defaultStateDir, openState, type State } from "../state/open.ts";
 import { ENGINE_VERSION } from "../state/format.ts";
 import { SECOND_MS } from "../time.ts";
-import { writeCards } from "../status/file.ts";
+import { type StatusPlaces, writeCards } from "../status/file.ts";
 import type { Card } from "../status/format.ts";
 import { closingAfter, npmLatest, type OpenWorkerOptions, workerOptions } from "../worker/open.ts";
 import { Worker, type WorkerOptions } from "../worker/worker.ts";
@@ -171,12 +171,14 @@ const serveHost = async ({ cwd: repo, env, stdout }: Io, pool: string): Promise<
 };
 
 /** Shows the card for a Program that differs from the one setup printed, else clears it; the status file is written here, as no worker runs to. */
-const showProgramCard = ({ faults, statusPath }: Pick<State, "faults" | "statusPath">, differences: readonly string[], now: number): Readonly<Card> | undefined => {
+const showProgramCard = (state: Pick<State, "faults"> & StatusPlaces, differences: readonly string[], now: number): Readonly<Card> | undefined => {
+	const { faults } = state;
+
 	faults.clear({ code: CARD_CODES.programEntry });
 
 	const card = differences.length > 0 ? faults.raise(CARD_KINDS.programEntry({ differences })) : undefined;
 
-	writeCards(statusPath, faults.list(), ENGINE_VERSION, now);
+	writeCards(state, ENGINE_VERSION, now);
 
 	return card;
 };
