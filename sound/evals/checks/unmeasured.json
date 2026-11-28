@@ -2,6 +2,7 @@
   "note": "Rules with a check or gate that this measurement skips, each with the reason.",
   "rules": {
     "file-stays-under-a-size-cap": "shipped before the mechanical-checks build; the build order excludes it",
-    "rename-leaves-no-stale-name": "a diff gate that lists stale lines and never blocks: this scan sees no removals and replay.sh counts only blocks, so its commits record the replay that measured it while it still blocked"
+    "rename-leaves-no-stale-name": "a diff gate that lists stale lines and never blocks: this scan sees no removals and replay.sh counts only blocks, so its commits record the replay that measured it while it still blocked",
+    "block-comment-only": "opt-in, and every // it flags is the rule's own mandate, so a false hit can only be a missed tool directive; measured by its directive cases instead of a labeled sample"
   }
 }

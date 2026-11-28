@@ -1,21 +1,17 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { describe, test } from 'node:test';
-import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { reviewHits } from '../lint/hits.mjs';
+import { checkSuffix, corpora, corpusFiles } from '../lint/corpora.mjs';
 import { installChecks } from '../lint/install.mjs';
 import { runLint } from '../lint/tools.mjs';
 import { ManualWiring, wireEslint } from '../lint/wire.mjs';
 import { installLinter } from './linters.mjs';
 
-const corpus = join(dirname(fileURLToPath(import.meta.url)), '../corpus');
-const checkSuffix = '.check.mjs';
-const shippedChecks = readdirSync(corpus, { recursive: true })
-  .filter((path) => path.endsWith(checkSuffix))
-  .map((path) => ({ rule: basename(path, checkSuffix), topic: dirname(path), cite: 'src/list.tsx' }));
+const shippedChecks = corpusFiles(checkSuffix).map(({ path }) => ({ rule: basename(path, checkSuffix), topic: dirname(path), cite: 'src/list.tsx' }));
 const keysRule = { rule: 'keys-are-identity-not-position', topic: 'effects', cite: 'src/list.tsx' };
 const violation = 'export const List = ({ rows }) => <ul>{rows.map((row, index) => <li key={index}>{row}</li>)}</ul>;\n';
 
@@ -41,7 +37,7 @@ const corpusWith = (checks) => {
   const directory = mkdtempSync(join(tmpdir(), 'sound-corpus-'));
   Object.entries(checks).forEach(([name, source]) => {
     mkdirSync(join(directory, 'test'), { recursive: true });
-    writeFileSync(join(directory, 'test', `${name}.check.mjs`), source);
+    writeFileSync(join(directory, 'test', `${name}${checkSuffix}`), source);
   });
   return directory;
 };
@@ -83,34 +79,34 @@ for (const linter of linters) {
     test('wires, fires through the repo config, and is idempotent', async (t) => {
       const repo = repoFor(linter, { [linter.config]: linter.text });
       if (repo.skip) return t.skip(repo.skip);
-      const first = await installChecks({ root: repo.root, corpus, selected: [keysRule], write: true });
+      const first = await installChecks({ root: repo.root, corpora, selected: [keysRule], write: true });
       assert.deepEqual(first.map(({ rule, status, severity }) => ({ rule, status, severity })), [{ rule: keysRule.rule, status: 'installed', severity: 'warn' }]);
       assert.equal(first[0].repoHits, 1);
       const hits = lintHits({ root: repo.root, installed: repo.installed, linter }).filter((hit) => hit.ruleId === `sound/${keysRule.rule}`);
       assert.equal(hits.length, 1);
       const wired = readFileSync(join(repo.root, linter.config), 'utf8');
-      await installChecks({ root: repo.root, corpus, selected: [keysRule], write: true });
+      await installChecks({ root: repo.root, corpora, selected: [keysRule], write: true });
       assert.equal(readFileSync(join(repo.root, linter.config), 'utf8'), wired);
     });
 
     test('every shipped check installs together, and none is reverted or cannot run', async (t) => {
       const repo = repoFor(linter, { [linter.config]: linter.text });
       if (repo.skip) return t.skip(repo.skip);
-      const rows = await installChecks({ root: repo.root, corpus, selected: shippedChecks, write: true });
+      const rows = await installChecks({ root: repo.root, corpora, selected: shippedChecks, write: true });
       assert.deepEqual(rows.filter(({ status }) => !['installed', 'covered'].includes(status)).map(({ rule, status, note }) => ({ rule, status, note })), []);
     });
 
     test('lints only the files the repo config lints, so a check file the config ignores adds no failure', async (t) => {
       const repo = repoFor(linter, { [linter.config]: linter.ignoringLongFiles });
       if (repo.skip) return t.skip(repo.skip);
-      const rows = await installChecks({ root: repo.root, corpus, selected: [keysRule], write: true });
+      const rows = await installChecks({ root: repo.root, corpora, selected: [keysRule], write: true });
       assert.deepEqual(rows.map(({ status, note }) => ({ status, note })), [{ status: 'installed', note: undefined }]);
     });
 
     test('a dry run measures and leaves the repo byte-for-byte as it was', async (t) => {
       const repo = repoFor(linter, { [linter.config]: linter.text });
       if (repo.skip) return t.skip(repo.skip);
-      const rows = await installChecks({ root: repo.root, corpus, selected: [keysRule] });
+      const rows = await installChecks({ root: repo.root, corpora, selected: [keysRule] });
       assert.equal(rows[0].status, 'would-install');
       assert.equal(readFileSync(join(repo.root, linter.config), 'utf8'), linter.text);
       assert.equal(existsSync(join(repo.root, '.claude')), false);
@@ -119,7 +115,7 @@ for (const linter of linters) {
     test('a problem check is an error where the repo has no hits and a warning where it has some', async (t) => {
       const repo = repoFor(linter, { [linter.config]: linter.text });
       if (repo.skip) return t.skip(repo.skip);
-      const options = { root: repo.root, corpus: corpusWith({ forbidden: forbiddenNameCheck }), selected: [{ rule: 'forbidden', topic: 'test', cite: 'src/list.tsx' }] };
+      const options = { root: repo.root, corpora: [corpusWith({ forbidden: forbiddenNameCheck })], selected: [{ rule: 'forbidden', topic: 'test', cite: 'src/list.tsx' }] };
       assert.equal((await installChecks(options))[0].severity, 'error');
       writeFileSync(join(repo.root, 'src/dirty.ts'), 'export const b = forbiddenName;\n');
       assert.equal((await installChecks(options))[0].severity, 'warn');
@@ -128,11 +124,18 @@ for (const linter of linters) {
     test('a check that does not fire through the repo config is reverted', async (t) => {
       const repo = repoFor(linter, { [linter.config]: linter.text });
       if (repo.skip) return t.skip(repo.skip);
-      const rows = await installChecks({ root: repo.root, corpus: corpusWith({ silent: silentCheck }), selected: [{ rule: 'silent', topic: 'test', cite: 'src/list.tsx' }], write: true });
+      const rows = await installChecks({ root: repo.root, corpora: [corpusWith({ silent: silentCheck })], selected: [{ rule: 'silent', topic: 'test', cite: 'src/list.tsx' }], write: true });
       assert.equal(rows[0].status, 'reverted');
       assert.match(rows[0].note, /does not fire/);
       assert.equal(readFileSync(join(repo.root, linter.config), 'utf8'), linter.text);
       assert.equal(existsSync(join(repo.root, '.claude')), false);
+    });
+
+    test('a check that only a later corpus holds still installs', async (t) => {
+      const repo = repoFor(linter, { [linter.config]: linter.text });
+      if (repo.skip) return t.skip(repo.skip);
+      const rows = await installChecks({ root: repo.root, corpora: [corpusWith({}), corpusWith({ forbidden: forbiddenNameCheck })], selected: [{ rule: 'forbidden', topic: 'test', cite: 'src/list.tsx' }] });
+      assert.equal(rows[0]?.status, 'would-install');
     });
   });
 }
@@ -141,7 +144,7 @@ describe('a linter older than the lowest tested version', () => {
   test('the failure names the version, and the repo is left as it was', async (t) => {
     const repo = repoFor({ tool: 'oxlint', version: '1.21.0' }, { [linters[1].config]: linters[1].text, 'package.json': '{"devDependencies":{"oxlint":"1.21.0"}}' });
     if (repo.skip) return t.skip(repo.skip);
-    const rows = await installChecks({ root: repo.root, corpus, selected: [keysRule], write: true });
+    const rows = await installChecks({ root: repo.root, corpora, selected: [keysRule], write: true });
     assert.equal(rows[0].status, 'reverted');
     assert.match(rows[0].note, /report that cannot be read/);
     assert.match(rows[0].note, /oxlint 1\.21\.0 from package\.json range is older than 1\.26\.0/);
@@ -156,7 +159,7 @@ describe('reviewing a staged diff', () => {
     const git = (...args) => execFileSync('git', args, { cwd: repo.root });
     git('init', '-q');
     git('add', '-f', 'package.json', 'eslint.config.mjs', 'src/clean.tsx');
-    await installChecks({ root: repo.root, corpus, selected: [keysRule], write: true });
+    await installChecks({ root: repo.root, corpora, selected: [keysRule], write: true });
     git('add', '-f', '.claude');
     assert.deepEqual(reviewHits({ root: repo.root }), []);
     git('add', '-f', 'src/list.tsx');
@@ -176,7 +179,7 @@ describe('a repo whose own lint already flags the check\'s invalid cases', () =>
   test('reports the repo rule that covers it and installs nothing', async (t) => {
     const repo = repoFor(linters[0], { 'eslint.config.mjs': eslintConfig.replace('rules: {}', "rules: { 'no-debugger': 'error' }") });
     if (repo.skip) return t.skip(repo.skip);
-    const rows = await installChecks({ root: repo.root, corpus: corpusWith({ debugger: debuggerCheck }), selected: [{ rule: 'debugger', topic: 'test', cite: 'src/list.tsx' }], write: true });
+    const rows = await installChecks({ root: repo.root, corpora: [corpusWith({ debugger: debuggerCheck })], selected: [{ rule: 'debugger', topic: 'test', cite: 'src/list.tsx' }], write: true });
     assert.deepEqual(rows.map(({ status, covered }) => ({ status, covered })), [{ status: 'covered', covered: [{ ruleId: 'no-debugger', file: 'eslint.config.mjs' }] }]);
     assert.equal(existsSync(join(repo.root, '.claude')), false);
   });
@@ -185,7 +188,7 @@ describe('a repo whose own lint already flags the check\'s invalid cases', () =>
     const clashing = eslintConfig.replace('rules: {}', "rules: { 'no-unused-vars': 'warn' }");
     const repo = repoFor(linters[0], { 'eslint.config.mjs': clashing });
     if (repo.skip) return t.skip(repo.skip);
-    const rows = await installChecks({ root: repo.root, corpus: corpusWith({ debugger: debuggerCheck }), selected: [{ rule: 'debugger', topic: 'test', cite: 'src/list.tsx' }] });
+    const rows = await installChecks({ root: repo.root, corpora: [corpusWith({ debugger: debuggerCheck })], selected: [{ rule: 'debugger', topic: 'test', cite: 'src/list.tsx' }] });
     assert.deepEqual(rows.map(({ status, clashes }) => ({ status, clashes })), [{ status: 'would-install', clashes: ['no-unused-vars'] }]);
   });
 });
@@ -195,7 +198,7 @@ describe('the generated plugin entry', () => {
     const blankAfterImports = "{ rules: { 'padding-line-between-statements': ['error', { blankLine: 'always', prev: 'import', next: '*' }, { blankLine: 'any', prev: 'import', next: 'import' }] } }";
     const repo = repoFor(linters[0], { 'eslint.config.mjs': eslintConfig.replace("';\nexport default [\n", `';\n\nexport default [\n  ${blankAfterImports},\n`) });
     if (repo.skip) return t.skip(repo.skip);
-    const rows = await installChecks({ root: repo.root, corpus, selected: [keysRule], write: true });
+    const rows = await installChecks({ root: repo.root, corpora, selected: [keysRule], write: true });
     assert.deepEqual(rows.map(({ status, note }) => ({ status, note })), [{ status: 'installed', note: undefined }]);
   });
 });
@@ -204,14 +207,14 @@ describe('a rule the repo\'s lint cannot run', () => {
   test('a cited file no supported config covers is reported, not wired', async (t) => {
     const repo = repoFor(linters[0], { 'packages/a/eslint.config.mjs': eslintConfig });
     if (repo.skip) return t.skip(repo.skip);
-    const rows = await installChecks({ root: repo.root, corpus, selected: [{ ...keysRule, cite: 'packages/b/x.tsx' }] });
+    const rows = await installChecks({ root: repo.root, corpora, selected: [{ ...keysRule, cite: 'packages/b/x.tsx' }] });
     assert.equal(rows[0].status, 'no-linter');
   });
 
   test('a commented oxlint config comes back as exact lines to add by hand', async (t) => {
     const repo = repoFor(linters[1], { '.oxlintrc.json': '{\n  // mine\n  "rules": {}\n}\n' });
     if (repo.skip) return t.skip(repo.skip);
-    const rows = await installChecks({ root: repo.root, corpus, selected: [keysRule], write: true });
+    const rows = await installChecks({ root: repo.root, corpora, selected: [keysRule], write: true });
     assert.equal(rows[0].status, 'manual');
     assert.match(rows[0].note, /"jsPlugins"/);
     assert.equal(readFileSync(join(repo.root, '.oxlintrc.json'), 'utf8'), '{\n  // mine\n  "rules": {}\n}\n');
@@ -222,11 +225,11 @@ describe('re-running over an edited check file', () => {
   const rerun = async (resolution, t) => {
     const repo = repoFor(linters[0], { 'eslint.config.mjs': eslintConfig });
     if (repo.skip) return t.skip(repo.skip);
-    await installChecks({ root: repo.root, corpus, selected: [keysRule], write: true });
+    await installChecks({ root: repo.root, corpora, selected: [keysRule], write: true });
     const installedFile = join(repo.root, '.claude/sound/effects/keys-are-identity-not-position.check.mjs');
     const theirs = readFileSync(installedFile, 'utf8') + '\n';
     writeFileSync(installedFile, theirs);
-    const rows = await installChecks({ root: repo.root, corpus, selected: [keysRule], write: true, resolutions: resolution ? { [keysRule.rule]: resolution } : {} });
+    const rows = await installChecks({ root: repo.root, corpora, selected: [keysRule], write: true, resolutions: resolution ? { [keysRule.rule]: resolution } : {} });
     return { rows, installedFile, theirs };
   };
 

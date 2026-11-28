@@ -1,29 +1,19 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
 import { caseFailures, caseList, lintCases, loadCheck } from './cases.mjs';
-import { pluginSource } from './plugin.mjs';
+import { checkSuffix } from './corpora.mjs';
+import { installedRoot, pluginFile, pluginSource } from './plugin.mjs';
 import { coveringLinter, probeRepo } from './probe.mjs';
-import { meetsFloor, runLint, tools } from './tools.mjs';
+import { binaryFor, configDirectoryOf, meetsFloor, runLint, tools } from './tools.mjs';
 import { ManualWiring, wireEslint, wireOxlint } from './wire.mjs';
 
-const installedRoot = '.claude/sound';
-const pluginFile = `${installedRoot}/plugin.mjs`;
 const trialDirectory = 'sound-trial';
-const checkSuffix = '.check.mjs';
-const localSuffix = '.local.check.mjs';
+const localSuffix = `.local${checkSuffix}`;
 const wiringByTool = { oxlint: wireOxlint, eslint: wireEslint };
 
 const specifierFrom = (from, to) => {
   const path = posix.relative(posix.dirname(from), to);
   return /^\.\.?\//.test(path) ? path : `./${path}`;
-};
-
-const binaryFor = ({ root, configDirectory, tool }) => {
-  for (let directory = join(root, configDirectory); ; directory = dirname(directory)) {
-    const candidate = join(directory, 'node_modules/.bin', tool);
-    if (existsSync(candidate)) return candidate;
-    if (directory === root || directory === dirname(directory)) return null;
-  }
 };
 
 const snapshot = ({ files, directories }) => {
@@ -39,7 +29,7 @@ const rowKey = ({ file, ruleId, line, message }) => `${file}|${ruleId}|${line}|$
 const outsideRules = (hits) => hits.filter((hit) => hit.ruleId && !hit.ruleId.startsWith('sound/'));
 
 const trial = ({ tool, bin, root, config, cases }) => {
-  const configDirectory = join(root, posix.dirname(config));
+  const configDirectory = configDirectoryOf({ root, config });
   const directory = join(configDirectory, trialDirectory);
   try {
     return lintCases({ tool, bin, directory, from: configDirectory, config: join(root, config), cases: caseList({ cases }) });
@@ -62,7 +52,7 @@ const trialOutcome = ({ cases, hitsByCase }) => {
 };
 
 const wholeLint = ({ tool, bin, root, config }) =>
-  runLint({ tool, bin, cwd: join(root, posix.dirname(config)), config: join(root, config), files: ['.'] }).hits;
+  runLint({ tool, bin, cwd: configDirectoryOf({ root, config }), config: join(root, config), files: ['.'] }).hits;
 
 const severityFor = ({ type, repoHits }) => (type === 'problem' && repoHits === 0 ? 'error' : 'warn');
 
@@ -152,14 +142,14 @@ const installGroup = async ({ root, linter, bin, entries, resolutions, write }) 
   }
 };
 
-export const installChecks = async ({ root, corpus, selected, resolutions = {}, write = false }) => {
+export const installChecks = async ({ root, corpora, selected, resolutions = {}, write = false }) => {
   const probe = probeRepo(root);
   const rows = [];
   const groups = new Map();
 
   for (const { rule, topic, cite } of selected) {
-    const corpusFile = join(corpus, topic, `${rule}${checkSuffix}`);
-    if (!existsSync(corpusFile)) continue;
+    const corpusFile = corpora.map((corpus) => join(corpus, topic, `${rule}${checkSuffix}`)).find(existsSync);
+    if (!corpusFile) throw new Error(`no check in any corpus for rule ${rule} under topic ${topic}`);
     const linter = coveringLinter(probe, cite);
     if (!linter) {
       const why = probe.unsupported.map(({ tool, reason }) => `${tool}: ${reason}`).join('; ') || 'no linter config found';
@@ -170,8 +160,7 @@ export const installChecks = async ({ root, corpus, selected, resolutions = {}, 
   }
 
   for (const { linter, entries } of groups.values()) {
-    const configDirectory = posix.dirname(linter.config) === '.' ? '' : posix.dirname(linter.config);
-    const bin = binaryFor({ root, configDirectory, tool: linter.tool });
+    const bin = binaryFor({ root, config: linter.config, tool: linter.tool });
     if (!bin) {
       rows.push(...entries.map(({ rule }) => ({ rule, status: 'no-linter', tool: linter.tool, config: linter.config, note: `${linter.tool} is not installed in the repo; install its dependencies first` })));
       continue;

@@ -1,19 +1,15 @@
 #!/usr/bin/env node
-import { readdirSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { basename, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import { checkSuffix, corpora, corpusFiles } from './corpora.mjs';
 import { reviewHits } from './hits.mjs';
 import { installChecks } from './install.mjs';
 import { probeRepo } from './probe.mjs';
 
-const corpus = join(dirname(fileURLToPath(import.meta.url)), '../corpus');
-const checkSuffix = '.check.mjs';
-
 const topicOf = (rule) => {
-  const found = readdirSync(corpus, { recursive: true }).map(String).find((path) => path.endsWith(`/${rule}${checkSuffix}`));
+  const found = corpusFiles(checkSuffix).find(({ path }) => basename(path, checkSuffix) === rule);
   if (!found) throw new Error(`no check in the corpus for rule ${rule}`);
-  return found.split('/')[0];
+  return found.path.split('/')[0];
 };
 
 const { positionals, values } = parseArgs({
@@ -38,7 +34,7 @@ const commands = {
   install: () =>
     installChecks({
       root,
-      corpus,
+      corpora,
       write: values.write,
       selected: (values.rule ?? []).map(pair).map(([rule, cite]) => ({ rule, topic: topicOf(rule), cite })),
       resolutions: Object.fromEntries((values.resolve ?? []).map(pair)),

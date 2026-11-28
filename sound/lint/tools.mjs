@@ -1,12 +1,22 @@
 import { spawnSync } from 'node:child_process';
-import { realpathSync } from 'node:fs';
-import { relative, resolve } from 'node:path';
+import { existsSync, realpathSync } from 'node:fs';
+import { dirname, join, posix, relative, resolve } from 'node:path';
 
 const sourceGlob = '**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}';
 const reportExcerptLength = 300;
 const oxlintCode = /^(.+)\((.+)\)$/;
 const eslintSeverities = { 1: 'warn', 2: 'error' };
 const oxlintSeverities = { warning: 'warn', error: 'error', advice: 'warn' };
+
+export const configDirectoryOf = ({ root, config }) => join(root, posix.dirname(config));
+
+export const binaryFor = ({ root, config, tool }) => {
+  for (let directory = configDirectoryOf({ root, config }); ; directory = dirname(directory)) {
+    const candidate = join(directory, 'node_modules/.bin', tool);
+    if (existsSync(candidate)) return candidate;
+    if (directory === root || directory === dirname(directory)) return null;
+  }
+};
 
 const eslintHits = (stdout) =>
   JSON.parse(stdout).flatMap(({ filePath, messages }) =>

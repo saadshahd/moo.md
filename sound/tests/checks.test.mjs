@@ -1,20 +1,15 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, join } from 'node:path';
 import { test } from 'node:test';
-import { fileURLToPath } from 'node:url';
 import { caseFailures, caseList, lintCases, loadCheck } from '../lint/cases.mjs';
+import { checkSuffix, corpusFiles } from '../lint/corpora.mjs';
 import { pluginSource } from '../lint/plugin.mjs';
 import { tools } from '../lint/tools.mjs';
 import { installLinter, matrix } from './linters.mjs';
 
-const corpus = resolve(dirname(fileURLToPath(import.meta.url)), '../corpus');
-const checkSuffix = '.check.mjs';
-
-const checkPaths = readdirSync(corpus, { recursive: true })
-  .filter((path) => path.endsWith(checkSuffix))
-  .map((path) => join(corpus, path));
+const checkPaths = corpusFiles(checkSuffix).map(({ corpus, path }) => join(corpus, path));
 
 for (const linter of matrix) {
   for (const checkPath of checkPaths) {

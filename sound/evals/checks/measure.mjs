@@ -5,13 +5,12 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFile
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { checkSuffix, corpusFiles } from '../../lint/corpora.mjs';
 import { pluginSource } from '../../lint/plugin.mjs';
 import { runLint, tools } from '../../lint/tools.mjs';
 import { installLinter } from '../../tests/linters.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const corpusRules = resolve(here, '../../corpus');
-const checkSuffix = '.check.mjs';
 const gateSuffix = '.gate';
 const gateHitLine = /^ {2}(\S+) {2}\((.+)\)$/;
 const confidenceZ = 1.96;
@@ -23,9 +22,9 @@ const anchorLength = 160;
 const { rules: unmeasured } = JSON.parse(readFileSync(join(here, 'unmeasured.json'), 'utf8'));
 
 const rulePaths = (suffix) =>
-  readdirSync(corpusRules, { recursive: true })
-    .filter((path) => path.endsWith(suffix) && !(basename(path, suffix) in unmeasured))
-    .map((path) => join(corpusRules, path));
+  corpusFiles(suffix)
+    .filter(({ path }) => !(basename(path, suffix) in unmeasured))
+    .map(({ corpus, path }) => join(corpus, path));
 
 const lineAt = (corpus, { source, file, line }) =>
   readFileSync(join(corpus, source, file), 'utf8')
