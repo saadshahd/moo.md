@@ -69,7 +69,7 @@ import { mergedThrough, type OnBase, recordMerged } from "./merged.ts";
 import { keepLanding, keepPick } from "../state/item-log.ts";
 import { blockedPaths, brokenCommits } from "../loop/breaks.ts";
 import { queueQuestion, releaseQuestions } from "./questions.ts";
-import { pickedAnswer } from "./thread.ts";
+import { pickedChoice } from "./answers.ts";
 import { reportAlignment } from "./alignment-report.ts";
 import { reportTaste } from "./taste.ts";
 import type { ThinResult } from "./thin-path.ts";
@@ -230,7 +230,7 @@ const changedSinceReviews = async ({ git, state, id }: Pick<LandContext, "git" |
 export const changeOn = async (ctx: Pick<LandContext, "git" | "base" | "config" | "dir" | "id">): Promise<Change> => changeOf(await changeDiff(ctx), ctx.config.hum);
 
 /** The level the owner picked for unclear paths, answered since the change was saved. */
-const answeredLevel = (item: Item, since: number, levels: readonly string[]): string | undefined => pickedAnswer(item.thread, levels, since)?.option;
+const answeredLevel = (ctx: Pick<LandContext, "state" | "item">, since: number, levels: readonly string[]): string | undefined => pickedChoice(ctx.state, ctx.item, levels, since)?.choice;
 
 const askUnclear = async (ctx: LandContext, unclear: readonly string[]): Promise<void> => {
 	const globs = [...new Set(unclear.map(ruleGlobFor))];
@@ -586,7 +586,7 @@ export const land = async (ctx: LandContext): Promise<ThinResult> => {
 	if (saved.change.paths.length === 0 && (await isOnBase(ctx))) return finish(ctx, await pushedOnBase(ctx));
 
 	const first = await placementOf(ctx, saved.change);
-	const answered = answeredLevel(ctx.item, saved.since, levelNames(ctx.config));
+	const answered = answeredLevel(ctx, saved.since, levelNames(ctx.config));
 	const learns = first.placement.unclear.length > 0 && answered !== undefined;
 
 	const unlearned = learns ? await learnRules(ctx, first.placement.unclear, answered) : undefined;
@@ -611,7 +611,7 @@ export const land = async (ctx: LandContext): Promise<ThinResult> => {
 
 	const verdict = reviewed?.verdict;
 	const route = routeWith(verdict);
-	const approvals = { review: doesApprove(ctx.state.verdicts.get(ctx.id), saved.head), owner: pickedAnswer(ctx.item.thread, [OWNER_APPROVAL], saved.since) !== undefined };
+	const approvals = { review: doesApprove(ctx.state.verdicts.get(ctx.id), saved.head), owner: pickedChoice(ctx.state, ctx.item, [OWNER_APPROVAL], saved.since) !== undefined };
 	const cleared = isCleared(route, approvals);
 	const why = verdict && verdict.event !== REVIEW_APPROVAL ? `the review run answered ${verdict.event}: ${verdict.reason}` : waitReason(route);
 	const rules = ctx.pulls ? await ctx.pulls.rules(ctx.base) : NO_RULES;

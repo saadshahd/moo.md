@@ -214,15 +214,9 @@ export const SettledNote = z.object({
 
 export type SettledNote = z.infer<typeof SettledNote>;
 
-/** The option a settled answer picked, when its source names one. */
-export const optionOf = (answer: SettledAnswer): string | undefined => ("option" in answer ? answer.option : undefined);
-
-/** Whether a settled answer changed the plan: one applied, and not one picking an option of `steering`, hum's own. */
-export const changesPlan = (answer: SettledAnswer, steering: ReadonlySet<string>): boolean => {
-	const option = optionOf(answer);
-
-	return answer.disposition === "applied" && (option === undefined || !steering.has(option));
-};
+/** Whether an answer changed the plan: one applied, and not one picking an option of `steering`, hum's own. */
+export const changesPlan = ({ disposition, option }: { readonly disposition: SettledAnswer["disposition"]; readonly option?: string }, steering: ReadonlySet<string>): boolean =>
+	disposition === "applied" && (option === undefined || !steering.has(option));
 
 const slotFields = {
 	name,
