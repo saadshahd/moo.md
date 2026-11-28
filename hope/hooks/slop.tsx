@@ -1,8 +1,9 @@
 import type { Register } from "claude-code";
 import { update } from "claude-code";
-import type { Chosen, Finding, Mark, Slop } from "../slop.d.ts";
+import type { Chosen, Finding, Hidden, Mark, Slop } from "../slop.d.ts";
 
 /** After a main-thread turn that edited repo-bound files, judge.sh judges them off the turn.
+ * A finding that repeats one the person rejected in that file, in any session, stays hidden.
  * A `slop N` button waits above the prompt. It opens a pane showing one finding at a time as the
  * diff that fixes it, and the row turns into the accept, edit or reject choice for that finding: the
  * row already holds the keys, which a pane opened from it would not get. /fix-slops accepts every
@@ -10,6 +11,7 @@ import type { Chosen, Finding, Mark, Slop } from "../slop.d.ts";
 
 const SLOP = { plugin: "hope", key: "slop" } as const;
 const PANE = "slop";
+const HIDDEN_PANE = "slop-hidden";
 
 const EMPTY: Slop = {
   findings: [],
@@ -22,6 +24,7 @@ const EMPTY: Slop = {
   seen: [],
   offset: 0,
   unjudged: [],
+  hidden: [],
 };
 
 const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
@@ -32,6 +35,12 @@ const CHANGED_SINCE = "the file changed since the judge read it";
 export const MOVED = `${CHANGED_SINCE}; accept sends this to Claude`;
 export const FIX_SLOPS = "fix-slops";
 export const NONE = "No slop findings wait.";
+export const FORGET_REJECTS = "forget-slop-rejects";
+export const REJECTS = "slop:rejects:";
+/** The rejects a repo keeps, newest; an older one shows again. */
+export const KEPT_REJECTS = 100;
+export const PICK_MODEL = "haiku";
+export const NO_REPEAT = "none";
 
 // ---- pure ----
 
@@ -145,6 +154,85 @@ export function addFindings(s: Slop, found: Finding[]): Slop {
     }
   }
   return { ...s, findings, seen: [...known] };
+}
+
+/** Where a session's findings live: the repo every worktree of it shares, and its top folder. */
+export type Repo = { id: string; root: string; top: string };
+
+/** The finding as the repo stores it: its file relative to the repo's top folder, so every
+ * worktree names it the same. A relative file is the session root's. */
+export function inRepo(f: Finding, repo: Repo): Finding {
+  if (!f.file) return f;
+  const path = f.file.startsWith("/") ? f.file : `${repo.root}/${f.file}`;
+  return path.startsWith(`${repo.top}/`)
+    ? { ...f, file: path.slice(repo.top.length + 1) }
+    : { ...f, file: path };
+}
+
+export type Sorted =
+  | { kind: "show"; finding: Finding }
+  | { kind: "hide"; hidden: Hidden }
+  | { kind: "ask"; finding: Finding; rejects: Finding[] };
+
+/** Each finding a run found against the repo's rejects. One waiting for a decision shows, to take its
+ * newer change; one with a reject's file and rule, or hidden earlier this session, is hidden; one in
+ * a file with rejects asks the model whether it repeats one of them; every other shows. */
+export function sortRepeats(
+  found: Finding[],
+  rejects: Finding[],
+  s: Slop,
+  repo: Repo,
+): Sorted[] {
+  const rejected = new Map(rejects.map((r) => [findingKey(r), r]));
+  const earlier = new Map(s.hidden.map((h) => [findingKey(h.finding), h]));
+  const waiting = new Set(s.findings.slice(s.cursor).map(findingKey));
+  return found.map((f): Sorted => {
+    const k = findingKey(f);
+    const stored = inRepo(f, repo);
+    const repeats = rejected.get(findingKey(stored));
+    const before = earlier.get(k);
+    const inFile = rejects.filter((r) => r.file === stored.file);
+    if (k === undefined || waiting.has(k)) return { kind: "show", finding: f };
+    if (repeats)
+      return { kind: "hide", hidden: { finding: f, repeats, by: "rule" } };
+    if (before) return { kind: "hide", hidden: { ...before, finding: f } };
+    return inFile.length
+      ? { kind: "ask", finding: f, rejects: inFile }
+      : { kind: "show", finding: f };
+  });
+}
+
+/** One finding or reject as the model reads it: its rule, then what is wrong. */
+const said = (f: Finding) => `${f.rule} — ${f.claim}`;
+
+/** What the model reads to say whether a finding repeats one of the file's rejects, by number. */
+export function pickText(f: Finding, rejects: Finding[]): string {
+  return `A code review flagged this in a file:
+<finding>${said(f)}</finding>
+
+The person rejected these earlier findings in the same file:
+${rejects.map((r, i) => `${i + 1}. ${said(r)}`).join("\n")}
+
+Answer with the number of the earlier finding this one repeats: the same complaint about the code, in any words. Answer ${NO_REPEAT} when it raises a different complaint.`;
+}
+
+/** The labels the model picks from: one number per reject, then none. */
+export function pickLabels(rejects: Finding[]): string[] {
+  return [...rejects.map((_, i) => String(i + 1)), NO_REPEAT];
+}
+
+/** The repo's rejects with `f` as the newest, once per key, the newest KEPT_REJECTS kept. */
+export function withReject(rejects: Finding[], f: Finding): Finding[] {
+  const k = findingKey(f);
+  return [...rejects.filter((r) => findingKey(r) !== k), f].slice(
+    -KEPT_REJECTS,
+  );
+}
+
+/** The hidden findings with `more` added, once per key, the newer in the older one's place. */
+export function withHidden(hidden: Hidden[], more: Hidden[]): Hidden[] {
+  const keys = new Set(more.map((h) => findingKey(h.finding)));
+  return [...hidden.filter((h) => !keys.has(findingKey(h.finding))), ...more];
 }
 
 /** A git status line keeps a file when it is tracked: not untracked (??), not ignored (!!). */
@@ -317,6 +405,105 @@ async function repoBound($: any, files: string[]): Promise<string[]> {
   return kept.filter((f): f is string => f !== undefined);
 }
 
+/** The session's repo. Outside git, the session root stands in as its own repo. */
+async function repoOf($: any): Promise<Repo> {
+  const root = await $.session.root();
+  const r = await $.process
+    .run([
+      "git",
+      "-C",
+      root,
+      "rev-parse",
+      "--path-format=absolute",
+      "--git-common-dir",
+      "--show-toplevel",
+    ])
+    .catch(() => undefined);
+  const [id, top] = r?.exitCode === 0 ? r.stdout.trim().split("\n") : [];
+  return id && top ? { id, root, top } : { id: root, root, top: root };
+}
+
+async function readRejects($: any, repo: Repo): Promise<Finding[]> {
+  return (
+    ((await $.store.get(REJECTS + repo.id)) as Finding[] | undefined) ?? []
+  );
+}
+
+/** Stores the rejected finding for its repo over a fresh read, since another session may have
+ * stored one since. A finding with no file has nothing to match on. */
+async function keepReject($: any, f: Finding): Promise<void> {
+  if (!f.file) return;
+  const repo = await repoOf($);
+  await $.store.set(
+    REJECTS + repo.id,
+    withReject(await readRejects($, repo), inRepo(f, repo)),
+  );
+}
+
+/** The reject the model says `f` repeats, or none. */
+async function pick(
+  $: any,
+  f: Finding,
+  rejects: Finding[],
+): Promise<Finding | undefined> {
+  const label = await $.model.classify(
+    pickText(f, rejects),
+    pickLabels(rejects),
+    { model: PICK_MODEL },
+  );
+  return label === undefined || label === NO_REPEAT
+    ? undefined
+    : rejects[Number(label) - 1];
+}
+
+/** A run's findings split into those that show and those that repeat a reject. A failed model
+ * check shows its finding and names why. */
+async function withoutRepeats(
+  $: any,
+  found: Finding[],
+): Promise<{ shown: Finding[]; hidden: Hidden[]; failed?: string }> {
+  const repo = await repoOf($);
+  const sorted = sortRepeats(
+    found,
+    await readRejects($, repo),
+    await readSlop($),
+    repo,
+  );
+  const checked = await Promise.all(
+    sorted.map(async (x): Promise<Sorted & { failed?: string }> => {
+      if (x.kind !== "ask") return x;
+      try {
+        const repeats = await pick($, x.finding, x.rejects);
+        return repeats
+          ? {
+              kind: "hide",
+              hidden: { finding: x.finding, repeats, by: "pick" },
+            }
+          : { kind: "show", finding: x.finding };
+      } catch (err: any) {
+        return {
+          kind: "show",
+          finding: x.finding,
+          failed: err?.message ?? String(err),
+        };
+      }
+    }),
+  );
+  return {
+    shown: checked.flatMap((x) => (x.kind === "show" ? [x.finding] : [])),
+    hidden: checked.flatMap((x) => (x.kind === "hide" ? [x.hidden] : [])),
+    failed: checked.find((x) => x.failed)?.failed,
+  };
+}
+
+/** Throws `why` the first time this session sees it, so a failure shows once, not on every turn. */
+async function showOnce($: any, why: string): Promise<void> {
+  const key = `error|${why}`;
+  if ((await readSlop($)).seen.includes(key)) return;
+  await change($, (s) => ({ ...s, seen: [...s.seen, key] }));
+  throw new Error(why);
+}
+
 async function judge($: any, files: string[]): Promise<void> {
   const v: Verdict = await $.process
     .run([`${$.plugin.root}/hooks/judge.sh`], {
@@ -329,23 +516,30 @@ async function judge($: any, files: string[]): Promise<void> {
       why: `judge.sh did not finish: ${err?.message ?? err}`,
     }));
   if (v.kind === "not run") {
-    const { seen } = await readSlop($);
-    const known = seen.includes(`error|${v.why}`);
     await change($, (s) => ({
       ...s,
       unjudged: [...new Set([...s.unjudged, ...files])],
-      seen: known ? s.seen : [...s.seen, `error|${v.why}`],
     }));
-    // The same failure shows once a session, not on every edit turn.
-    if (!known) throw new Error(`not run: ${v.why}`);
-    return;
+    return showOnce($, `not run: ${v.why}`);
   }
+  const { shown, hidden, failed } = await withoutRepeats($, v.found).catch(
+    (err) => ({ shown: v.found, hidden: [], failed: err?.message ?? err }),
+  );
   await change($, (s) =>
     addFindings(
-      { ...s, unjudged: s.unjudged.filter((f) => !files.includes(f)) },
-      v.found,
+      {
+        ...s,
+        unjudged: s.unjudged.filter((f) => !files.includes(f)),
+        hidden: withHidden(s.hidden, hidden),
+      },
+      shown,
     ),
   );
+  if (failed)
+    await showOnce(
+      $,
+      `the repeat check failed, so its findings show: ${failed}`,
+    );
 }
 
 export async function afterTurn($: any): Promise<void> {
@@ -367,9 +561,42 @@ async function openReview($: any): Promise<void> {
   }
 }
 
+async function openHidden($: any): Promise<void> {
+  const r = await $.ui.open({
+    id: HIDDEN_PANE,
+    title: "slop: hidden repeats",
+    closeOnEscape: true,
+  });
+  if (!r.isPlaced) $.ui.toast(`hope slop: ${r.reason}`);
+}
+
+/** A rejected finding is stored for its repo after the review moves on, so a failed store write
+ * leaves the review whole; this session keeps it quiet either way. */
 async function choose($: any, mark: Mark): Promise<void> {
+  const { findings, cursor } = await readSlop($);
   await change($, (s) => decide(s, mark));
   await endReview($);
+  if (mark.kind === "reject" && findings[cursor])
+    await keepReject($, findings[cursor]);
+}
+
+/** Forgets the repo's rejects, and this session's, so each shows again when the judge finds it. */
+async function forgetRejects($: any): Promise<string> {
+  const repo = await repoOf($);
+  const rejects = await readRejects($, repo);
+  await $.store.delete(REJECTS + repo.id);
+  await $.ui.close({ id: HIDDEN_PANE });
+  await change($, (s) => {
+    const listed = new Set(s.findings.map(findingKey));
+    return {
+      ...s,
+      hidden: [],
+      seen: s.seen.filter((k) => k.startsWith("error|") || listed.has(k)),
+    };
+  });
+  return rejects.length
+    ? `Forgot ${rejects.length} rejected slop findings in ${repo.top}.`
+    : `No rejected slop findings in ${repo.top}.`;
 }
 
 /** The last decision ends the review: the pane closes, and when any finding waits for Claude the
@@ -429,6 +656,30 @@ async function fixAll($: any): Promise<string> {
   return fixReport(taken);
 }
 
+const HIDDEN_BY: Record<Hidden["by"], string> = {
+  rule: "same file and rule as your reject",
+  pick: "the model matched it to your reject",
+};
+
+async function hiddenList($: any, e: any) {
+  const { hidden } = await readSlop($);
+  const { Box, Text } = $.ui.resolve(e);
+  return (
+    <Box flexDirection="column" paddingX={1} gap={1}>
+      {hidden.map(({ finding: f, repeats, by }) => (
+        <Box key={findingKey(f)} flexDirection="column">
+          <Text bold wrap="wrap">{`${f.file}:${f.line}`}</Text>
+          <Text wrap="wrap">{said(f)}</Text>
+          <Text
+            dimColor
+            wrap="wrap"
+          >{`${HIDDEN_BY[by]}: ${said(repeats)}`}</Text>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
 // A failure shows as a toast; the session goes on (hooks fail open).
 function loud($: any, work: Promise<unknown>): void {
   work.catch((err) => $.ui.toast(`hope slop: ${err?.message ?? err}`));
@@ -446,11 +697,25 @@ export const register: Register = (on) => {
           "Write every waiting slop finding and show each change as a diff",
       }),
     );
+    loud(
+      $,
+      $.command.register({
+        name: FORGET_REJECTS,
+        description:
+          "Forget every slop finding you rejected in this repo, so each shows again",
+      }),
+    );
     return next(e);
   });
 
   on("command.run", { command: FIX_SLOPS }, async ($) => ({
     text: await fixAll($).catch((err) => `hope slop: ${err?.message ?? err}`),
+  }));
+
+  on("command.run", { command: FORGET_REJECTS }, async ($) => ({
+    text: await forgetRejects($).catch(
+      (err) => `hope slop: ${err?.message ?? err}`,
+    ),
   }));
 
   on("turn.complete", async ($, e, next) => {
@@ -490,7 +755,7 @@ export const register: Register = (on) => {
     const below = await next(e);
     if (e.props.hasSurvey) return below;
     const s = await readSlop($);
-    if (s.findings.length === 0) return below;
+    if (s.findings.length === 0 && s.hidden.length === 0) return below;
     const els = $.ui.resolve(e);
     const { Box, Text, Button } = els;
     // The mobile app draws no field, so there a finding offers no edit.
@@ -547,11 +812,22 @@ export const register: Register = (on) => {
             />
           </Box>
         ) : (
-          <Button
-            key="slop-open"
-            label={`slop ${s.findings.length}`}
-            onPress={() => loud($, openReview($))}
-          />
+          <Box gap={1}>
+            {s.findings.length ? (
+              <Button
+                key="slop-open"
+                label={`slop ${s.findings.length}`}
+                onPress={() => loud($, openReview($))}
+              />
+            ) : null}
+            {s.hidden.length ? (
+              <Button
+                key="slop-hidden"
+                label={`${s.hidden.length} hidden`}
+                onPress={() => loud($, openHidden($))}
+              />
+            ) : null}
+          </Box>
         )}
         {below}
       </Box>
@@ -566,9 +842,11 @@ export const register: Register = (on) => {
     return r;
   });
 
-  // The finding under the cursor, whole: where it is, what is wrong, and the diff that fixes it,
-  // or that the file moved under that diff since the judge read it.
+  // The review's pane holds the finding under the cursor, whole: where it is, what is wrong, and the
+  // diff that fixes it, or that the file moved under that diff since the judge read it. The hidden
+  // pane lists each hidden repeat with the reject it repeats.
   on("ui.render", { component: "Pane" }, async ($, e, next) => {
+    if (e.requestId === HIDDEN_PANE) return hiddenList($, e);
     if (e.requestId !== PANE) return next(e);
     const s = await readSlop($);
     const f = s.findings[s.cursor];
