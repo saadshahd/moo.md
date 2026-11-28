@@ -17,14 +17,12 @@ ul.front { padding: 0; }
 .front code { font-family: var(--__sl-font-mono); font-size: 0.875em; background: none; padding: 0; }
 .front a:has(> code) { color: var(--sl-color-text-accent); text-underline-offset: 0.2em; }
 
+/* The line under the band's actions links in its own grey. */
+.band-copy .quiet a { color: inherit; text-underline-offset: 0.2em; }
+
 /* The band's second action, a pill on the surface beside the filled one. */
 .moo-action.second, .moo-action.second:hover { background: var(--moo-surface); color: var(--moo-ink); }
 .moo-action.second:hover { background: var(--moo-paper); }
-
-/* Three traps side by side, each under a block in the demo's moo-off amber. */
-.front.traps ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: 1.5rem 2rem; margin-top: 2.5rem; }
-.front.traps li { font: 600 1.375rem / 1.2 var(--moo-heading); letter-spacing: -0.02em; text-wrap: balance; }
-.front.traps li::before { content: ""; display: block; width: 0.6rem; height: 1.15rem; margin-bottom: 0.9rem; background: var(--moo-off); }
 
 /* One guard each: a table on a surface, its rows parted by the page's tone. */
 .front.guards {

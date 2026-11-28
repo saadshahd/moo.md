@@ -20,7 +20,7 @@ export const INSTALL_LINE =
 export const INSTALL_SCRIPT_URL = INSTALL_LINE.split(" ").find((word) =>
   word.startsWith("https://"),
 )!;
-export const FIRST_COMMAND = "/hope:full <your seed>";
+export const FIRST_COMMAND = "/hope:compose <your seed>";
 export const RELOAD_PLUGINS = "/reload-plugins";
 
 /** The plugins the one line installs. */

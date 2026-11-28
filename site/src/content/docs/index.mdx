@@ -28,20 +28,16 @@ import "../../styles/front.css";
 <Band>
   <h2>Your agent ships faster than you can own.</h2>
   <p class="lead">Every session ends with code you signed for and could not explain.</p>
-  <p>moo.md runs agents at the pace you think. Every choice the agent would make for you comes back as a question, with a preview.</p>
-  <p class="quiet">Plugins for Claude Code. Skill files for any other agent.</p>
-  <p class="actions"><a class="moo-action" href="#install">Install</a><a class="moo-action second" href="#session">See a session</a></p>
+  <p>moo.md is a set of Claude Code plugins. Every choice your agent would make for you comes back as a question, with a preview of each answer.</p>
+  <p class="quiet">Skill files for any other agent.</p>
+  <p class="actions"><a class="moo-action" href={href("install")}>Install</a><a class="moo-action second" href="#session">See a session</a></p>
+  <p class="quiet">Free and open source (MIT). One line in your terminal; <a href="#install">see what it runs</a>. Run it again to update.</p>
   <BandFork slot="piece" />
 </Band>
 
-<section class="front traps not-content">
-  <h2>Not an autopilot.</h2>
-  <p class="lead">You are the world model. The agent is your hands.</p>
-  <ul>
-    <li>AI fills in your decisions.</li>
-    <li>Compaction mutates and drifts your context.</li>
-    <li>External state gets remembered, not read.</li>
-  </ul>
+<section class="front not-content">
+  <h2>Claude Code alone picks for you and tells you after.</h2>
+  <p class="lead">moo.md stops at each of those picks and asks you first.</p>
 </section>
 
 <table class="front guards not-content">
@@ -56,7 +52,7 @@ import "../../styles/front.css";
     </tr>
     <tr>
       <th scope="row">Compaction drifts your context</th>
-      <td>Doing stays out, deciding stays in</td>
+      <td>Agents do the work; your chat holds the decisions</td>
       <td><a href={href("moves/router")}><code>/hope:router</code></a></td>
     </tr>
     <tr>
