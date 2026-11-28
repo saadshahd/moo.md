@@ -19,6 +19,8 @@ Run `node ../../lint/cli.mjs hits <repo>` (add `--range <range>` for a range). E
 
 The project's taste rules live under `.claude/sound/`. Read the ones that bear on the code the diff touches, and apply each rule's `Detect:` and `Not-when:` **verbatim** — never from memory. If `.claude/sound/` is absent, say so and stop.
 
+A rule whose `Detect:` reads cognitive complexity reads it from `cccc --format json <file>`.
+
 Review deeply: surface every rule the changes violate, and the enhancements that genuinely matter for this diff's kind. Ground every finding in the diff and the intent behind it — never rule from the text alone. Stay silent where a rule's `Not-when:` applies.
 
 When the diff fixes a fault, search the repo for every other site of the same fault — the same call, pattern or missing guard — and report each one the diff leaves as it was: `- <file>:<line>: same fault as <fixed file>:<line>`.

@@ -44,7 +44,7 @@ Method — DEEP by design; spend the tokens. Every candidate rule is judged agai
 
 ## Phase 3 — Confirm (never skip; a request to install is the confirmation, so write, then present)
 
-Present compactly: the extracted facts (each with file evidence), the proposed tag set, and the proposed rule set — each rule as name + citation + its one-line statement (never name-only; the user must see what each rule requires) — plus the rejected candidates grouped with their reasons, plus the hook wiring change for each rule with a gate (Phase 4), plus one row per rule with a check. Get the rows from the install output — when confirming before writing, run `node ../../lint/cli.mjs install <repo> --rule <name>=<cite> …` without `--write`: it measures and restores every file:
+Present compactly: the extracted facts (each with file evidence), the proposed tag set, and the proposed rule set — each rule as name + citation + its one-line statement (never name-only; the user must see what each rule requires) — plus the rejected candidates grouped with their reasons, plus the hook wiring change for each rule with a gate (Phase 4), plus the tool each rule's measure needs (Phase 4), plus one row per rule with a check. Get the rows from the install output — when confirming before writing, run `node ../../lint/cli.mjs install <repo> --rule <name>=<cite> …` without `--write`: it measures and restores every file:
 
 | Row status | Show | Result |
 |---|---|---|
@@ -73,6 +73,12 @@ A rule with a `<rule-name>.gate` beside it in the corpus installs that file too,
 An entry already naming `<gate>` stays as it is. A declined wiring leaves the gate installed but unrun — say so.
 
 A rule with a `<rule-name>.check.mjs` beside it runs as a lint rule inside the repo's own linter. Install with `node ../../lint/cli.mjs install <repo> --write --rule <name>=<cite> …` (`<cite>` is the Phase 2 file). The script copies each check to `.claude/sound/<topic>/`, generates `.claude/sound/plugin.mjs` (the linter's entry point, not a record), wires it into the config the cited file falls under, then verifies: the check's own cases through the repo's config, and the whole lint before and after. A failed verification restores every touched file byte-for-byte and says why. It adds no dependency, linter, or hook manager. Severity is `error` only for a `problem` check the repo has zero hits for; otherwise `warn`. A `manual` row carries the exact lines to add by hand: print them and leave the config alone.
+
+A rule whose `Detect:` reads a measure from a tool needs that tool on `PATH`. Missing → install it; a failed install leaves the rule's prose installed and says why.
+
+| Measure | Tool | Install |
+|---|---|---|
+| cognitive complexity | `moznion/cccc` | `cargo install cccc-cli`; no `cargo` → the release archive for this platform, checked with `gh attestation verify <archive> --repo moznion/cccc`, its `cccc` binary into a folder on `PATH` |
 
 ## Re-runs
 
